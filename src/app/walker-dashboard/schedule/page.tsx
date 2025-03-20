@@ -17,7 +17,7 @@ interface CalendarDay {
 export default function WalkerSchedulePage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState('upcoming');
+  const [activeTab, setActiveTab] = useState('calendar');
 
   // Redirect if not a walker or admin
   useEffect(() => {
