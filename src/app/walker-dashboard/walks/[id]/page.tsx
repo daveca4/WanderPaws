@@ -119,6 +119,28 @@ export default function WalkDetailPage({ params }: { params: { id: string } }) {
         </button>
       </div>
       
+      {walk.status === 'completed' && !walk.feedback && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+            <div className="mb-4 sm:mb-0">
+              <h2 className="text-lg font-medium text-amber-800">Feedback Required</h2>
+              <p className="text-amber-700 mt-1">
+                Please provide feedback for this walk with {dog.name}. Your insights help the owner track their dog's progress.
+              </p>
+            </div>
+            <Link
+              href={`/walker-dashboard/walks/${walk.id}/feedback`}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-amber-600 hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Provide Feedback Now
+            </Link>
+          </div>
+        </div>
+      )}
+      
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content */}
         <div className="lg:col-span-2 space-y-6">
@@ -307,9 +329,12 @@ export default function WalkDetailPage({ params }: { params: { id: string } }) {
             <div className="space-y-3">
               {walk.status === 'scheduled' && (
                 <>
-                  <button className="w-full flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700">
+                  <Link 
+                    href={`/walker-dashboard/walks/${walk.id}/start`}
+                    className="w-full flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700"
+                  >
                     Start Walk
-                  </button>
+                  </Link>
                   
                   <button className="w-full flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">
                     Cancel Walk
