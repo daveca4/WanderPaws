@@ -9,8 +9,8 @@ export const mockAssessments: Assessment[] = [
     dogId: 'dog1',
     ownerId: 'o1',
     assignedWalkerId: 'w1',
-    createdDate: '2023-04-01T00:00:00Z',
-    scheduledDate: '2023-04-12T10:00:00Z',
+    createdDate: '2025-04-01T00:00:00Z',
+    scheduledDate: '2025-04-12T10:00:00Z',
     status: 'completed',
     result: 'approved',
     adminNotes: 'Dog is friendly and well-behaved',
@@ -19,7 +19,7 @@ export const mockAssessments: Assessment[] = [
       id: 'feedback1',
       assessmentId: 'assess1',
       walkerId: 'w1',
-      submittedDate: '2023-04-12T11:00:00Z',
+      submittedDate: '2025-04-12T11:00:00Z',
       behaviorRatings: {
         socialization: 5,
         leashManners: 4,
@@ -39,8 +39,8 @@ export const mockAssessments: Assessment[] = [
     id: 'assess2',
     dogId: 'dog2',
     ownerId: 'o2',
-    createdDate: '2023-04-05T00:00:00Z',
-    scheduledDate: '2023-04-15T14:00:00Z',
+    createdDate: '2025-04-05T00:00:00Z',
+    scheduledDate: '2025-04-15T14:00:00Z',
     status: 'pending',
     adminNotes: 'Scheduling in progress'
   },
@@ -49,8 +49,8 @@ export const mockAssessments: Assessment[] = [
     dogId: 'dog3',
     ownerId: 'o3',
     assignedWalkerId: 'w2',
-    createdDate: '2023-04-08T00:00:00Z',
-    scheduledDate: '2023-04-18T11:00:00Z',
+    createdDate: '2025-04-08T00:00:00Z',
+    scheduledDate: '2025-04-18T11:00:00Z',
     status: 'scheduled',
     adminNotes: 'Will assess at owner\'s home'
   }

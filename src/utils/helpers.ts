@@ -62,7 +62,7 @@ export function getUpcomingWalks(dogId?: string, limit?: number, walkerId?: stri
     return walkDate.getFullYear() > now.getFullYear();
   });
   
-  // If using mock data with future dates in 2024, don't filter by date
+  // If using mock data with future dates in 2025, don't filter by date
   // This is a temporary fix for development only
   let walks = mockWalks.filter(walk => {
     if (isMockData) {

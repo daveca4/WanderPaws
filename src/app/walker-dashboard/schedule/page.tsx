@@ -54,10 +54,10 @@ export default function WalkerSchedulePage() {
 
   // Generate calendar weeks
   const getCalendarData = (): (CalendarDay | null)[][] => {
-    // Get current month
-    const currentDate = new Date();
-    const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    // Use June 2025 for the mock data
+    const mockDataDate = new Date(2025, 5, 1); // June 2025 (month is 0-indexed)
+    const firstDay = new Date(mockDataDate.getFullYear(), mockDataDate.getMonth(), 1);
+    const lastDay = new Date(mockDataDate.getFullYear(), mockDataDate.getMonth() + 1, 0);
     
     // Get the day of the week of the first day (0 is Sunday, 1 is Monday, etc.)
     const firstDayOfWeek = firstDay.getDay();
@@ -72,7 +72,7 @@ export default function WalkerSchedulePage() {
     
     // Add days of the month
     for (let i = 1; i <= lastDay.getDate(); i++) {
-      const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), i);
+      const date = new Date(mockDataDate.getFullYear(), mockDataDate.getMonth(), i);
       const dateString = date.toISOString().split('T')[0];
       const walksForDay = walksByDate[dateString] || [];
       
@@ -105,7 +105,7 @@ export default function WalkerSchedulePage() {
 
   const calendarWeeks = getCalendarData();
   const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const currentMonth = 'June 2025';
 
   return (
     <div className="space-y-6">
