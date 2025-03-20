@@ -16,9 +16,9 @@ export default function OwnerInsightsPage() {
   
   const insights = {
     activity: {
-      totalWalks: 24,
-      totalDistance: 28.5,
-      avgDuration: 34,
+      totalWalks: 23,
+      totalDistance: 46.5,
+      avgDuration: 60,
       mostActiveDay: 'Wednesday',
     },
     health: {
@@ -45,10 +45,11 @@ export default function OwnerInsightsPage() {
     ]
   };
   
-  const activityChartData = {
-    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-    distances: [2.1, 0, 3.2, 2.4, 0, 4.5, 3.8],
-    durations: [30, 0, 45, 30, 0, 60, 45],
+  // Walk distance and duration data for chart
+  const walkData = {
+    dates: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    distances: [3.2, 0, 4.5, 2.8, 0, 2.2, 5.1],
+    durations: [60, 0, 60, 60, 0, 60, 60],
   };
 
   return (
@@ -133,18 +134,18 @@ export default function OwnerInsightsPage() {
           </div>
           <div className="px-4 py-5 sm:p-6">
             <div className="h-64 relative">
-              {activityChartData.labels.map((day, index) => (
+              {walkData.dates.map((day, index) => (
                 <div key={day} className="absolute bottom-0" style={{ 
-                  left: `${(index / (activityChartData.labels.length - 1)) * 100}%`, 
-                  height: activityChartData.distances[index] ? `${(activityChartData.distances[index] / Math.max(...activityChartData.distances)) * 80}%` : '0', 
+                  left: `${(index / (walkData.dates.length - 1)) * 100}%`, 
+                  height: walkData.distances[index] ? `${(walkData.distances[index] / Math.max(...walkData.distances)) * 80}%` : '0', 
                   width: '20px',
                   transform: 'translateX(-50%)'
                 }}>
                   <div className="w-full bg-primary-500 rounded-t" style={{height: '100%'}}></div>
                   <div className="text-xs text-center mt-2">{day}</div>
-                  {activityChartData.distances[index] > 0 && (
+                  {walkData.distances[index] > 0 && (
                     <div className="text-xs text-center text-gray-600 font-medium absolute w-full" style={{bottom: '100%', marginBottom: '4px'}}>
-                      {activityChartData.distances[index]} mi
+                      {walkData.distances[index]} mi
                     </div>
                   )}
                 </div>

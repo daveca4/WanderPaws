@@ -7,7 +7,6 @@ import RouteGuard from '@/components/RouteGuard';
 export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
-    walkDurationIncrement: 15,
     maxWalksPerDay: 2,
     maxDogsPerWalker: 6,
     emailNotifications: true,
@@ -23,7 +22,7 @@ export default function AdminSettingsPage() {
       [name]: type === 'checkbox' 
         ? (e.target as HTMLInputElement).checked 
         : type === 'number' 
-          ? parseInt(value) 
+          ? Number(value) 
           : value
     }));
   };
@@ -35,9 +34,7 @@ export default function AdminSettingsPage() {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    // In a real app, this would make an API call to save settings
     console.log('Settings saved:', settings);
-    
     setSaving(false);
   };
 
@@ -65,40 +62,23 @@ export default function AdminSettingsPage() {
           
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Walk Duration Increment */}
-              <div>
-                <label htmlFor="walkDurationIncrement" className="block text-sm font-medium text-gray-700">
-                  Walk Duration Increment (minutes)
-                </label>
-                <select
-                  id="walkDurationIncrement"
-                  name="walkDurationIncrement"
-                  value={settings.walkDurationIncrement}
-                  onChange={handleChange}
-                  className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                >
-                  <option value={5}>5 minutes</option>
-                  <option value={10}>10 minutes</option>
-                  <option value={15}>15 minutes</option>
-                  <option value={30}>30 minutes</option>
-                </select>
-              </div>
-
               {/* Max Walks Per Day */}
               <div>
                 <label htmlFor="maxWalksPerDay" className="block text-sm font-medium text-gray-700">
                   Maximum Walks Per Day
                 </label>
-                <input
-                  type="number"
+                <select
                   id="maxWalksPerDay"
                   name="maxWalksPerDay"
-                  min={1}
-                  max={5}
                   value={settings.maxWalksPerDay}
                   onChange={handleChange}
                   className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                />
+                >
+                  <option value={1}>1 walk</option>
+                  <option value={2}>2 walks</option>
+                  <option value={3}>3 walks</option>
+                  <option value={4}>4 walks</option>
+                </select>
               </div>
 
               {/* Max Dogs Per Walker */}
@@ -106,16 +86,18 @@ export default function AdminSettingsPage() {
                 <label htmlFor="maxDogsPerWalker" className="block text-sm font-medium text-gray-700">
                   Maximum Dogs Per Walker
                 </label>
-                <input
-                  type="number"
+                <select
                   id="maxDogsPerWalker"
                   name="maxDogsPerWalker"
-                  min={1}
-                  max={10}
                   value={settings.maxDogsPerWalker}
                   onChange={handleChange}
                   className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                />
+                >
+                  <option value={3}>3 dogs</option>
+                  <option value={4}>4 dogs</option>
+                  <option value={5}>5 dogs</option>
+                  <option value={6}>6 dogs</option>
+                </select>
               </div>
             </div>
 

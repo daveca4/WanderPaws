@@ -16,6 +16,7 @@ import {
 import { Dog, Walker } from '@/lib/types';
 import { mockWalkers } from '@/lib/mockData';
 import { generateId } from '@/utils/helpers';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function CreateBookingPage() {
   const { user } = useAuth();
@@ -39,24 +40,47 @@ export default function CreateBookingPage() {
     if (!user) return;
     
     const loadData = () => {
-      // Get owner's dogs
-      const ownerDogs = getDogsByOwnerId(user.profileId || '');
-      
-      // Filter out dogs that haven't been approved yet
-      const approvedDogs = ownerDogs.filter(dog => 
-        dog.assessmentStatus === 'approved' || dog.assessmentStatus === 'not_required'
-      );
-      
-      setDogs(approvedDogs);
-      
-      // Get active subscription
-      const activeSubscription = getUserActiveSubscription(user.id);
-      setSubscription(activeSubscription);
-      
-      // Get available walkers
-      setWalkers(mockWalkers);
-      
-      setLoading(false);
+      try {
+        const dogs = mockWalkers.filter(dog => dog.ownerId === user.profileId);
+        const plans = mockSubscriptionPlans.filter(plan => plan.isActive);
+        const subscriptions = mockUserSubscriptions.filter(
+          sub => sub.ownerId === user.profileId && sub.status === 'active'
+        );
+        
+        const walkersWithRating = mockWalkers.map(walker => {
+          const walkerRating = calculateWalkerRating(walker.id);
+          return { ...walker, calculatedRating: walkerRating };
+        });
+        
+        setDogs(dogs);
+        setWalkers(walkersWithRating);
+        setSubscriptionPlans(plans);
+        setUserSubscriptions(subscriptions);
+        
+        if (dogs.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            dogId: dogs[0].id
+          }));
+        }
+        
+        if (subscriptions.length > 0) {
+          const subscription = subscriptions[0];
+          const plan = plans.find(p => p.id === subscription.planId);
+          
+          setSubscription({
+            id: subscription.id,
+            name: plan?.name || 'Unknown Plan',
+            walkCredits: subscription.creditsRemaining,
+            duration: 60,
+          });
+        }
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading data:", error);
+        setLoading(false);
+      }
     };
     
     setTimeout(loadData, 500);
@@ -114,20 +138,20 @@ export default function CreateBookingPage() {
       
       const selectedDog = dogs.find(dog => dog.id === formData.dogId);
       
-      const newWalk = {
-        id: generateId('walk'),
+      // Create a walk object to be sent to API
+      const walkData = {
+        id: uuidv4(),
         dogId: formData.dogId,
         walkerId: formData.walkerId,
         date: formData.date,
         startTime: startTime,
         timeSlot: formData.timeSlot as 'AM' | 'PM',
-        duration: subscription.walkDuration || 60,
+        duration: 60, // Fixed 60 minute duration for all walks
         status: 'scheduled',
         notes: formData.notes,
-        subscriptionId: subscription.id
       };
       
-      console.log('New walk created:', newWalk);
+      console.log('New walk created:', walkData);
       
       // In a real app, this would also update the subscription credits
       
@@ -260,7 +284,7 @@ export default function CreateBookingPage() {
                   <option value="">Select a walker</option>
                   {walkers.map(walker => (
                     <option key={walker.id} value={walker.id}>
-                      {walker.name} (Rating: {walker.rating}/5)
+                      {walker.name} (Rating: {walker.calculatedRating}/5)
                     </option>
                   ))}
                 </select>
@@ -327,11 +351,11 @@ export default function CreateBookingPage() {
                   type="text"
                   id="duration"
                   disabled
-                  value={`${subscription.walkDuration || 60} minutes`}
+                  value="60 minutes"
                   className="mt-1 block w-full bg-gray-100 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none sm:text-sm"
                 />
                 <p className="mt-1 text-xs text-gray-500">
-                  Walk duration is based on your subscription plan
+                  All walks are 60 minutes in duration
                 </p>
               </div>
               

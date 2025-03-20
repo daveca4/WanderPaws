@@ -26,7 +26,7 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
     imageUrl: initialData?.imageUrl || '',
     walkingPreferences: {
       frequency: initialData?.walkingPreferences?.frequency || 3,
-      duration: initialData?.walkingPreferences?.duration || 30,
+      duration: 60,
       preferredTimes: initialData?.walkingPreferences?.preferredTimes || ['morning'],
       preferredRoutes: initialData?.walkingPreferences?.preferredRoutes || [],
     },
@@ -395,19 +395,19 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
               
               <div>
                 <label htmlFor="walkingPreferences.duration" className="block text-sm font-medium text-gray-700">
-                  Duration (minutes per walk)
+                  Walk Duration
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   name="walkingPreferences.duration"
                   id="walkingPreferences.duration"
-                  min="5"
-                  max="120"
-                  step="5"
-                  value={formData.walkingPreferences?.duration}
-                  onChange={handleNumberChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+                  value="60"
+                  disabled
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100 text-gray-700 sm:text-sm"
                 />
+                <p className="mt-2 text-sm text-gray-500">
+                  All walks are 60 minutes in duration
+                </p>
               </div>
             </div>
             

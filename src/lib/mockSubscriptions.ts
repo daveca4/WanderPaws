@@ -9,64 +9,64 @@ const VALIDITY_PERIOD_DAYS = 60;
 // Create mock subscription plans with pricing based on £20 per walk
 export const mockSubscriptionPlans: SubscriptionPlan[] = [
   {
-    id: 'plan1',
+    id: 'plan-1',
     name: 'Basic',
-    description: 'Perfect for occasional walkers',
-    walkCredits: 10,
-    walkDuration: 30,
-    price: 9900, // £99.00
-    validityPeriod: 30, // 30 days
+    description: 'Perfect for occasional walks',
+    walkCredits: 5,
+    walkDuration: 60, // 60 minute walks
+    price: 7500,
+    validityPeriod: 30,
     isActive: true,
-    createdAt: '2023-01-01T00:00:00Z',
-    updatedAt: '2023-01-01T00:00:00Z'
+    createdAt: '2023-01-01T12:00:00Z',
+    updatedAt: '2023-01-01T12:00:00Z',
   },
   {
-    id: 'plan2',
+    id: 'plan-2',
     name: 'Standard',
-    description: 'Great value for regular walkers',
-    walkCredits: 20,
-    walkDuration: 45,
-    price: 17900, // £179.00
-    validityPeriod: 60, // 60 days
+    description: 'Ideal for regular dog walkers',
+    walkCredits: 10,
+    walkDuration: 60, // 60 minute walks
+    price: 13500,
+    validityPeriod: 30,
     isActive: true,
-    createdAt: '2023-01-01T00:00:00Z',
-    updatedAt: '2023-01-01T00:00:00Z'
+    createdAt: '2023-01-01T12:00:00Z',
+    updatedAt: '2023-01-01T12:00:00Z',
   },
   {
-    id: 'plan3',
+    id: 'plan-3',
     name: 'Premium',
-    description: 'Our best value package',
-    walkCredits: 40,
-    walkDuration: 60,
-    price: 29900, // £299.00
-    validityPeriod: 90, // 90 days
+    description: 'For frequent walking needs',
+    walkCredits: 20,
+    walkDuration: 60, // 60 minute walks
+    price: 24000,
+    validityPeriod: 30,
     isActive: true,
-    createdAt: '2023-01-01T00:00:00Z',
-    updatedAt: '2023-01-01T00:00:00Z'
+    createdAt: '2023-01-01T12:00:00Z',
+    updatedAt: '2023-01-01T12:00:00Z',
   },
   {
-    id: 'plan4',
-    name: 'Single Walk', 
-    description: '1 walk of 60 minutes, valid for 2 months',
-    walkCredits: 1,
-    walkDuration: 60,
-    price: 2000, // £20.00 (standard rate, no discount)
-    validityPeriod: VALIDITY_PERIOD_DAYS,
+    id: 'plan-4',
+    name: 'Annual Basic',
+    description: 'Year-round occasional walks',
+    walkCredits: 60,
+    walkDuration: 60, // 60 minute walks
+    price: 86000,
+    validityPeriod: 365,
     isActive: true,
-    createdAt: '2023-01-01T00:00:00Z',
-    updatedAt: '2023-01-01T00:00:00Z',
+    createdAt: '2023-01-01T12:00:00Z',
+    updatedAt: '2023-01-01T12:00:00Z',
   },
   {
-    id: 'plan5',
-    name: 'Premium Plus',
-    description: '12 walks of 60 minutes each, valid for 2 months',
-    walkCredits: 12,
-    walkDuration: 60,
-    price: 20400, // £204.00 (£17.00 per walk, 15% discount)
-    validityPeriod: VALIDITY_PERIOD_DAYS,
-    isActive: false, // Discontinued plan
-    createdAt: '2023-01-01T00:00:00Z',
-    updatedAt: '2023-02-01T00:00:00Z',
+    id: 'plan-5',
+    name: 'Annual Premium',
+    description: 'Year-round frequent walks',
+    walkCredits: 240,
+    walkDuration: 60, // 60 minute walks
+    price: 264000,
+    validityPeriod: 365,
+    isActive: true,
+    createdAt: '2023-01-01T12:00:00Z',
+    updatedAt: '2023-01-01T12:00:00Z',
   },
 ];
 
@@ -90,36 +90,36 @@ export const mockUserSubscriptions: UserSubscription[] = [
     id: 'sub1',
     userId: 'user1',
     ownerId: 'o1',
-    planId: 'plan2',
+    planId: 'plan-2',
     startDate: '2023-04-01T00:00:00Z',
     endDate: '2023-05-31T23:59:59Z',
     creditsRemaining: 15,
     status: 'active',
-    purchaseAmount: 17900,
+    purchaseAmount: 13500,
     purchaseDate: '2023-04-01T00:00:00Z'
   },
   {
     id: 'sub2',
     userId: 'user2',
     ownerId: 'o2',
-    planId: 'plan1',
+    planId: 'plan-1',
     startDate: '2023-03-15T00:00:00Z',
     endDate: '2023-04-14T23:59:59Z',
     creditsRemaining: 2,
     status: 'expired',
-    purchaseAmount: 9900,
+    purchaseAmount: 7500,
     purchaseDate: '2023-03-15T00:00:00Z'
   },
   {
     id: 'sub3',
     userId: 'user3',
     ownerId: 'o3',
-    planId: 'plan3',
+    planId: 'plan-3',
     startDate: '2023-04-10T00:00:00Z',
     endDate: '2023-07-09T23:59:59Z',
     creditsRemaining: 32,
     status: 'active',
-    purchaseAmount: 29900,
+    purchaseAmount: 24000,
     purchaseDate: '2023-04-10T00:00:00Z'
   },
   // John Smith's previous subscription
@@ -127,12 +127,12 @@ export const mockUserSubscriptions: UserSubscription[] = [
     id: 'sub4',
     userId: 'user2', // John Smith
     ownerId: 'o1',
-    planId: 'plan1', // Basic
+    planId: 'plan-1', // Basic
     startDate: '2023-04-01T00:00:00Z',
     endDate: '2023-05-31T00:00:00Z',
     creditsRemaining: 0,
     status: 'expired',
-    purchaseAmount: 9900,
+    purchaseAmount: 7500,
     purchaseDate: '2023-04-01T00:00:00Z',
   },
 ];
@@ -143,7 +143,7 @@ export const mockSubscriptionTransactions: SubscriptionTransaction[] = [
   {
     id: 'trans1',
     userSubscriptionId: 'sub1',
-    amount: 17900,
+    amount: 13500,
     type: 'purchase',
     status: 'successful',
     date: '2023-04-01T00:00:00Z',
@@ -153,7 +153,7 @@ export const mockSubscriptionTransactions: SubscriptionTransaction[] = [
   {
     id: 'trans2',
     userSubscriptionId: 'sub2',
-    amount: 9900,
+    amount: 7500,
     type: 'purchase',
     status: 'successful',
     date: '2023-03-15T00:00:00Z',
@@ -163,7 +163,7 @@ export const mockSubscriptionTransactions: SubscriptionTransaction[] = [
   {
     id: 'trans3',
     userSubscriptionId: 'sub3',
-    amount: 29900,
+    amount: 24000,
     type: 'purchase',
     status: 'successful',
     date: '2023-04-10T00:00:00Z',
@@ -173,7 +173,7 @@ export const mockSubscriptionTransactions: SubscriptionTransaction[] = [
   {
     id: 'trans4',
     userSubscriptionId: 'sub4',
-    amount: 9900,
+    amount: 7500,
     type: 'purchase',
     status: 'successful',
     date: '2023-04-01T00:00:00Z',

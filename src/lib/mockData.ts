@@ -13,7 +13,7 @@ export const mockDogs: Dog[] = [
     imageUrl: 'https://images.unsplash.com/photo-1552053831-71594a27632d?q=80&w=500',
     walkingPreferences: {
       frequency: 5,
-      duration: 45,
+      duration: 60,
       preferredTimes: ['morning', 'evening'],
     },
   },
@@ -29,7 +29,7 @@ export const mockDogs: Dog[] = [
     imageUrl: 'https://images.unsplash.com/photo-1589941013453-ec89f98c5116?q=80&w=500',
     walkingPreferences: {
       frequency: 3,
-      duration: 30,
+      duration: 60,
       preferredTimes: ['afternoon'],
     },
   },
@@ -60,9 +60,9 @@ export const mockDogs: Dog[] = [
     ownerId: 'o3',
     imageUrl: 'https://images.unsplash.com/photo-1583512603805-3cc6b41f3edb?q=80&w=500',
     walkingPreferences: {
-      frequency: 4,
-      duration: 20,
-      preferredTimes: ['morning'],
+      frequency: 1,
+      duration: 60,
+      preferredTimes: ['evening'],
     },
   },
 ];
@@ -189,7 +189,7 @@ export const mockWalks: Walk[] = [
     date: '2024-06-15',
     startTime: '10:00',
     timeSlot: 'AM',
-    duration: 45,
+    duration: 60,
     status: 'completed',
     notes: 'Buddy was very energetic today',
     feedback: {
@@ -213,7 +213,7 @@ export const mockWalks: Walk[] = [
     date: '2024-06-16',
     startTime: '08:00',
     timeSlot: 'AM',
-    duration: 30,
+    duration: 60,
     status: 'completed',
     notes: 'Max did well avoiding stairs',
     feedback: {
@@ -261,7 +261,7 @@ export const mockWalks: Walk[] = [
     date: '2024-06-18',
     startTime: '09:30',
     timeSlot: 'AM',
-    duration: 20,
+    duration: 60,
     status: 'completed',
     notes: 'Luna stayed calm in quiet areas',
     feedback: {
@@ -285,7 +285,7 @@ export const mockWalks: Walk[] = [
     date: '2024-06-20',
     startTime: '10:00',
     timeSlot: 'AM',
-    duration: 45,
+    duration: 60,
     status: 'scheduled',
   },
   {
@@ -295,7 +295,7 @@ export const mockWalks: Walk[] = [
     date: '2024-06-21',
     startTime: '08:00',
     timeSlot: 'AM',
-    duration: 30,
+    duration: 60,
     status: 'scheduled',
   },
   {
@@ -305,7 +305,7 @@ export const mockWalks: Walk[] = [
     date: '2024-06-20',
     startTime: '15:00',
     timeSlot: 'PM',
-    duration: 20,
+    duration: 60,
     status: 'scheduled',
   },
   {
@@ -315,7 +315,7 @@ export const mockWalks: Walk[] = [
     date: '2024-06-22',
     startTime: '10:30',
     timeSlot: 'AM',
-    duration: 45,
+    duration: 60,
     status: 'scheduled',
   },
 ]; 

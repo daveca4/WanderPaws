@@ -14,14 +14,15 @@ export default function AddDogPage() {
   const [formData, setFormData] = useState({
     name: '',
     breed: '',
-    age: 1,
+    age: '',
     size: 'medium' as 'small' | 'medium' | 'large',
-    temperament: ['friendly'],
+    temperament: [] as string[],
     specialNeeds: [] as string[],
+    imageUrl: '',
     walkingPreferences: {
       frequency: 3,
-      duration: 30,
-      preferredTimes: ['morning']
+      duration: 60,
+      preferredTimes: [] as string[],
     },
     newTemperament: '',
     newSpecialNeed: ''
@@ -324,24 +325,21 @@ export default function AddDogPage() {
                   />
                 </div>
 
-                <div>
+                <div className="space-y-2">
                   <label htmlFor="walkingPreferences.duration" className="block text-sm font-medium text-gray-700">
-                    Preferred walk duration (minutes)
+                    Walk Duration
                   </label>
-                  <select
+                  <input
+                    type="text"
                     id="walkingPreferences.duration"
                     name="walkingPreferences.duration"
-                    required
-                    value={formData.walkingPreferences.duration}
-                    onChange={handleChange}
-                    className="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                  >
-                    <option value={15}>15 minutes</option>
-                    <option value={30}>30 minutes</option>
-                    <option value={45}>45 minutes</option>
-                    <option value={60}>60 minutes</option>
-                    <option value={90}>90 minutes</option>
-                  </select>
+                    value="60"
+                    disabled
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100 text-gray-700 sm:text-sm"
+                  />
+                  <p className="mt-2 text-sm text-gray-500">
+                    All walks are 60 minutes in duration
+                  </p>
                 </div>
 
                 <div className="sm:col-span-2">
