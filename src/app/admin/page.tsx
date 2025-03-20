@@ -2,50 +2,95 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
-import { DashboardSummary } from '@/components/DashboardSummary';
-import { UpcomingWalks } from '@/components/UpcomingWalks';
-import { RecentActivities } from '@/components/RecentActivities';
-import { AIRecommendations } from '@/components/AIRecommendations';
-import { mockUserSubscriptions } from '@/lib/mockSubscriptions';
-import { getSubscriptionPlanById, formatPrice } from '@/lib/mockSubscriptions';
-import { getPendingAssessments } from '@/lib/mockAssessments';
-import { mockDogs, mockOwners } from '@/lib/mockData';
-import { formatDate } from '@/utils/helpers';
-import { Assessment, UserSubscription } from '@/lib/types';
+import { Responsive, WidthProvider } from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
 
-// Helper functions to get objects by ID
-const getDogById = (dogId: string) => {
-  return mockDogs.find(dog => dog.id === dogId) || { name: 'Unknown dog', breed: 'Unknown' };
-};
+import { SummaryWidget } from '@/components/dashboard/SummaryWidget';
+import { PendingAssessmentsWidget } from '@/components/dashboard/PendingAssessmentsWidget';
+import { ActiveSubscriptionsWidget } from '@/components/dashboard/ActiveSubscriptionsWidget';
+import { UpcomingWalksWidget } from '@/components/dashboard/UpcomingWalksWidget';
+import { AIRecommendationsWidget } from '@/components/dashboard/AIRecommendationsWidget';
+import { RecentActivitiesWidget } from '@/components/dashboard/RecentActivitiesWidget';
 
-const getOwnerById = (ownerId: string) => {
-  return mockOwners.find(owner => owner.id === ownerId) || { name: 'Unknown owner' };
-};
+import {
+  dashboardWidgets,
+  defaultDesktopLayout,
+  defaultMobileLayout,
+  loadLayout,
+  saveLayout,
+  getWidgetById
+} from '@/lib/dashboardLayout';
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
 
 export default function AdminDashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [pendingAssessments, setPendingAssessments] = useState<Assessment[]>([]);
-  const [activeSubscriptions, setActiveSubscriptions] = useState<UserSubscription[]>([]);
+  
+  // State for layouts
+  const [layouts, setLayouts] = useState(() => {
+    const savedLayout = loadLayout();
+    return savedLayout || {
+      lg: defaultDesktopLayout,
+      md: defaultDesktopLayout.map(item => ({ ...item, w: Math.min(item.w, 6) })),
+      sm: defaultDesktopLayout.map(item => ({ ...item, w: Math.min(item.w, 4) })),
+      xs: defaultMobileLayout,
+    };
+  });
+  
+  // State for indicating edit mode
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     // If user is not an admin, redirect to login page
     if (!loading && (!user || user.role !== 'admin')) {
       router.push('/auth/login');
     }
-
-    // Load pending assessments
-    setPendingAssessments(getPendingAssessments());
-
-    // Load active subscriptions
-    setActiveSubscriptions(
-      mockUserSubscriptions
-        .filter(sub => sub.status === 'active')
-        .slice(0, 5) // Only show top 5
-    );
   }, [user, loading, router]);
+
+  // Handler for layout changes
+  const handleLayoutChange = (currentLayout: any, allLayouts: any) => {
+    setLayouts(allLayouts);
+    saveLayout(allLayouts);
+  };
+
+  // Reset to default layouts
+  const resetLayout = () => {
+    const defaultLayouts = {
+      lg: defaultDesktopLayout,
+      md: defaultDesktopLayout.map(item => ({ ...item, w: Math.min(item.w, 6) })),
+      sm: defaultDesktopLayout.map(item => ({ ...item, w: Math.min(item.w, 4) })),
+      xs: defaultMobileLayout,
+    };
+    setLayouts(defaultLayouts);
+    saveLayout(defaultLayouts);
+  };
+
+  // Render the widget component based on the widget type
+  const renderWidget = (widgetId: string) => {
+    const widget = getWidgetById(widgetId);
+    
+    if (!widget) return null;
+    
+    switch (widget.type) {
+      case 'summary':
+        return <SummaryWidget />;
+      case 'pendingAssessments':
+        return <PendingAssessmentsWidget />;
+      case 'activeSubscriptions':
+        return <ActiveSubscriptionsWidget />;
+      case 'upcomingWalks':
+        return <UpcomingWalksWidget />;
+      case 'aiRecommendations':
+        return <AIRecommendationsWidget />;
+      case 'recentActivities':
+        return <RecentActivitiesWidget />;
+      default:
+        return <div>Unknown widget type</div>;
+    }
+  };
 
   if (loading || !user || user.role !== 'admin') {
     return (
@@ -57,119 +102,56 @@ export default function AdminDashboard() {
 
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
-      
-      <DashboardSummary />
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Pending Assessments</h2>
-            <Link href="/admin/assessments" className="text-sm text-primary-600 hover:text-primary-800">
-              View All →
-            </Link>
-          </div>
-          
-          {pendingAssessments.length === 0 ? (
-            <p className="text-gray-500">No pending assessments</p>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {pendingAssessments.map((assessment) => {
-                const dog = getDogById(assessment.dogId);
-                const owner = getOwnerById(assessment.ownerId);
-                return (
-                  <div key={assessment.id} className="py-3">
-                    <div className="flex justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">{dog.name}</p>
-                        <p className="text-sm text-gray-500">{dog.breed} • Owner: {owner.name}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
-                          {assessment.status}
-                        </span>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {formatDate(assessment.createdDate)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-2 flex">
-                      <Link 
-                        href={`/admin/assessments/${assessment.id}`}
-                        className="text-xs px-3 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 mr-2"
-                      >
-                        Assign Walker
-                      </Link>
-                      <Link 
-                        href={`/admin/assessments/${assessment.id}/schedule`}
-                        className="text-xs px-3 py-1 bg-gray-100 text-gray-800 rounded hover:bg-gray-200"
-                      >
-                        Schedule
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-        
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Active Subscriptions</h2>
-            <Link href="/admin/subscriptions" className="text-sm text-primary-600 hover:text-primary-800">
-              View All →
-            </Link>
-          </div>
-          
-          {activeSubscriptions.length === 0 ? (
-            <p className="text-gray-500">No active subscriptions</p>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {activeSubscriptions.map((subscription) => {
-                const owner = getOwnerById(subscription.ownerId);
-                const plan = getSubscriptionPlanById(subscription.planId);
-                return (
-                  <div key={subscription.id} className="py-3">
-                    <div className="flex justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">{owner.name}</p>
-                        <p className="text-sm text-gray-500">{plan?.name || 'Unknown'} Plan • {subscription.creditsRemaining} credits left</p>
-                      </div>
-                      <div className="text-right">
-                        <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                          Active
-                        </span>
-                        <p className="text-sm text-gray-500 mt-1">
-                          Expires: {formatDate(subscription.endDate)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="mt-2 text-sm text-gray-500">
-                      <span className="font-medium text-gray-700">
-                        {formatPrice(subscription.purchaseAmount)}
-                      </span> • Purchased {formatDate(subscription.purchaseDate)}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+        <div className="flex space-x-3">
+          <button 
+            onClick={() => setIsEditMode(!isEditMode)}
+            className={`px-4 py-2 rounded ${
+              isEditMode 
+                ? 'bg-green-600 text-white hover:bg-green-700' 
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            {isEditMode ? 'Save Layout' : 'Edit Layout'}
+          </button>
+          {isEditMode && (
+            <button 
+              onClick={resetLayout}
+              className="px-4 py-2 rounded bg-gray-200 text-gray-800 hover:bg-gray-300"
+            >
+              Reset Layout
+            </button>
           )}
         </div>
       </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <UpcomingWalks />
+
+      {isEditMode && (
+        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6">
+          <p className="font-bold">Layout Edit Mode</p>
+          <p>Drag widgets to rearrange the dashboard. Click and drag the bottom corner of each widget to resize.</p>
         </div>
-        <div>
-          <AIRecommendations />
-        </div>
-      </div>
+      )}
       
-      <div className="mt-6">
-        <RecentActivities />
-      </div>
+      <ResponsiveGridLayout
+        className="layout"
+        layouts={layouts}
+        breakpoints={{ lg: 1200, md: 996, sm: 768, xs: 480 }}
+        cols={{ lg: 6, md: 6, sm: 4, xs: 1 }}
+        rowHeight={100}
+        containerPadding={[0, 0]}
+        margin={[16, 16]}
+        onLayoutChange={handleLayoutChange}
+        isDraggable={isEditMode}
+        isResizable={isEditMode}
+        draggableHandle=".drag-handle"
+      >
+        {defaultDesktopLayout.map(item => (
+          <div key={item.i} data-grid={item}>
+            {renderWidget(item.i)}
+          </div>
+        ))}
+      </ResponsiveGridLayout>
     </div>
   );
 } 

@@ -24,7 +24,7 @@ export function DashboardSummary() {
   const pendingAssessments = getPendingAssessments().length;
   
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
       <SummaryCard 
         title="Scheduled Walks" 
         value={scheduledWalks.toString()} 
@@ -73,16 +73,16 @@ function SummaryCard({ title, value, icon, color }: {
   color: string;
 }) {
   return (
-    <div className="bg-white rounded-lg shadow p-4">
+    <div className="bg-white rounded-lg shadow p-3">
       <div className="flex items-center">
-        <div className={`${color} p-3 rounded-full`}>
-          <svg className="h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className={`${color} p-2 rounded-full`}>
+          <svg className="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
           </svg>
         </div>
-        <div className="ml-4">
-          <p className="text-sm font-medium text-gray-500">{title}</p>
-          <p className="text-lg font-semibold text-gray-700">{value}</p>
+        <div className="ml-3">
+          <p className="text-xs font-medium text-gray-500">{title}</p>
+          <p className="text-base font-semibold text-gray-700">{value}</p>
         </div>
       </div>
     </div>
