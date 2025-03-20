@@ -17,6 +17,21 @@ function getWalkerPendingFeedbackCount(walkerId?: string): number {
   ).length;
 }
 
+// Mock holiday requests for demonstration - in a real app would come from an API
+const mockHolidayRequests = [
+  { id: 'h1', walkerId: 'w1', date: '2025-06-05', status: 'approved', reason: 'Family vacation' },
+  { id: 'h2', walkerId: 'w1', date: '2025-06-15', status: 'pending', reason: 'Doctor appointment' },
+  { id: 'h3', walkerId: 'w1', date: '2025-06-25', status: 'denied', reason: 'Personal day' },
+  { id: 'h4', walkerId: 'w2', date: '2025-06-10', status: 'pending', reason: 'Wedding attendance' },
+  { id: 'h5', walkerId: 'w2', date: '2025-07-04', status: 'approved', reason: 'Independence Day' },
+  { id: 'h6', walkerId: 'w3', date: '2025-06-30', status: 'pending', reason: 'Family emergency' },
+];
+
+// Helper function to get count of pending holiday requests
+function getPendingHolidayRequestsCount(): number {
+  return mockHolidayRequests.filter(req => req.status === 'pending').length;
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
@@ -32,6 +47,12 @@ export function Sidebar() {
     { name: 'Walkers', href: '/walkers', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z' },
     { name: 'Owners', href: '/owners', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
     { name: 'Schedule', href: '/schedule', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
+    { 
+      name: 'Holiday Requests', 
+      href: '/admin/holiday-requests', 
+      icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
+      badge: getPendingHolidayRequestsCount()
+    },
     { name: 'Assessments', href: '/admin/assessments', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
     { name: 'Subscriptions', href: '/admin/subscriptions', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
     { name: 'AI Insights', href: '/admin/insights', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
