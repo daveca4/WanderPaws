@@ -19,6 +19,7 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
     isActive: true,
     createdAt: '2023-01-01T12:00:00Z',
     updatedAt: '2023-01-01T12:00:00Z',
+    discountPercentage: 5
   },
   {
     id: 'plan-2',
@@ -31,6 +32,7 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
     isActive: true,
     createdAt: '2023-01-01T12:00:00Z',
     updatedAt: '2023-01-01T12:00:00Z',
+    discountPercentage: 10
   },
   {
     id: 'plan-3',
@@ -43,6 +45,7 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
     isActive: true,
     createdAt: '2023-01-01T12:00:00Z',
     updatedAt: '2023-01-01T12:00:00Z',
+    discountPercentage: 15
   },
   {
     id: 'plan-4',
@@ -55,6 +58,7 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
     isActive: true,
     createdAt: '2023-01-01T12:00:00Z',
     updatedAt: '2023-01-01T12:00:00Z',
+    discountPercentage: 20
   },
   {
     id: 'plan-5',
@@ -67,6 +71,7 @@ export const mockSubscriptionPlans: SubscriptionPlan[] = [
     isActive: true,
     createdAt: '2023-01-01T12:00:00Z',
     updatedAt: '2023-01-01T12:00:00Z',
+    discountPercentage: 25
   },
 ];
 

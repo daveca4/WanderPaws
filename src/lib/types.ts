@@ -135,6 +135,7 @@ export interface SubscriptionPlan {
   isActive: boolean;      // Whether the plan is currently offered
   createdAt: string;      // ISO date string
   updatedAt: string;      // ISO date string
+  discountPercentage?: number; // Optional discount percentage
 }
 
 export interface UserSubscription {
