@@ -39,7 +39,8 @@ export default function WalkerWalksPage() {
   
   const [activeTab, setActiveTab] = useState<'completed' | 'scheduled' | 'needs-feedback' | 'group-walks'>(
     tabParam === 'needs-feedback' ? 'needs-feedback' : 
-    tabParam === 'group-walks' ? 'group-walks' : 'completed'
+    tabParam === 'completed' ? 'completed' :
+    tabParam === 'scheduled' ? 'scheduled' : 'group-walks'
   );
   const [walkerWalks, setWalkerWalks] = useState<Walk[]>([]);
   const [groupedWalks, setGroupedWalks] = useState<Record<string, Walk[]>>({});
@@ -82,10 +83,16 @@ export default function WalkerWalksPage() {
   
   // Update activeTab when URL parameter changes
   useEffect(() => {
-    if (tabParam === 'needs-feedback') {
-      setActiveTab('needs-feedback');
-    } else if (tabParam === 'group-walks') {
-      setActiveTab('group-walks');
+    if (tabParam) {
+      if (tabParam === 'needs-feedback') {
+        setActiveTab('needs-feedback');
+      } else if (tabParam === 'group-walks') {
+        setActiveTab('group-walks');
+      } else if (tabParam === 'scheduled') {
+        setActiveTab('scheduled');
+      } else if (tabParam === 'completed') {
+        setActiveTab('completed');
+      }
     }
   }, [tabParam]);
 
@@ -252,6 +259,21 @@ export default function WalkerWalksPage() {
         <div className="border-b border-gray-100">
           <nav className="flex">
             <button
+              onClick={() => setActiveTab('group-walks')}
+              className={`px-6 py-3 text-sm font-medium flex items-center ${
+                activeTab === 'group-walks'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Group Walks
+              {groupWalksCount > 0 && (
+                <span className="ml-2 inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
+                  {groupWalksCount}
+                </span>
+              )}
+            </button>
+            <button
               onClick={() => setActiveTab('completed')}
               className={`px-6 py-3 text-sm font-medium ${
                 activeTab === 'completed'
@@ -283,21 +305,6 @@ export default function WalkerWalksPage() {
                 Needs Feedback
                 <span className="ml-2 inline-flex items-center justify-center h-5 w-5 rounded-full bg-amber-100 text-amber-800 text-xs font-medium">
                   {needsFeedbackCount}
-                </span>
-              </button>
-            )}
-            {groupWalksCount > 0 && (
-              <button
-                onClick={() => setActiveTab('group-walks')}
-                className={`px-6 py-3 text-sm font-medium flex items-center ${
-                  activeTab === 'group-walks'
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Group Walks
-                <span className="ml-2 inline-flex items-center justify-center h-5 w-5 rounded-full bg-blue-100 text-blue-800 text-xs font-medium">
-                  {groupWalksCount}
                 </span>
               </button>
             )}
