@@ -1,11 +1,7 @@
 import './globals.css';
-import 'react-grid-layout/css/styles.css';
-import 'react-resizable/css/styles.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/AuthContext';
-import { Navbar } from '@/components/Navbar';
-import { Sidebar } from '@/components/Sidebar';
 import { LandingLayout } from '@/components/LandingLayout';
 
 const inter = Inter({ subsets: ['latin'] });

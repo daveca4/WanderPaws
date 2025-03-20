@@ -6,23 +6,35 @@ import { useRouter } from 'next/navigation';
 import { 
   mockUserSubscriptions,
   mockSubscriptionPlans,
-  mockUsers,
   formatPrice
 } from '@/lib/mockSubscriptions';
+import { mockUsers } from '@/lib/mockUsers';
 import { UserSubscription } from '@/lib/types';
 import RouteGuard from '@/components/RouteGuard';
+
+// Extended UserSubscription interface for the details
+interface ExtendedUserSubscription extends UserSubscription {
+  totalCredits?: number;
+  creditsUsed?: number;
+  amountPaid?: number;
+  paymentMethod?: string;
+  expiryDate?: string;
+  notes?: string;
+}
 
 export default function UserSubscriptionDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const id = params.id;
   
-  const [userSubscription, setUserSubscription] = useState<UserSubscription | null>(null);
+  const [userSubscription, setUserSubscription] = useState<ExtendedUserSubscription | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Find the user subscription by ID
+    // Fetch the user subscription by ID
     const subscription = mockUserSubscriptions.find(sub => sub.id === id);
-    setUserSubscription(subscription || null);
+    if (subscription) {
+      setUserSubscription(subscription as ExtendedUserSubscription);
+    }
     setLoading(false);
   }, [id]);
 
@@ -36,20 +48,25 @@ export default function UserSubscriptionDetailPage({ params }: { params: { id: s
     return mockUsers.find(user => user.id === ownerId) || null;
   };
 
-  const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return 'N/A';
+    
+    const options: Intl.DateTimeFormatOptions = { 
+      year: 'numeric', 
+      month: 'long', 
       day: 'numeric'
-    });
+    };
+    return new Date(dateString).toLocaleDateString('en-US', options);
   };
-
-  const calculateDaysRemaining = (expiryDate: string): number => {
-    const expiry = new Date(expiryDate).getTime();
-    const today = new Date().getTime();
-    const diffTime = expiry - today;
+  
+  const calculateDaysRemaining = (expiryDate?: string): number => {
+    if (!expiryDate) return 0;
+    
+    const now = new Date();
+    const expiry = new Date(expiryDate);
+    const diffTime = expiry.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays > 0 ? diffDays : 0;
+    return Math.max(0, diffDays);
   };
 
   const getStatusBadgeClasses = (status: string): string => {
@@ -179,8 +196,16 @@ export default function UserSubscriptionDetailPage({ params }: { params: { id: s
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Credits Used</h3>
-                <p className="mt-1 text-base font-medium text-gray-900">
-                  {userSubscription.creditsUsed} / {userSubscription.totalCredits}
+                <div className="mt-1 w-full bg-gray-200 rounded-full h-2.5">
+                  <div 
+                    className="bg-primary-600 h-2.5 rounded-full" 
+                    style={{ 
+                      width: `${((userSubscription?.creditsUsed ?? 0) / (userSubscription?.totalCredits ?? 1)) * 100}%`
+                    }}
+                  ></div>
+                </div>
+                <p className="mt-1 text-sm text-gray-700">
+                  {userSubscription?.creditsUsed ?? 0} of {userSubscription?.totalCredits ?? 0} credits used
                 </p>
               </div>
               <div>

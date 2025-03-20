@@ -4,6 +4,18 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import PermissionGate from './PermissionGate';
 import { useAuth } from '@/lib/AuthContext';
+import { mockWalks } from '@/lib/mockData';
+
+// Helper function to get count of walks needing feedback
+function getWalkerPendingFeedbackCount(walkerId?: string): number {
+  if (!walkerId) return 0;
+  
+  return mockWalks.filter(walk => 
+    walk.walkerId === walkerId && 
+    walk.status === 'completed' && 
+    !walk.feedback
+  ).length;
+}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -40,7 +52,12 @@ export function Sidebar() {
   // Walker-specific menu items
   const walkerMenuItems = [
     { name: 'My Schedule', href: '/walker-dashboard/schedule', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z' },
-    { name: 'My Walks', href: '/walker-dashboard/walks', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z' },
+    { 
+      name: 'My Walks', 
+      href: '/walker-dashboard/walks', 
+      icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+      badge: getWalkerPendingFeedbackCount(user?.profileId)
+    },
     { name: 'Assigned Dogs', href: '/walker-dashboard/dogs', icon: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z' },
     { name: 'Assessments', href: '/walker-dashboard/assessments', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
     { name: 'Reports', href: '/walker-dashboard/reports', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
@@ -48,29 +65,28 @@ export function Sidebar() {
   ];
   
   // Render a menu item
-  const renderMenuItem = (item: { name: string; href: string; icon: string }) => {
+  const renderMenuItem = (item: { name: string; href: string; icon: string; badge?: number }) => {
     const isActive = pathname === item.href;
     
     return (
       <Link
-        key={item.name}
         href={item.href}
-        className={`flex items-center px-4 py-3 text-gray-700 rounded-md group ${
-          isActive ? 'bg-primary-50 text-primary-600' : 'hover:bg-gray-50'
+        className={`flex items-center px-3 py-2 rounded-md text-sm font-medium ${
+          isActive
+            ? 'bg-primary-100 text-primary-700'
+            : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
         }`}
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          className={`h-5 w-5 mr-3 ${
-            isActive ? 'text-primary-600' : 'text-gray-500 group-hover:text-gray-600'
-          }`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} />
+        <svg className="mr-3 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
         </svg>
-        <span>{item.name}</span>
+        <span className="flex-1">{item.name}</span>
+        
+        {item.badge && item.badge > 0 && (
+          <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-amber-100 text-amber-800 text-xs font-medium">
+            {item.badge}
+          </span>
+        )}
       </Link>
     );
   };

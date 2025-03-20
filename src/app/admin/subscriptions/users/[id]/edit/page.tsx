@@ -11,6 +11,16 @@ import {
 import { UserSubscription } from '@/lib/types';
 import RouteGuard from '@/components/RouteGuard';
 
+// Extended UserSubscription interface for the form
+interface ExtendedUserSubscription extends UserSubscription {
+  totalCredits?: number;
+  creditsUsed?: number;
+  amountPaid?: number;
+  paymentMethod?: string;
+  expiryDate?: string;
+  notes?: string;
+}
+
 export default function EditUserSubscriptionPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const id = params.id;
@@ -18,13 +28,13 @@ export default function EditUserSubscriptionPage({ params }: { params: { id: str
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [formData, setFormData] = useState<UserSubscription | null>(null);
+  const [formData, setFormData] = useState<ExtendedUserSubscription | null>(null);
 
   useEffect(() => {
     // Find the user subscription by ID
     const subscription = mockUserSubscriptions.find(sub => sub.id === id);
     if (subscription) {
-      setFormData(subscription);
+      setFormData(subscription as ExtendedUserSubscription);
     }
     setLoading(false);
   }, [id]);
@@ -58,12 +68,12 @@ export default function EditUserSubscriptionPage({ params }: { params: { id: str
     if (!formData) return;
 
     // Validation
-    if (formData.totalCredits < formData.creditsUsed) {
+    if ((formData.totalCredits ?? 0) < (formData.creditsUsed ?? 0)) {
       setFormError('Total credits cannot be less than credits used');
       return;
     }
 
-    if (formData.amountPaid < 0) {
+    if ((formData.amountPaid ?? 0) < 0) {
       setFormError('Amount paid cannot be negative');
       return;
     }
@@ -283,7 +293,7 @@ export default function EditUserSubscriptionPage({ params }: { params: { id: str
                       type="date"
                       name="expiryDate"
                       id="expiryDate"
-                      value={formData.expiryDate.split('T')[0]}
+                      value={formData.expiryDate?.split('T')[0] || ''}
                       onChange={handleChange}
                       className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
                     />
