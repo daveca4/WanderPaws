@@ -54,17 +54,33 @@ export function getDogsByOwnerId(ownerId: string): Dog[] {
 
 export function getUpcomingWalks(dogId?: string, limit?: number, walkerId?: string): Walk[] {
   // Get walks that are scheduled in the future
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const now = new Date();
   
+  // Check if we're using mock data with future dates
+  const isMockData = mockWalks.some(walk => {
+    const walkDate = new Date(walk.date);
+    return walkDate.getFullYear() > now.getFullYear();
+  });
+  
+  // If using mock data with future dates in 2024, don't filter by date
+  // This is a temporary fix for development only
   let walks = mockWalks.filter(walk => {
-    const walkDate = parseISO(walk.date);
-    return (
-      walk.status === 'scheduled' && 
-      walkDate >= today && 
-      (dogId ? walk.dogId === dogId : true) &&
-      (walkerId ? walk.walkerId === walkerId : true)
-    );
+    if (isMockData) {
+      return (
+        walk.status === 'scheduled' && 
+        (dogId ? walk.dogId === dogId : true) &&
+        (walkerId ? walk.walkerId === walkerId : true)
+      );
+    } else {
+      // Normal date filtering for real data
+      const walkDate = parseISO(walk.date);
+      return (
+        walk.status === 'scheduled' && 
+        walkDate >= now && 
+        (dogId ? walk.dogId === dogId : true) &&
+        (walkerId ? walk.walkerId === walkerId : true)
+      );
+    }
   });
   
   // Sort by date and time

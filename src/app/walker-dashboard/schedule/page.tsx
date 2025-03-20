@@ -4,7 +4,15 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { getUpcomingWalks, formatDate, formatTime, getDogById } from '@/utils/helpers';
+import { Walk } from '@/lib/types';
 import Image from 'next/image';
+import Link from 'next/link';
+
+interface CalendarDay {
+  date: Date;
+  dateString: string;
+  walks: Walk[];
+}
 
 export default function WalkerSchedulePage() {
   const { user, loading } = useAuth();
@@ -43,6 +51,61 @@ export default function WalkerSchedulePage() {
   const sortedDates = Object.keys(walksByDate).sort((a, b) => 
     new Date(a).getTime() - new Date(b).getTime()
   );
+
+  // Generate calendar weeks
+  const getCalendarData = (): (CalendarDay | null)[][] => {
+    // Get current month
+    const currentDate = new Date();
+    const firstDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const lastDay = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+    
+    // Get the day of the week of the first day (0 is Sunday, 1 is Monday, etc.)
+    const firstDayOfWeek = firstDay.getDay();
+    
+    // Create an array with dates for the calendar
+    const calendarDays: (CalendarDay | null)[] = [];
+    
+    // Add empty slots for days before the first day of the month
+    for (let i = 0; i < firstDayOfWeek; i++) {
+      calendarDays.push(null);
+    }
+    
+    // Add days of the month
+    for (let i = 1; i <= lastDay.getDate(); i++) {
+      const date = new Date(currentDate.getFullYear(), currentDate.getMonth(), i);
+      const dateString = date.toISOString().split('T')[0];
+      const walksForDay = walksByDate[dateString] || [];
+      
+      calendarDays.push({
+        date,
+        dateString,
+        walks: walksForDay
+      });
+    }
+    
+    // Group days into weeks
+    const weeks: (CalendarDay | null)[][] = [];
+    let week: (CalendarDay | null)[] = [];
+    
+    calendarDays.forEach((day, index) => {
+      week.push(day);
+      
+      if (index % 7 === 6 || index === calendarDays.length - 1) {
+        // Ensure week has 7 days by padding with null
+        while (week.length < 7) {
+          week.push(null);
+        }
+        weeks.push(week);
+        week = [];
+      }
+    });
+    
+    return weeks;
+  };
+
+  const calendarWeeks = getCalendarData();
+  const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   return (
     <div className="space-y-6">
@@ -141,9 +204,12 @@ export default function WalkerSchedulePage() {
                               </div>
                               
                               <div className="ml-2">
-                                <button className="px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-md">
+                                <Link 
+                                  href={`/walker-dashboard/walks/${walk.id}`}
+                                  className="px-4 py-2 text-sm font-medium text-primary-600 hover:text-primary-700 hover:bg-primary-50 rounded-md"
+                                >
                                   Details
-                                </button>
+                                </Link>
                               </div>
                             </div>
                           );
@@ -155,8 +221,62 @@ export default function WalkerSchedulePage() {
               )}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-500">Calendar view coming soon</p>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 text-center mb-4">{currentMonth}</h2>
+              
+              <div className="overflow-hidden rounded-lg border border-gray-200">
+                {/* Calendar header with weekdays */}
+                <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-200">
+                  {weekDays.map(day => (
+                    <div key={day} className="px-2 py-3 text-center text-sm font-medium text-gray-600">
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Calendar body */}
+                <div>
+                  {calendarWeeks.map((week, weekIndex) => (
+                    <div key={weekIndex} className="grid grid-cols-7 border-b border-gray-200 last:border-b-0">
+                      {week.map((day, dayIndex) => (
+                        <div 
+                          key={dayIndex} 
+                          className={`min-h-[100px] p-2 border-r border-gray-200 last:border-r-0 ${
+                            day ? 'bg-white' : 'bg-gray-50'
+                          }`}
+                        >
+                          {day && (
+                            <>
+                              <div className="text-sm font-medium mb-2">
+                                {day.date.getDate()}
+                              </div>
+                              
+                              {day.walks.length > 0 ? (
+                                <div className="space-y-1">
+                                  {day.walks.map(walk => {
+                                    const dog = getDogById(walk.dogId);
+                                    return (
+                                      <Link
+                                        key={walk.id}
+                                        href={`/walker-dashboard/walks/${walk.id}`}
+                                        className="block text-xs p-1 rounded bg-primary-100 text-primary-800 truncate"
+                                      >
+                                        {formatTime(walk.startTime)} - {dog?.name || 'Walk'}
+                                      </Link>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-gray-400">No walks</div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>

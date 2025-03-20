@@ -16,8 +16,8 @@ export function DogList() {
       )
     ) : [];
   
-  // If no dogs are found, or we can't determine the walker, fall back to showing first 4 dogs
-  const dogsToShow = walkerDogs.length > 0 ? walkerDogs.slice(0, 4) : mockDogs.slice(0, 4);
+  // Only show walker's dogs if the user is a walker
+  const dogsToShow = user?.role === 'walker' ? walkerDogs : walkerDogs.length > 0 ? walkerDogs.slice(0, 4) : mockDogs.slice(0, 4);
   
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
@@ -61,14 +61,16 @@ export function DogList() {
         </div>
       )}
       
-      <div className="mt-6 pt-4 border-t border-gray-100">
-        <button className="w-full flex items-center justify-center px-4 py-2 border border-dashed border-gray-300 rounded-md text-sm font-medium text-gray-600 hover:text-primary-600 hover:border-primary-300">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-          </svg>
-          Add a Dog
-        </button>
-      </div>
+      {user?.role !== 'walker' && (
+        <div className="mt-6 pt-4 border-t border-gray-100">
+          <button className="w-full flex items-center justify-center px-4 py-2 border border-dashed border-gray-300 rounded-md text-sm font-medium text-gray-600 hover:text-primary-600 hover:border-primary-300">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add a Dog
+          </button>
+        </div>
+      )}
     </div>
   );
 } 

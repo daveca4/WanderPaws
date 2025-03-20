@@ -299,7 +299,7 @@ export const mockWalks: Walk[] = [
     status: 'scheduled',
   },
   {
-    id: 'walk4',
+    id: 'walk7',
     dogId: 'd4',
     walkerId: 'w3',
     date: '2024-06-20',
@@ -309,7 +309,7 @@ export const mockWalks: Walk[] = [
     status: 'scheduled',
   },
   {
-    id: 'walk5',
+    id: 'walk8',
     dogId: 'd1',
     walkerId: 'w1',
     date: '2024-06-22',
