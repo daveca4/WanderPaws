@@ -562,50 +562,13 @@ export default function ContentAIPage() {
             
             <div className="bg-white shadow sm:rounded-lg">
               <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg leading-6 font-medium text-gray-900">API Integrations</h3>
+                <h3 className="text-lg leading-6 font-medium text-gray-900">Social Media API Integrations</h3>
                 <div className="mt-2 max-w-xl text-sm text-gray-500">
-                  <p>Connect to external services for content publishing and distribution.</p>
+                  <p>Connect your social media accounts to publish content directly from the platform.</p>
                 </div>
-                <div className="mt-5 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <svg className="h-8 w-8 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                      </svg>
-                      <div className="ml-3">
-                        <h4 className="text-sm font-medium text-gray-900">Facebook</h4>
-                        <p className="text-xs text-gray-500">Connected as WanderPaws</p>
-                      </div>
-                    </div>
-                    <button className="text-sm text-red-600 hover:text-red-500">Disconnect</button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <svg className="h-8 w-8 text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723 10.023 10.023 0 01-3.127 1.195 4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.937 4.937 0 004.604 3.417 9.868 9.868 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.054 0 13.999-7.496 13.999-13.986 0-.209 0-.42-.015-.63a9.936 9.936 0 002.46-2.548l-.047-.02z"/>
-                      </svg>
-                      <div className="ml-3">
-                        <h4 className="text-sm font-medium text-gray-900">Twitter</h4>
-                        <p className="text-xs text-gray-500">Connected as @WanderPaws</p>
-                      </div>
-                    </div>
-                    <button className="text-sm text-red-600 hover:text-red-500">Disconnect</button>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <svg className="h-8 w-8 text-purple-600" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 11.162-.105-.949-.199-2.403.041-3.439.219-.937 1.406-5.957 1.406-5.957s-.359-.72-.359-1.781c0-1.663.967-2.911 2.168-2.911 1.024 0 1.518.769 1.518 1.688 0 1.029-.653 2.567-.992 3.992-.285 1.193.6 2.165 1.775 2.165 2.128 0 3.768-2.245 3.768-5.487 0-2.861-2.063-4.869-5.008-4.869-3.41 0-5.409 2.562-5.409 5.199 0 1.033.394 2.143.889 2.741.099.12.112.225.085.345-.09.375-.293 1.199-.334 1.363-.053.225-.172.271-.401.165-1.495-.69-2.433-2.878-2.433-4.646 0-3.776 2.748-7.252 7.92-7.252 4.158 0 7.392 2.967 7.392 6.923 0 4.135-2.607 7.462-6.233 7.462-1.214 0-2.354-.629-2.758-1.379l-.749 2.848c-.269 1.045-1.004 2.352-1.498 3.146 1.123.345 2.306.535 3.55.535 6.607 0 11.985-5.365 11.985-11.987C23.97 5.39 18.592.026 11.985.026L12.017 0z"/>
-                      </svg>
-                      <div className="ml-3">
-                        <h4 className="text-sm font-medium text-gray-900">Pinterest</h4>
-                        <p className="text-xs text-gray-500">Not connected</p>
-                      </div>
-                    </div>
-                    <button className="text-sm text-primary-600 hover:text-primary-500">Connect</button>
-                  </div>
-                  
+                
+                {/* Instagram Integration */}
+                <div className="mt-6 border-t border-gray-200 pt-6">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <svg className="h-8 w-8 text-pink-500" fill="currentColor" viewBox="0 0 24 24">
@@ -616,7 +579,380 @@ export default function ContentAIPage() {
                         <p className="text-xs text-gray-500">Connected as @wanderpaws_official</p>
                       </div>
                     </div>
-                    <button className="text-sm text-red-600 hover:text-red-500">Disconnect</button>
+                    <div className="flex space-x-3">
+                      <button className="text-sm text-primary-600 hover:text-primary-500">Configure</button>
+                      <button className="text-sm text-red-600 hover:text-red-500">Disconnect</button>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 ml-11 space-y-4">
+                    <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="instagram-api-key" className="block text-sm font-medium text-gray-700">API Key</label>
+                        <div className="mt-1 flex rounded-md shadow-sm">
+                          <input
+                            type="password"
+                            name="instagram-api-key"
+                            id="instagram-api-key"
+                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                            placeholder="••••••••••••••••"
+                            value="igkf_1234567890abcdef"
+                            readOnly
+                          />
+                          <button
+                            type="button"
+                            className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                          >
+                            Show
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="instagram-api-secret" className="block text-sm font-medium text-gray-700">API Secret</label>
+                        <div className="mt-1 flex rounded-md shadow-sm">
+                          <input
+                            type="password"
+                            name="instagram-api-secret"
+                            id="instagram-api-secret"
+                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                            placeholder="••••••••••••••••"
+                            value="igs_9876543210fedcba"
+                            readOnly
+                          />
+                          <button
+                            type="button"
+                            className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                          >
+                            Show
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <fieldset>
+                        <legend className="text-sm font-medium text-gray-700">Post Types</legend>
+                        <div className="mt-2 space-y-3">
+                          <div className="relative flex items-start">
+                            <div className="flex items-center h-5">
+                              <input
+                                id="instagram-feed"
+                                name="instagram-feed"
+                                type="checkbox"
+                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                defaultChecked
+                              />
+                            </div>
+                            <div className="ml-3 text-sm">
+                              <label htmlFor="instagram-feed" className="font-medium text-gray-700">Feed Posts</label>
+                              <p className="text-gray-500">Standard posts to your Instagram feed</p>
+                            </div>
+                          </div>
+                          <div className="relative flex items-start">
+                            <div className="flex items-center h-5">
+                              <input
+                                id="instagram-stories"
+                                name="instagram-stories"
+                                type="checkbox"
+                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                defaultChecked
+                              />
+                            </div>
+                            <div className="ml-3 text-sm">
+                              <label htmlFor="instagram-stories" className="font-medium text-gray-700">Stories</label>
+                              <p className="text-gray-500">24-hour Instagram stories</p>
+                            </div>
+                          </div>
+                          <div className="relative flex items-start">
+                            <div className="flex items-center h-5">
+                              <input
+                                id="instagram-reels"
+                                name="instagram-reels"
+                                type="checkbox"
+                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                defaultChecked
+                              />
+                            </div>
+                            <div className="ml-3 text-sm">
+                              <label htmlFor="instagram-reels" className="font-medium text-gray-700">Reels</label>
+                              <p className="text-gray-500">Short-form vertical videos</p>
+                            </div>
+                          </div>
+                        </div>
+                      </fieldset>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Facebook Integration */}
+                <div className="mt-6 border-t border-gray-200 pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <svg className="h-8 w-8 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                      </svg>
+                      <div className="ml-3">
+                        <h4 className="text-sm font-medium text-gray-900">Facebook</h4>
+                        <p className="text-xs text-gray-500">Connected as WanderPaws</p>
+                      </div>
+                    </div>
+                    <div className="flex space-x-3">
+                      <button className="text-sm text-primary-600 hover:text-primary-500">Configure</button>
+                      <button className="text-sm text-red-600 hover:text-red-500">Disconnect</button>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-4 ml-11 space-y-4">
+                    <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="facebook-app-id" className="block text-sm font-medium text-gray-700">App ID</label>
+                        <div className="mt-1 flex rounded-md shadow-sm">
+                          <input
+                            type="password"
+                            name="facebook-app-id"
+                            id="facebook-app-id"
+                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                            placeholder="••••••••••••••••"
+                            value="123456789012345"
+                            readOnly
+                          />
+                          <button
+                            type="button"
+                            className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                          >
+                            Show
+                          </button>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="facebook-app-secret" className="block text-sm font-medium text-gray-700">App Secret</label>
+                        <div className="mt-1 flex rounded-md shadow-sm">
+                          <input
+                            type="password"
+                            name="facebook-app-secret"
+                            id="facebook-app-secret"
+                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                            placeholder="••••••••••••••••"
+                            value="abcdef1234567890abcdef"
+                            readOnly
+                          />
+                          <button
+                            type="button"
+                            className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                          >
+                            Show
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="facebook-page" className="block text-sm font-medium text-gray-700">Connected Page</label>
+                      <select
+                        id="facebook-page"
+                        name="facebook-page"
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                        defaultValue="wanderpaws-main"
+                      >
+                        <option value="wanderpaws-main">WanderPaws (Main Page)</option>
+                        <option value="wanderpaws-community">WanderPaws Community</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <fieldset>
+                        <legend className="text-sm font-medium text-gray-700">Post Types</legend>
+                        <div className="mt-2 space-y-3">
+                          <div className="relative flex items-start">
+                            <div className="flex items-center h-5">
+                              <input
+                                id="facebook-posts"
+                                name="facebook-posts"
+                                type="checkbox"
+                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                defaultChecked
+                              />
+                            </div>
+                            <div className="ml-3 text-sm">
+                              <label htmlFor="facebook-posts" className="font-medium text-gray-700">Standard Posts</label>
+                              <p className="text-gray-500">Text, image, or video posts to your page's timeline</p>
+                            </div>
+                          </div>
+                          <div className="relative flex items-start">
+                            <div className="flex items-center h-5">
+                              <input
+                                id="facebook-reels"
+                                name="facebook-reels"
+                                type="checkbox"
+                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                defaultChecked
+                              />
+                            </div>
+                            <div className="ml-3 text-sm">
+                              <label htmlFor="facebook-reels" className="font-medium text-gray-700">Reels</label>
+                              <p className="text-gray-500">Short-form vertical videos</p>
+                            </div>
+                          </div>
+                          <div className="relative flex items-start">
+                            <div className="flex items-center h-5">
+                              <input
+                                id="facebook-stories"
+                                name="facebook-stories"
+                                type="checkbox"
+                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                              />
+                            </div>
+                            <div className="ml-3 text-sm">
+                              <label htmlFor="facebook-stories" className="font-medium text-gray-700">Stories</label>
+                              <p className="text-gray-500">24-hour Facebook stories</p>
+                            </div>
+                          </div>
+                        </div>
+                      </fieldset>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* TikTok Integration */}
+                <div className="mt-6 border-t border-gray-200 pt-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <svg className="h-8 w-8 text-black" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+                      </svg>
+                      <div className="ml-3">
+                        <h4 className="text-sm font-medium text-gray-900">TikTok</h4>
+                        <p className="text-xs text-gray-500">Not connected</p>
+                      </div>
+                    </div>
+                    <button className="text-sm text-primary-600 hover:text-primary-500">Connect Account</button>
+                  </div>
+                  
+                  <div className="mt-4 ml-11 space-y-4">
+                    <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
+                      <div>
+                        <label htmlFor="tiktok-client-key" className="block text-sm font-medium text-gray-700">Client Key</label>
+                        <div className="mt-1 flex rounded-md shadow-sm">
+                          <input
+                            type="text"
+                            name="tiktok-client-key"
+                            id="tiktok-client-key"
+                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                            placeholder="Enter your TikTok Client Key"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="tiktok-client-secret" className="block text-sm font-medium text-gray-700">Client Secret</label>
+                        <div className="mt-1 flex rounded-md shadow-sm">
+                          <input
+                            type="password"
+                            name="tiktok-client-secret"
+                            id="tiktok-client-secret"
+                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                            placeholder="Enter your TikTok Client Secret"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="tiktok-redirect-uri" className="block text-sm font-medium text-gray-700">Redirect URI</label>
+                      <div className="mt-1 flex rounded-md shadow-sm">
+                        <input
+                          type="text"
+                          name="tiktok-redirect-uri"
+                          id="tiktok-redirect-uri"
+                          className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                          placeholder="https://your-app-domain.com/tiktok/callback"
+                          value="https://wanderpaws.com/api/tiktok/callback"
+                          readOnly
+                        />
+                        <button
+                          type="button"
+                          className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                          onClick={() => navigator.clipboard.writeText("https://wanderpaws.com/api/tiktok/callback")}
+                        >
+                          Copy
+                        </button>
+                      </div>
+                      <p className="mt-1 text-sm text-gray-500">
+                        Add this URI to your TikTok Developer account OAuth settings.
+                      </p>
+                    </div>
+                    
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        Save TikTok Settings
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-6 border-t border-gray-200 pt-6">
+                  <h4 className="text-sm font-medium text-gray-900">Global Social Media Settings</h4>
+                  <div className="mt-4 space-y-4">
+                    <div className="relative flex items-start">
+                      <div className="flex items-center h-5">
+                        <input
+                          id="auto-post"
+                          name="auto-post"
+                          type="checkbox"
+                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        />
+                      </div>
+                      <div className="ml-3 text-sm">
+                        <label htmlFor="auto-post" className="font-medium text-gray-700">Auto-post to selected platforms</label>
+                        <p className="text-gray-500">Automatically post to connected platforms when content is published</p>
+                      </div>
+                    </div>
+                    
+                    <div className="relative flex items-start">
+                      <div className="flex items-center h-5">
+                        <input
+                          id="cross-posting"
+                          name="cross-posting"
+                          type="checkbox"
+                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          defaultChecked
+                        />
+                      </div>
+                      <div className="ml-3 text-sm">
+                        <label htmlFor="cross-posting" className="font-medium text-gray-700">Enable cross-platform posting</label>
+                        <p className="text-gray-500">Post the same content to multiple platforms at once</p>
+                      </div>
+                    </div>
+                    
+                    <div className="relative flex items-start">
+                      <div className="flex items-center h-5">
+                        <input
+                          id="platform-adaptation"
+                          name="platform-adaptation"
+                          type="checkbox"
+                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          defaultChecked
+                        />
+                      </div>
+                      <div className="ml-3 text-sm">
+                        <label htmlFor="platform-adaptation" className="font-medium text-gray-700">AI content adaptation</label>
+                        <p className="text-gray-500">Automatically adapt content format for each platform</p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mt-5">
+                    <button
+                      type="button"
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    >
+                      Save All Integration Settings
+                    </button>
                   </div>
                 </div>
               </div>

@@ -30,7 +30,7 @@ export interface ContentItem {
   thumbnailUrl?: string;
   aspectRatio?: '1:1' | '16:9' | '9:16' | '4:5';
   duration?: number;
-  socialPlatforms?: ('instagram' | 'tiktok' | 'facebook' | 'twitter')[];
+  socialPlatforms?: ('instagram' | 'facebook' | 'tiktok')[];
 }
 
 export interface ContentGenerationOptions {
