@@ -7,7 +7,8 @@ export type WidgetType =
   | 'activeSubscriptions' 
   | 'upcomingWalks' 
   | 'aiRecommendations' 
-  | 'recentActivities';
+  | 'recentActivities'
+  | 'contentAI';
 
 // Interface for dashboard widgets
 export interface DashboardWidget {
@@ -21,67 +22,76 @@ export interface DashboardWidget {
 // Default widgets configuration
 export const dashboardWidgets: DashboardWidget[] = [
   { 
-    id: 'summary', 
+    id: 'summaryWidget', 
     type: 'summary', 
     title: 'Dashboard Summary', 
     minH: 2,
     minW: 6
   },
   { 
-    id: 'pendingAssessments', 
+    id: 'pendingAssessmentsWidget', 
     type: 'pendingAssessments', 
     title: 'Pending Assessments', 
     minH: 4,
     minW: 3
   },
   { 
-    id: 'activeSubscriptions', 
+    id: 'activeSubscriptionsWidget', 
     type: 'activeSubscriptions', 
     title: 'Active Subscriptions', 
     minH: 4,
     minW: 3
   },
   { 
-    id: 'upcomingWalks', 
+    id: 'upcomingWalksWidget', 
     type: 'upcomingWalks', 
     title: 'Upcoming Walks', 
     minH: 4,
     minW: 4
   },
   { 
-    id: 'aiRecommendations', 
+    id: 'aiRecommendationsWidget', 
     type: 'aiRecommendations', 
     title: 'AI Recommendations', 
     minH: 4,
     minW: 2
   },
   { 
-    id: 'recentActivities', 
+    id: 'recentActivitiesWidget', 
     type: 'recentActivities', 
     title: 'Recent Activities', 
     minH: 4,
     minW: 6
+  },
+  { 
+    id: 'contentAIWidget', 
+    type: 'contentAI', 
+    title: 'Content AI', 
+    minH: 4,
+    minW: 2
   }
 ];
 
 // Default layout for larger screens (desktop/laptop)
 export const defaultDesktopLayout: Layout[] = [
-  { i: 'summary', x: 0, y: 0, w: 6, h: 2, static: false },
-  { i: 'pendingAssessments', x: 0, y: 2, w: 3, h: 4, static: false },
-  { i: 'activeSubscriptions', x: 3, y: 2, w: 3, h: 4, static: false },
-  { i: 'upcomingWalks', x: 0, y: 6, w: 4, h: 4, static: false },
-  { i: 'aiRecommendations', x: 4, y: 6, w: 2, h: 4, static: false },
-  { i: 'recentActivities', x: 0, y: 10, w: 6, h: 4, static: false }
+  { i: 'summaryWidget', x: 0, y: 0, w: 6, h: 2, static: false },
+  { i: 'pendingAssessmentsWidget', x: 0, y: 2, w: 3, h: 4, static: false },
+  { i: 'activeSubscriptionsWidget', x: 3, y: 2, w: 3, h: 4, static: false },
+  { i: 'upcomingWalksWidget', x: 0, y: 6, w: 4, h: 4, static: false },
+  { i: 'aiRecommendationsWidget', x: 4, y: 6, w: 2, h: 4, static: false },
+  { i: 'recentActivitiesWidget', x: 0, y: 10, w: 6, h: 4, static: false },
+  { i: 'contentAIWidget', x: 0, y: 14, w: 6, h: 4, static: false }
 ];
 
 // Default layout for mobile screens
 export const defaultMobileLayout: Layout[] = [
-  { i: 'summary', x: 0, y: 0, w: 1, h: 2, static: false },
-  { i: 'pendingAssessments', x: 0, y: 2, w: 1, h: 4, static: false },
-  { i: 'activeSubscriptions', x: 0, y: 6, w: 1, h: 4, static: false },
-  { i: 'upcomingWalks', x: 0, y: 10, w: 1, h: 4, static: false },
-  { i: 'aiRecommendations', x: 0, y: 14, w: 1, h: 4, static: false },
-  { i: 'recentActivities', x: 0, y: 18, w: 1, h: 4, static: false }
+  { i: 'summaryWidget', x: 0, y: 0, w: 1, h: 2, static: false },
+  { i: 'pendingAssessmentsWidget', x: 0, y: 2, w: 1, h: 4, static: false },
+  { i: 'activeSubscriptionsWidget', x: 0, y: 6, w: 1, h: 4, static: false },
+  { i: 'upcomingWalksWidget', x: 0, y: 10, w: 1, h: 4, static: false },
+  { i: 'aiRecommendationsWidget', x: 0, y: 14, w: 1, h: 4, static: false },
+  { i: 'recentActivitiesWidget', x: 0, y: 18, w: 1, h: 4, static: false },
+  { i: 'contentAIWidget', x: 0, y: 22, w: 1, h: 4, static: false }
 ];
 
 // Constants for localStorage keys

@@ -13,6 +13,8 @@ import { ActiveSubscriptionsWidget } from '@/components/dashboard/ActiveSubscrip
 import { UpcomingWalksWidget } from '@/components/dashboard/UpcomingWalksWidget';
 import { AIRecommendationsWidget } from '@/components/dashboard/AIRecommendationsWidget';
 import { RecentActivitiesWidget } from '@/components/dashboard/RecentActivitiesWidget';
+import ContentQuickActionCard from '@/components/admin/content-ai/ContentQuickActionCard';
+import { ContentAIWidget } from '@/components/dashboard/ContentAIWidget';
 
 import {
   dashboardWidgets,
@@ -68,27 +70,28 @@ export default function AdminDashboard() {
     saveLayout(defaultLayouts);
   };
 
-  // Render the widget component based on the widget type
-  const renderWidget = (widgetId: string) => {
-    const widget = getWidgetById(widgetId);
-    
+  // Render the appropriate widget based on id
+  const renderWidget = (id: string) => {
+    const widget = getWidgetById(id);
     if (!widget) return null;
-    
-    switch (widget.type) {
-      case 'summary':
+
+    switch (id) {
+      case 'summaryWidget':
         return <SummaryWidget />;
-      case 'pendingAssessments':
+      case 'pendingAssessmentsWidget':
         return <PendingAssessmentsWidget />;
-      case 'activeSubscriptions':
+      case 'activeSubscriptionsWidget':
         return <ActiveSubscriptionsWidget />;
-      case 'upcomingWalks':
+      case 'upcomingWalksWidget':
         return <UpcomingWalksWidget />;
-      case 'aiRecommendations':
+      case 'aiRecommendationsWidget':
         return <AIRecommendationsWidget />;
-      case 'recentActivities':
+      case 'recentActivitiesWidget':
         return <RecentActivitiesWidget />;
+      case 'contentAIWidget':
+        return <ContentAIWidget />;
       default:
-        return <div>Unknown widget type</div>;
+        return <div className="p-4">Widget {id} not found</div>;
     }
   };
 
@@ -136,7 +139,7 @@ export default function AdminDashboard() {
       {/* Quick Access Section - Added for the marketing features */}
       <div className="mb-8">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Access</h2>
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="p-5">
               <div className="flex items-center">
@@ -157,6 +160,31 @@ export default function AdminDashboard() {
               <div className="mt-5">
                 <a href="/admin/marketing" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700">
                   Go to Marketing
+                </a>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-indigo-100 rounded-md p-3">
+                  <svg className="h-6 w-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Content AI</dt>
+                    <dd>
+                      <div className="text-lg font-medium text-gray-900">AI Content Creation</div>
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+              <div className="mt-5">
+                <a href="/admin/content-ai" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+                  Manage Content
                 </a>
               </div>
             </div>
@@ -211,6 +239,10 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
+        </div>
+        
+        <div className="mt-5">
+          <ContentQuickActionCard />
         </div>
       </div>
       

@@ -14,9 +14,15 @@ import {
   isWalkerAvailable
 } from '@/lib/mockBookings';
 import { Dog, Walker } from '@/lib/types';
-import { mockWalkers } from '@/lib/mockData';
+import { mockWalkers, mockDogs } from '@/lib/mockData';
+import { mockSubscriptionPlans, mockUserSubscriptions } from '@/lib/mockSubscriptions';
 import { generateId } from '@/utils/helpers';
 import { v4 as uuidv4 } from 'uuid';
+
+// Define an extended Walker interface that includes calculatedRating
+interface WalkerWithRating extends Walker {
+  calculatedRating: number;
+}
 
 export default function CreateBookingPage() {
   const { user } = useAuth();
@@ -24,7 +30,9 @@ export default function CreateBookingPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [dogs, setDogs] = useState<Dog[]>([]);
-  const [walkers, setWalkers] = useState<Walker[]>([]);
+  const [walkers, setWalkers] = useState<WalkerWithRating[]>([]);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<any[]>([]);
+  const [userSubscriptions, setUserSubscriptions] = useState<any[]>([]);
   const [subscription, setSubscription] = useState<any>(null);
   const [availableTimeSlots, setAvailableTimeSlots] = useState<('AM' | 'PM')[]>([]);
   
@@ -41,9 +49,10 @@ export default function CreateBookingPage() {
     
     const loadData = () => {
       try {
-        const dogs = mockWalkers.filter(dog => dog.ownerId === user.profileId);
+        // Get dogs for the current user
+        const userDogs = mockDogs.filter(dog => dog.ownerId === user.profileId);
         const plans = mockSubscriptionPlans.filter(plan => plan.isActive);
-        const subscriptions = mockUserSubscriptions.filter(
+        const userSubscriptions = mockUserSubscriptions.filter(
           sub => sub.ownerId === user.profileId && sub.status === 'active'
         );
         
@@ -52,20 +61,20 @@ export default function CreateBookingPage() {
           return { ...walker, calculatedRating: walkerRating };
         });
         
-        setDogs(dogs);
+        setDogs(userDogs);
         setWalkers(walkersWithRating);
         setSubscriptionPlans(plans);
-        setUserSubscriptions(subscriptions);
+        setUserSubscriptions(userSubscriptions);
         
-        if (dogs.length > 0) {
+        if (userDogs.length > 0) {
           setFormData(prev => ({
             ...prev,
-            dogId: dogs[0].id
+            dogId: userDogs[0].id
           }));
         }
         
-        if (subscriptions.length > 0) {
-          const subscription = subscriptions[0];
+        if (userSubscriptions.length > 0) {
+          const subscription = userSubscriptions[0];
           const plan = plans.find(p => p.id === subscription.planId);
           
           setSubscription({
@@ -428,4 +437,11 @@ export default function CreateBookingPage() {
       </div>
     </RouteGuard>
   );
-} 
+}
+
+// Add a helper function to calculate walker rating 
+const calculateWalkerRating = (walkerId: string): number => {
+  // This would be a calculation based on reviews in a real app
+  // For now, just return a rating between 4.0 and 5.0
+  return 4 + Math.random();
+}; 

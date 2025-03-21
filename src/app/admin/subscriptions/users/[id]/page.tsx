@@ -9,6 +9,7 @@ import {
   formatPrice
 } from '@/lib/mockSubscriptions';
 import { mockUsers } from '@/lib/mockUsers';
+import { mockOwners } from '@/lib/mockData';
 import { UserSubscription } from '@/lib/types';
 import RouteGuard from '@/components/RouteGuard';
 
@@ -45,7 +46,26 @@ export default function UserSubscriptionDetailPage({ params }: { params: { id: s
 
   // Helper function to find the owner
   const getOwner = (ownerId: string) => {
-    return mockUsers.find(user => user.id === ownerId) || null;
+    // Get the owner profile information
+    const ownerProfile = mockOwners.find(owner => owner.id === ownerId);
+    
+    // Combine profile info with user info or return one of them if the other doesn't exist
+    if (ownerProfile) {
+      const ownerUser = mockUsers.find(user => user.profileId === ownerProfile.id);
+      if (ownerUser) {
+        return {
+          ...ownerUser,
+          ...ownerProfile
+        };
+      }
+      return {
+        id: ownerProfile.id,
+        name: ownerProfile.name,
+        email: ownerProfile.email
+      };
+    }
+    
+    return null;
   };
 
   const formatDate = (dateString?: string): string => {
@@ -211,12 +231,12 @@ export default function UserSubscriptionDetailPage({ params }: { params: { id: s
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Credits Remaining</h3>
                 <p className="mt-1 text-base font-medium text-gray-900">
-                  {userSubscription.totalCredits - userSubscription.creditsUsed}
+                  {(userSubscription.totalCredits || 0) - (userSubscription.creditsUsed || 0)}
                 </p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Amount Paid</h3>
-                <p className="mt-1 text-base font-medium text-gray-900">{formatPrice(userSubscription.amountPaid)}</p>
+                <p className="mt-1 text-base font-medium text-gray-900">{formatPrice(userSubscription.amountPaid || 0)}</p>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Payment Method</h3>
