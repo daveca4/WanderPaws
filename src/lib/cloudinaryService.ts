@@ -189,36 +189,30 @@ export const createReel = async (
       }
     }
     
-    // Server-side call Cloudinary API directly
-    if (typeof window === 'undefined' && cloudinary) {
-      // Create a video montage
-      const result = await cloudinary.uploader.create_slideshow({
-        public_ids: options.mediaItems.map(item => item.publicId),
-        transformation,
-        notification_url: '/api/cloudinary/webhook',
-        tags: [...(options.tags || []), 'reel', 'auto-generated'],
-        resource_type: 'video',
-      });
-      
-      return result as CloudinaryUploadResult;
-    } else {
-      // Client-side - use the API endpoint
-      const response = await fetch('/api/cloudinary/create-reel', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(options),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to create reel via API');
-      }
-      
-      return await response.json();
+    // Client-side - use the API endpoint
+    const response = await fetch('/api/cloudinary/create-reel', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        ...options,
+        // Add indicator if the media items are from S3 vs Cloudinary
+        mediaItems: options.mediaItems.map(item => ({
+          ...item,
+          // Add a flag to indicate if this is an S3 asset (publicId contains no slashes)
+          isS3Asset: !item.publicId.includes('/') && !item.publicId.startsWith('sample-')
+        }))
+      }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to create reel via API');
     }
+    
+    return await response.json();
   } catch (error) {
-    console.error('Error creating reel with Cloudinary:', error);
+    console.error('Error creating reel:', error);
     throw error;
   }
 };

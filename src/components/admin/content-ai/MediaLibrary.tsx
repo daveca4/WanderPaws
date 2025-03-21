@@ -56,13 +56,29 @@ export default function MediaLibrary({
     setLoading(true);
     try {
       // Load existing Cloudinary assets
-      const cloudinaryAssets = await loadCloudinaryAssets();
+      let cloudinaryAssets: CloudinaryAsset[] = [];
+      try {
+        cloudinaryAssets = await loadCloudinaryAssets();
+      } catch (cloudinaryError) {
+        console.error('Error loading Cloudinary assets:', cloudinaryError);
+        // Continue with empty Cloudinary assets
+      }
       
       // Load walker uploads from S3 if that option is enabled
-      const walkerAssets = includeWalkerUploads ? await loadWalkerUploads() : [];
+      let walkerAssets: CloudinaryAsset[] = [];
+      try {
+        if (includeWalkerUploads) {
+          walkerAssets = await loadWalkerUploads();
+        }
+      } catch (s3Error) {
+        console.error('Error loading S3 assets:', s3Error);
+      }
       
       // Combine both sets of assets
-      setAssets([...cloudinaryAssets, ...walkerAssets]);
+      const combinedAssets = [...cloudinaryAssets, ...walkerAssets];
+      console.log(`Loaded ${cloudinaryAssets.length} Cloudinary assets and ${walkerAssets.length} S3 assets`);
+      
+      setAssets(combinedAssets);
     } catch (error) {
       console.error('Error loading media assets:', error);
       // Fallback to empty array on error
@@ -74,46 +90,13 @@ export default function MediaLibrary({
 
   // Load Cloudinary assets (existing implementation)
   const loadCloudinaryAssets = async (): Promise<CloudinaryAsset[]> => {
-    // Mock data flag for development
-    const useMockData = true; // Change to false when API endpoint is properly configured
+    // API endpoint call implementation
+    const queryParams = new URLSearchParams();
+    if (resourceType !== 'all') {
+      queryParams.set('resourceType', resourceType);
+    }
     
-    if (useMockData) {
-      // Mock data for development
-      const imageAssets: CloudinaryAsset[] = Array.from({ length: 8 }).map((_, index) => ({
-        id: `img-${index + 1}`,
-        publicId: `sample-image-${index + 1}`,
-        url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1623456789/sample-${index + 1}.jpg`,
-        format: 'jpg',
-        type: 'image',
-        createdAt: new Date(Date.now() - Math.random() * 10000000).toISOString(),
-        fileSize: Math.floor(Math.random() * 1000000) + 500000,
-        width: 1200,
-        height: 800,
-        tags: ['dogs', 'walking', 'outdoors'],
-      }));
-      
-      const videoAssets: CloudinaryAsset[] = Array.from({ length: 4 }).map((_, index) => ({
-        id: `vid-${index + 1}`,
-        publicId: `sample-video-${index + 1}`,
-        url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/v1623456789/sample-video-${index + 1}.mp4`,
-        format: 'mp4',
-        type: 'video',
-        createdAt: new Date(Date.now() - Math.random() * 10000000).toISOString(),
-        fileSize: Math.floor(Math.random() * 50000000) + 1000000,
-        width: 1920,
-        height: 1080,
-        duration: Math.floor(Math.random() * 60) + 10,
-        tags: ['dogs', 'walking', 'promotional'],
-      }));
-      
-      return [...imageAssets, ...videoAssets];
-    } else {
-      // Call our API endpoint
-      const queryParams = new URLSearchParams();
-      if (resourceType !== 'all') {
-        queryParams.set('resourceType', resourceType);
-      }
-      
+    try {
       const response = await fetch(`/api/cloudinary/assets?${queryParams.toString()}`);
       
       if (!response.ok) {
@@ -121,6 +104,9 @@ export default function MediaLibrary({
       }
       
       return await response.json();
+    } catch (error) {
+      console.error('Error fetching Cloudinary assets:', error);
+      return [];
     }
   };
 
@@ -316,7 +302,37 @@ export default function MediaLibrary({
         
         {!loading && filteredAssets.length > 0 && (
           <div className="flex justify-between items-center mt-4 text-sm text-gray-500">
-            <span>Showing {paginatedAssets.length} of {filteredAssets.length} items</span>
+            <div className="flex space-x-2 items-center">
+              <span>Showing {paginatedAssets.length} of {filteredAssets.length} items</span>
+              {maxSelection > 0 && selectedIds.length > 0 && (
+                <button
+                  onClick={() => setSelectedIds([])}
+                  className="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Clear Selection
+                </button>
+              )}
+              {maxSelection > 0 && filteredAssets.length > 0 && selectedIds.length < Math.min(maxSelection, filteredAssets.length) && (
+                <button
+                  onClick={() => {
+                    // Select all visible assets, up to the max selection limit
+                    const availableSpace = maxSelection - selectedIds.length;
+                    if (availableSpace <= 0) return;
+                    
+                    const newIds = [...selectedIds];
+                    const idsToAdd = paginatedAssets
+                      .filter(asset => !selectedIds.includes(asset.id))
+                      .slice(0, availableSpace)
+                      .map(asset => asset.id);
+                    
+                    setSelectedIds([...newIds, ...idsToAdd]);
+                  }}
+                  className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                >
+                  Select Page
+                </button>
+              )}
+            </div>
             <div className="flex items-center space-x-2">
               <span>Page {currentPage} of {totalPages}</span>
               <select 
@@ -407,11 +423,24 @@ export default function MediaLibrary({
                 </div>
                 
                 {selectedIds.includes(asset.id) && (
-                  <div className="absolute top-2 right-2 bg-primary-500 rounded-full w-6 h-6 flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </div>
+                  <>
+                    <div className="absolute top-2 right-2 bg-primary-500 rounded-full w-6 h-6 flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <button 
+                      className="absolute top-2 left-2 bg-white bg-opacity-90 rounded-full w-6 h-6 flex items-center justify-center text-red-600 hover:text-red-800 shadow-sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedIds(prev => prev.filter(id => id !== asset.id));
+                      }}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </>
                 )}
               </div>
             ))}
@@ -507,9 +536,19 @@ export default function MediaLibrary({
       
       {maxSelection > 0 && (
         <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 sm:px-6">
-          <p className="text-sm text-gray-500">
-            {selectedIds.length} of {maxSelection} items selected
-          </p>
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-gray-500">
+              {selectedIds.length} of {maxSelection} items selected
+            </p>
+            {selectedIds.length > 0 && (
+              <button
+                onClick={() => setSelectedIds([])}
+                className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200"
+              >
+                Clear Selection
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

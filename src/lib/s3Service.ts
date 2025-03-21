@@ -557,6 +557,16 @@ export const getThumbnailUrl = (asset: S3Asset, size: 'small' | 'medium' | 'larg
     return asset.url;
   }
   
+  // For HEIC files, we need to ensure we're using a browser-compatible format
+  // For thumbnails, we'll use our HEIC conversion endpoint with a cache-busting parameter
+  if (asset.key.toLowerCase().endsWith('.heic') && asset.contentType === 'image/heic') {
+    // This constructs a URL to our conversion endpoint, which will convert to JPEG
+    if (typeof window !== 'undefined') {
+      return `/api/s3/heic-convert?key=${encodeURIComponent(asset.key)}&size=${size}&t=${Date.now()}`;
+    }
+    // When running on server side, keep original URL
+  }
+  
   // Check if the URL is from S3
   if (!asset.url.includes('.s3.')) {
     return asset.url;

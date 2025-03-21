@@ -10,11 +10,35 @@ interface MediaViewerProps {
 export default function MediaViewer({ asset, onClose, formatDate }: MediaViewerProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState<string>(asset.url);
   
   useEffect(() => {
     // Reset state when asset changes
     setIsLoading(true);
     setLoadError(false);
+    
+    // Set initial URL from asset
+    setMediaUrl(asset.url);
+    
+    // For HEIC files, try to get converted URL
+    if (asset.key.toLowerCase().endsWith('.heic') && asset.contentType === 'image/heic') {
+      // Get a converted URL for viewing
+      const getConvertedUrl = async () => {
+        try {
+          const response = await fetch(`/api/s3/heic-convert?key=${encodeURIComponent(asset.key)}`);
+          
+          if (response.ok) {
+            const data = await response.json();
+            setMediaUrl(data.signedUrl);
+          }
+        } catch (error) {
+          console.error('Error getting converted HEIC URL:', error);
+          // Keep using original URL if conversion fails
+        }
+      };
+      
+      getConvertedUrl();
+    }
   }, [asset]);
   
   // Format the date with a default formatter if none provided
@@ -89,7 +113,7 @@ export default function MediaViewer({ asset, onClose, formatDate }: MediaViewerP
             <div className="w-full h-full flex items-center justify-center">
               {asset.contentType.startsWith('image/') ? (
                 <img
-                  src={asset.url}
+                  src={mediaUrl}
                   alt=""
                   className={`max-w-full max-h-[80vh] object-contain shadow-2xl transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                   onLoad={() => setIsLoading(false)}
@@ -101,7 +125,7 @@ export default function MediaViewer({ asset, onClose, formatDate }: MediaViewerP
               ) : asset.contentType.startsWith('video/') ? (
                 <div className={`max-w-full max-h-[80vh] w-full transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'}`}>
                   <video
-                    src={asset.url}
+                    src={mediaUrl}
                     controls
                     autoPlay
                     className="max-w-full max-h-[80vh] mx-auto shadow-2xl rounded"
@@ -133,7 +157,7 @@ export default function MediaViewer({ asset, onClose, formatDate }: MediaViewerP
                   </p>
                   <div className="mt-4 text-center">
                     <a
-                      href={asset.url}
+                      href={mediaUrl}
                       download={asset.key.split('/').pop()}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -161,7 +185,7 @@ export default function MediaViewer({ asset, onClose, formatDate }: MediaViewerP
                   </p>
                   <div className="mt-4 flex justify-center">
                     <a
-                      href={asset.url}
+                      href={mediaUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700"

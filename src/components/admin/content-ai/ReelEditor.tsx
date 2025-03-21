@@ -192,29 +192,54 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
     
     return (
       <div className="mt-6">
-        <h4 className="font-medium text-gray-900 mb-2">Selected Media ({selectedAssets.length})</h4>
+        <div className="flex justify-between items-center mb-2">
+          <h4 className="font-medium text-gray-900">Selected Media ({selectedAssets.length})</h4>
+          {selectedAssets.length > 0 && (
+            <button
+              onClick={() => setSelectedAssets([])}
+              className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
         <p className="text-sm text-gray-500 mb-2">
           {selectedAssets.length > 20 ? 
             `Showing 20 of ${selectedAssets.length} assets. All selected assets will be used in the reel.` : 
-            'These will appear in the order shown.'}
+            'These will appear in the order shown. Click an item to remove it.'}
         </p>
         <div className="grid grid-cols-4 gap-2">
           {displayAssets.map((asset, index) => (
             <div 
               key={asset.id}
-              className="relative border border-gray-200 rounded-md overflow-hidden"
+              className="relative border border-gray-200 rounded-md overflow-hidden group cursor-pointer"
+              onClick={() => {
+                setSelectedAssets(prev => prev.filter(a => a.id !== asset.id));
+              }}
             >
               {asset.type === 'image' ? (
-                <img 
-                  src={asset.url} 
-                  alt=""
-                  className="w-full h-16 object-cover"
-                />
+                <div className="relative">
+                  <img 
+                    src={asset.url} 
+                    alt=""
+                    className="w-full h-16 object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-200">
+                    <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                </div>
               ) : (
                 <div className="w-full h-16 bg-gray-100 flex items-center justify-center relative">
                   <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                   </svg>
+                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 flex items-center justify-center transition-all duration-200">
+                    <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
                 </div>
               )}
               <div className="absolute top-0 left-0 bg-gray-800 bg-opacity-70 text-white text-xs px-1">
