@@ -6,7 +6,8 @@ import {
   PutObjectCommand,
   CreateMultipartUploadCommand,
   UploadPartCommand,
-  CompleteMultipartUploadCommand
+  CompleteMultipartUploadCommand,
+  GetObjectCommand
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Upload } from '@aws-sdk/lib-storage';
@@ -359,15 +360,58 @@ export const uploadFileToS3 = async (
   }
 };
 
+// Generate signed URL for viewing media objects in S3
+export const getSignedViewUrl = async (
+  key: string,
+  expiresIn: number = 3600 // Default to 1 hour expiration
+): Promise<string> => {
+  // Server-side implementation
+  if (typeof window === 'undefined') {
+    const bucketName = process.env.AWS_S3_BUCKET_NAME || 'wanderpaws-media';
+    
+    // Create the command for the operation
+    const command = new GetObjectCommand({
+      Bucket: bucketName,
+      Key: key,
+    });
+
+    // Generate the signed URL
+    const signedUrl = await getSignedUrl(s3Client, command, {
+      expiresIn,
+    });
+    
+    return signedUrl;
+  } else {
+    // Client-side implementation - call API endpoint
+    try {
+      const response = await fetch(`/api/s3/signed-url?key=${encodeURIComponent(key)}&expiresIn=${expiresIn}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to get signed URL for viewing');
+      }
+      
+      const { signedUrl } = await response.json();
+      return signedUrl;
+    } catch (error) {
+      console.error('Error getting signed URL:', error);
+      // Fall back to the original URL as a last resort
+      // This won't work if the bucket is private, but allows code to continue
+      const fallbackUrl = `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${key}`;
+      return fallbackUrl;
+    }
+  }
+};
+
 // Get assets from S3
 export const getS3Assets = async (
   options: {
     prefix?: string;
     walkId?: string;
     maxResults?: number;
+    signedUrlExpiration?: number;
   } = {}
 ): Promise<S3Asset[]> => {
-  const { prefix = '', walkId, maxResults = 100 } = options;
+  const { prefix = '', walkId, maxResults = 100, signedUrlExpiration = 3600 } = options;
   
   try {
     // Use the API route on client-side
@@ -377,6 +421,7 @@ export const getS3Assets = async (
       if (prefix) queryParams.set('prefix', prefix);
       if (walkId) queryParams.set('walkId', walkId);
       if (maxResults) queryParams.set('maxResults', maxResults.toString());
+      if (signedUrlExpiration) queryParams.set('signedUrlExpiration', signedUrlExpiration.toString());
       
       console.log(`Fetching assets from /api/s3/assets?${queryParams.toString()}`);
       const response = await fetch(`/api/s3/assets?${queryParams.toString()}`);
@@ -422,24 +467,28 @@ export const getS3Assets = async (
       return [];
     }
     
-    // Transform to our S3Asset format
-    const assets: S3Asset[] = listResult.Contents.map(item => {
+    // Transform to our S3Asset format with signed URLs
+    const assetsPromises = listResult.Contents.map(async item => {
       const key = item.Key || '';
-      const url = `https://${bucketName}.s3.amazonaws.com/${key}`;
+      
+      // Generate a signed URL for viewing the object
+      const url = await getSignedViewUrl(key, signedUrlExpiration);
       
       return {
         id: item.ETag?.replace(/"/g, '') || key,
         key,
-        url,
+        url, // Use the signed URL instead of the direct S3 URL
         contentType: getContentTypeFromKey(key),
         size: item.Size || 0,
         uploaded: item.LastModified?.toISOString() || new Date().toISOString(),
       };
     });
     
+    const assets = await Promise.all(assetsPromises);
+    
     // If walkId is provided, filter by walkId using Head requests to check metadata
     if (walkId) {
-      const filteredAssets = [];
+      const filteredAssetsPromises = [];
       
       for (const asset of assets) {
         try {
@@ -453,7 +502,7 @@ export const getS3Assets = async (
           
           if (headResult.Metadata?.walkid === walkId) {
             // Add walkId and tags from metadata
-            filteredAssets.push({
+            filteredAssetsPromises.push({
               ...asset,
               walkId,
               tags: headResult.Metadata?.tags?.split(',') || [],
@@ -465,6 +514,7 @@ export const getS3Assets = async (
       }
       
       // Sort by upload date, newest first
+      const filteredAssets = await Promise.all(filteredAssetsPromises);
       return filteredAssets.sort((a, b) => {
         return new Date(b.uploaded).getTime() - new Date(a.uploaded).getTime();
       });
