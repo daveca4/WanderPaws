@@ -1310,6 +1310,251 @@ export default function AdminReportsPage() {
                 </div>
               </div>
             )}
+            
+            {selectedReport === 'subscriptions' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                  <div className="bg-white overflow-hidden shadow rounded-lg">
+                    <div className="px-4 py-5 sm:p-6">
+                      <dt className="text-sm font-medium text-gray-500 truncate">Total Subscriptions</dt>
+                      <dd className="mt-1 text-3xl font-semibold text-gray-900">{reportData.totalSubscriptions}</dd>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white overflow-hidden shadow rounded-lg">
+                    <div className="px-4 py-5 sm:p-6">
+                      <dt className="text-sm font-medium text-gray-500 truncate">New Subscriptions</dt>
+                      <dd className="mt-1 text-3xl font-semibold text-green-600">{reportData.newSubscriptions}</dd>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white overflow-hidden shadow rounded-lg">
+                    <div className="px-4 py-5 sm:p-6">
+                      <dt className="text-sm font-medium text-gray-500 truncate">Renewals</dt>
+                      <dd className="mt-1 text-3xl font-semibold text-primary-600">{reportData.renewals}</dd>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white overflow-hidden shadow rounded-lg">
+                    <div className="px-4 py-5 sm:p-6">
+                      <dt className="text-sm font-medium text-gray-500 truncate">Cancellations</dt>
+                      <dd className="mt-1 text-3xl font-semibold text-red-600">{reportData.cancellations}</dd>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Subscription Activity Chart */}
+                <div className="bg-white shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Subscription Activity</h3>
+                    <div className="mt-6 h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart
+                          data={subscriptionActivityData}
+                          margin={{
+                            top: 20,
+                            right: 30,
+                            left: 20,
+                            bottom: 5,
+                          }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis yAxisId="left" orientation="left" />
+                          <YAxis yAxisId="right" orientation="right" />
+                          <Tooltip
+                            formatter={(value, name) => {
+                              if (name === 'revenue') {
+                                return [formatCurrency(Number(value)), 'Revenue'];
+                              }
+                              return [value, name];
+                            }}
+                          />
+                          <Legend />
+                          <Bar yAxisId="left" dataKey="newSubscriptions" fill="#8884d8" name="New Subscriptions" />
+                          <Bar yAxisId="left" dataKey="renewals" fill="#82ca9d" name="Renewals" />
+                          <Bar yAxisId="left" dataKey="cancellations" fill="#ff8042" name="Cancellations" />
+                          <Line yAxisId="right" type="monotone" dataKey="revenue" stroke="#ff7300" name="Revenue" />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Subscription Plans Distribution */}
+                <div className="bg-white shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Subscription Plan Distribution</h3>
+                    <div className="mt-6 h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={subscriptionPlanData}
+                            cx="50%"
+                            cy="50%"
+                            labelLine={true}
+                            label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
+                            outerRadius={80}
+                            fill="#8884d8"
+                            dataKey="value"
+                          >
+                            {subscriptionPlanData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value, name, props) => [value, 'Subscribers']} />
+                          <Legend />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Subscription Plan Comparison */}
+                <div className="bg-white shadow rounded-lg">
+                  <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Subscription Plan Performance
+                    </h3>
+                    <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                      Comparative analysis of different subscription plans
+                    </p>
+                  </div>
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Plan Name
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Conversion Rate
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Avg. Credits Used
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Retention Rate
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Revenue
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {subscriptionPlanComparisonData.map((plan) => (
+                            <tr key={plan.name}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{plan.name}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{plan.conversionRate}%</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{plan.averageCreditsUsed}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{plan.retentionRate}%</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{formatCurrency(plan.revenue)}</div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Subscription Credit Usage */}
+                <div className="bg-white shadow rounded-lg">
+                  <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Subscription Credit Usage
+                    </h3>
+                    <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                      Analysis of how subscribers use their walk credits
+                    </p>
+                  </div>
+                  <div className="px-4 py-5 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900 mb-3">Credit Usage Distribution</h4>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={subscriptionCreditUsageData}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={true}
+                              label={({ name, value, percent }) => `${name.category}: ${(percent * 100).toFixed(0)}%`}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                            >
+                              {subscriptionCreditUsageData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={creditUsageColors[index % creditUsageColors.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip formatter={(value, name, props) => {
+                              if (props && props.payload) {
+                                const payload = props.payload as any;
+                                if (payload.category && payload.percentage) {
+                                  return [`${payload.percentage}%`, payload.category];
+                                }
+                              }
+                              return [value, name];
+                            }} />
+                            <Legend formatter={(value, entry) => {
+                              if (entry && entry.payload) {
+                                const payload = entry.payload as any;
+                                if (payload.category) {
+                                  return payload.category;
+                                }
+                              }
+                              return value;
+                            }} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900 mb-3">Subscription Expiry Forecast</h4>
+                      <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={subscriptionExpiryForecastData}
+                            margin={{
+                              top: 20,
+                              right: 30,
+                              left: 20,
+                              bottom: 5,
+                            }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="month" />
+                            <YAxis yAxisId="left" orientation="left" />
+                            <YAxis yAxisId="right" orientation="right" />
+                            <Tooltip formatter={(value, name) => {
+                              if (name === 'potentialLoss') return [formatCurrency(Number(value)), 'Potential Revenue Loss'];
+                              if (name === 'renewalProbability') return [value + '%', 'Renewal Probability'];
+                              return [value, 'Expiring Subscriptions'];
+                            }} />
+                            <Legend />
+                            <Bar yAxisId="left" dataKey="expirations" fill="#8884d8" name="Expiring Subscriptions" />
+                            <Line yAxisId="right" type="monotone" dataKey="renewalProbability" stroke="#82ca9d" name="Renewal Probability (%)" />
+                            <Bar yAxisId="left" dataKey="potentialLoss" fill="#ff8042" name="Potential Revenue Loss" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
