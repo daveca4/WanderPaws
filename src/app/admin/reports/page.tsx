@@ -208,10 +208,102 @@ const spendingFrequencyDistribution = [
   { range: '£9,000+', count: 1, percentage: 8.3 },
 ];
 
+// Mock data for individual dog activity tracking
+const dogActivityBreakdownData = [
+  { 
+    id: 'd1', 
+    name: 'Buddy', 
+    breed: 'Golden Retriever', 
+    size: 'large',
+    owner: 'John Smith',
+    totalWalks: 15, 
+    totalDistance: 32.5, 
+    avgDuration: 60,
+    recommendedWalks: 12,
+    recommendedDistance: 30,
+    meetsGuidelines: true,
+    lastActive: '2025-06-15'
+  },
+  { 
+    id: 'd2', 
+    name: 'Max', 
+    breed: 'German Shepherd', 
+    size: 'large',
+    owner: 'Sarah Johnson',
+    totalWalks: 9, 
+    totalDistance: 18.2, 
+    avgDuration: 45,
+    recommendedWalks: 12,
+    recommendedDistance: 30,
+    meetsGuidelines: false,
+    lastActive: '2025-06-16'
+  },
+  { 
+    id: 'd3', 
+    name: 'Daisy', 
+    breed: 'Beagle', 
+    size: 'medium',
+    owner: 'John Smith',
+    totalWalks: 20, 
+    totalDistance: 35.8, 
+    avgDuration: 50,
+    recommendedWalks: 14,
+    recommendedDistance: 28,
+    meetsGuidelines: true,
+    lastActive: '2025-06-17'
+  },
+  { 
+    id: 'd4', 
+    name: 'Luna', 
+    breed: 'Poodle', 
+    size: 'small',
+    owner: 'Michael Brown',
+    totalWalks: 6, 
+    totalDistance: 8.4, 
+    avgDuration: 40,
+    recommendedWalks: 10,
+    recommendedDistance: 15,
+    meetsGuidelines: false,
+    lastActive: '2025-06-18'
+  },
+  { 
+    id: 'd5', 
+    name: 'Charlie', 
+    breed: 'Labrador Retriever', 
+    size: 'large',
+    owner: 'Sarah Johnson',
+    totalWalks: 14, 
+    totalDistance: 28.6, 
+    avgDuration: 55,
+    recommendedWalks: 12,
+    recommendedDistance: 30,
+    meetsGuidelines: true,
+    lastActive: '2025-06-14'
+  },
+  { 
+    id: 'd6', 
+    name: 'Bella', 
+    breed: 'Yorkshire Terrier', 
+    size: 'small',
+    owner: 'Michael Brown',
+    totalWalks: 10, 
+    totalDistance: 12.5, 
+    avgDuration: 35,
+    recommendedWalks: 10,
+    recommendedDistance: 15,
+    meetsGuidelines: true,
+    lastActive: '2025-06-13'
+  },
+];
+
 export default function AdminReportsPage() {
   const [selectedReport, setSelectedReport] = useState('walks');
   const [dateRange, setDateRange] = useState('week');
   const [chartData, setChartData] = useState<any[]>([]);
+  // Add filter states for dog activity
+  const [breedFilter, setBreedFilter] = useState('all');
+  const [sizeFilter, setSizeFilter] = useState('all');
+  const [guidelineFilter, setGuidelineFilter] = useState('all');
   
   // Generate filtered data based on date range
   useEffect(() => {
@@ -318,6 +410,28 @@ export default function AdminReportsPage() {
   // Function to handle printing
   const handlePrint = () => {
     window.print();
+  };
+
+  // Filter dog activity data based on selected filters
+  const getFilteredDogActivityData = () => {
+    return dogActivityBreakdownData.filter(dog => {
+      return (breedFilter === 'all' || dog.breed === breedFilter) &&
+             (sizeFilter === 'all' || dog.size === sizeFilter) &&
+             (guidelineFilter === 'all' || 
+              (guidelineFilter === 'meeting' && dog.meetsGuidelines) ||
+              (guidelineFilter === 'below' && !dog.meetsGuidelines));
+    });
+  };
+  
+  // Get unique breed and size values for filter options
+  const getBreedOptions = () => {
+    const breeds = new Set(dogActivityBreakdownData.map(dog => dog.breed));
+    return ['all', ...Array.from(breeds)];
+  };
+  
+  const getSizeOptions = () => {
+    const sizes = new Set(dogActivityBreakdownData.map(dog => dog.size));
+    return ['all', ...Array.from(sizes)];
   };
 
   return (
@@ -636,6 +750,223 @@ export default function AdminReportsPage() {
                           <Legend />
                         </PieChart>
                       </ResponsiveContainer>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Add the new detailed dog activity breakdown */}
+                <div className="bg-white shadow rounded-lg mt-6">
+                  <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Dog Activity Breakdown
+                    </h3>
+                    <p className="mt-1 max-w-2xl text-sm text-gray-500">
+                      Detailed activity stats for individual dogs and exercise guideline compliance
+                    </p>
+                  </div>
+                  <div className="px-4 py-5 sm:p-6">
+                    {/* Add filter controls */}
+                    <div className="mb-6 flex flex-wrap gap-4">
+                      <div>
+                        <label htmlFor="breedFilter" className="block text-sm font-medium text-gray-700 mb-1">
+                          Filter by Breed
+                        </label>
+                        <select
+                          id="breedFilter"
+                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                          value={breedFilter}
+                          onChange={(e) => setBreedFilter(e.target.value)}
+                        >
+                          <option value="all">All Breeds</option>
+                          {getBreedOptions().filter(b => b !== 'all').map(breed => (
+                            <option key={breed} value={breed}>{breed}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="sizeFilter" className="block text-sm font-medium text-gray-700 mb-1">
+                          Filter by Size
+                        </label>
+                        <select
+                          id="sizeFilter"
+                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                          value={sizeFilter}
+                          onChange={(e) => setSizeFilter(e.target.value)}
+                        >
+                          <option value="all">All Sizes</option>
+                          {getSizeOptions().filter(s => s !== 'all').map(size => (
+                            <option key={size} value={size} className="capitalize">{size}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="guidelineFilter" className="block text-sm font-medium text-gray-700 mb-1">
+                          Guideline Compliance
+                        </label>
+                        <select
+                          id="guidelineFilter"
+                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                          value={guidelineFilter}
+                          onChange={(e) => setGuidelineFilter(e.target.value)}
+                        >
+                          <option value="all">All Dogs</option>
+                          <option value="meeting">Meeting Guidelines</option>
+                          <option value="below">Below Target</option>
+                        </select>
+                      </div>
+                      
+                      <div className="flex items-end">
+                        <button
+                          onClick={() => {
+                            setBreedFilter('all');
+                            setSizeFilter('all');
+                            setGuidelineFilter('all');
+                          }}
+                          className="bg-gray-100 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                        >
+                          Reset Filters
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Dog
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Owner
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Breed/Size
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Total Walks
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Distance (miles)
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Avg Duration
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Guidelines
+                            </th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Last Active
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {getFilteredDogActivityData().map((dog) => (
+                            <tr key={dog.id}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900">{dog.name}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-500">{dog.owner}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{dog.breed}</div>
+                                <div className="text-sm text-gray-500 capitalize">{dog.size}</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{dog.totalWalks}</div>
+                                <div className="text-xs text-gray-500">
+                                  Target: {dog.recommendedWalks}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{dog.totalDistance}</div>
+                                <div className="text-xs text-gray-500">
+                                  Target: {dog.recommendedDistance}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">{dog.avgDuration} min</div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                  dog.meetsGuidelines 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {dog.meetsGuidelines ? 'Meeting' : 'Below Target'}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {new Date(dog.lastActive).toLocaleDateString()}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  
+                  {/* Add exercise comparison chart */}
+                  <div className="mt-8 mb-4">
+                    <h4 className="text-md leading-6 font-medium text-gray-900 mb-4">
+                      Exercise Comparison: Actual vs. Recommended
+                    </h4>
+                    <div className="h-80">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={getFilteredDogActivityData()}
+                          margin={{ top: 20, right: 30, left: 20, bottom: 70 }}
+                          barSize={36}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis 
+                            dataKey="name" 
+                            angle={-45} 
+                            textAnchor="end" 
+                            height={70}
+                            interval={0}
+                          />
+                          <YAxis yAxisId="left" orientation="left" label={{ value: 'Walks', angle: -90, position: 'insideLeft' }} />
+                          <YAxis yAxisId="right" orientation="right" label={{ value: 'Distance (miles)', angle: 90, position: 'insideRight' }} />
+                          <Tooltip 
+                            formatter={(value, name) => {
+                              if (name === 'Walks' || name === 'Recommended Walks') return [value, name];
+                              return [`${value} miles`, name];
+                            }}
+                          />
+                          <Legend />
+                          <Bar yAxisId="left" dataKey="totalWalks" name="Walks" fill="#8884d8" />
+                          <Bar yAxisId="left" dataKey="recommendedWalks" name="Recommended Walks" fill="#82ca9d" />
+                          <Bar yAxisId="right" dataKey="totalDistance" name="Distance" fill="#ffc658" />
+                          <Bar yAxisId="right" dataKey="recommendedDistance" name="Recommended Distance" fill="#ff8042" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  
+                  <div className="px-4 py-5 sm:px-6 border-t border-gray-200">
+                    <h4 className="text-md leading-6 font-medium text-gray-900 mb-2">
+                      Exercise Guideline Compliance Summary
+                    </h4>
+                    <div className="flex items-center space-x-6">
+                      <div className="flex items-center">
+                        <div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
+                        <span className="text-sm text-gray-700">
+                          Meeting Guidelines: {getFilteredDogActivityData().filter(d => d.meetsGuidelines).length} dogs
+                        </span>
+                      </div>
+                      <div className="flex items-center">
+                        <div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
+                        <span className="text-sm text-gray-700">
+                          Below Target: {getFilteredDogActivityData().filter(d => !d.meetsGuidelines).length} dogs
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 text-sm text-gray-500">
+                      Showing {getFilteredDogActivityData().length} out of {dogActivityBreakdownData.length} dogs
                     </div>
                   </div>
                 </div>
