@@ -46,6 +46,13 @@ export const permissions: RolePermissions = {
     { action: 'access', resource: 'analytics' },
     { action: 'access', resource: 'admin-dashboard' },
     { action: 'access', resource: 'subscription-dashboard' },
+
+    // Messaging permissions
+    { action: 'access', resource: 'messages' },
+    { action: 'create', resource: 'messages' },
+    { action: 'read', resource: 'messages' },
+    { action: 'update', resource: 'messages' },
+    { action: 'delete', resource: 'messages' },
   ],
   
   owner: [
@@ -72,6 +79,12 @@ export const permissions: RolePermissions = {
     
     // Access to owner dashboard features
     { action: 'access', resource: 'owner-dashboard' },
+
+    // Messaging permissions
+    { action: 'access', resource: 'messages' },
+    { action: 'create', resource: 'messages' },
+    { action: 'read', resource: 'messages' },
+    { action: 'update', resource: 'messages' },
   ],
   
   walker: [
@@ -87,6 +100,12 @@ export const permissions: RolePermissions = {
     { action: 'update', resource: 'walks' }, // Their assigned walks (to update status, add metrics)
     
     { action: 'access', resource: 'walker-dashboard' },
+
+    // Messaging permissions
+    { action: 'access', resource: 'messages' },
+    { action: 'create', resource: 'messages' },
+    { action: 'read', resource: 'messages' },
+    { action: 'update', resource: 'messages' },
   ],
 };
 

@@ -2,6 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/AuthContext';
+import { MessageProvider } from '@/lib/MessageContext';
 import { LandingLayout } from '@/components/LandingLayout';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -23,9 +24,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <AuthProvider>
-          <LandingLayout>
-            {children}
-          </LandingLayout>
+          <MessageProvider>
+            <LandingLayout>
+              {children}
+            </LandingLayout>
+          </MessageProvider>
         </AuthProvider>
       </body>
     </html>

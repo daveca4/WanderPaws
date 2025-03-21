@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
+import { useMessages } from '@/lib/MessageContext';
 import PermissionGate from './PermissionGate';
 import { useState } from 'react';
 
 export function Navbar() {
   const { user, logout } = useAuth();
+  const { unreadCount } = useMessages();
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   // Handle user logout
@@ -35,6 +37,20 @@ export function Navbar() {
             Admin Panel
           </Link>
         </PermissionGate>
+
+        {/* Messages */}
+        {user && (
+          <Link href="/messages" className="text-gray-500 hover:text-gray-700 relative">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </Link>
+        )}
 
         {/* Notifications */}
         <button className="text-gray-500 hover:text-gray-700">
@@ -105,6 +121,19 @@ export function Navbar() {
                       Your Profile
                     </Link>
                   </PermissionGate>
+                  
+                  <Link 
+                    href="/messages" 
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    Messages
+                    {unreadCount > 0 && (
+                      <span className="ml-2 inline-flex items-center justify-center h-4 w-4 rounded-full bg-red-100 text-xs font-medium text-red-600">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </Link>
                   
                   <PermissionGate action="access" resource="owner-dashboard">
                     <Link 

@@ -36,6 +36,12 @@ export function isUrlAccessibleForUser(url: string, user: User | null): boolean 
     return true;
   }
 
+  // Common paths that all authenticated users can access
+  const commonAuthenticatedPaths = ['/messages'];
+  if (commonAuthenticatedPaths.some(path => url === path || url.startsWith(`${path}?`))) {
+    return true;
+  }
+
   // Check owner access
   if (user.role === 'owner') {
     const allowedOwnerPaths = [

@@ -197,4 +197,34 @@ export interface AssessmentFeedback {
   walkerNotes: string; // Additional notes from walker
   photosOrVideos?: string[]; // URLs to any photos or videos taken
   recommendedWalkerExperience: 'beginner' | 'intermediate' | 'expert';
+}
+
+// Messaging System Types
+export interface Message {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  content: string;
+  timestamp: string; // ISO date string
+  readStatus: 'read' | 'unread';
+  attachments?: MessageAttachment[];
+}
+
+export interface MessageAttachment {
+  id: string;
+  url: string;
+  type: 'image' | 'document' | 'audio';
+  name: string;
+  size: number; // in bytes
+}
+
+export interface Conversation {
+  id: string;
+  participants: string[]; // Array of user IDs
+  title?: string; // Optional title for group conversations
+  createdAt: string; // ISO date string
+  updatedAt: string; // ISO date string
+  lastMessageId?: string; // ID of the last message
+  unreadCount?: {[userId: string]: number}; // Count of unread messages per user
+  type: 'direct' | 'group';
 } 
