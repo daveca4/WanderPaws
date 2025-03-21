@@ -24,11 +24,21 @@ export async function GET(req: NextRequest) {
     
     // Log a sample of assets if available
     if (assets.length > 0) {
-      console.log(`Sample asset: ${JSON.stringify(assets[0])}`);
+      console.log(`Sample asset: ${JSON.stringify({
+        key: assets[0].key,
+        contentType: assets[0].contentType,
+        walkId: assets[0].walkId,
+        tags: assets[0].tags || [] // Ensure tags are included
+      })}`);
     }
     
-    // Return the assets
-    return NextResponse.json(assets);
+    // Return the assets with tags
+    const assetsWithTags = assets.map(asset => ({
+      ...asset,
+      tags: asset.tags || [] // Ensure every asset has a tags property
+    }));
+    
+    return NextResponse.json(assetsWithTags);
   } catch (error) {
     console.error('Error fetching S3 assets:', error);
     return NextResponse.json(

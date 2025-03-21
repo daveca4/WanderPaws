@@ -17,6 +17,7 @@ export interface S3UploadResult {
   bucket: string;
   etag: string;
   contentType: string;
+  tags?: string[];
 }
 
 export interface S3Asset {
@@ -273,13 +274,15 @@ export const uploadFileToS3 = async (
       
       if (uploadResponse.ok) {
         // Original upload succeeded
-        return {
+        const result: S3UploadResult = {
           key,
           location: `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${key}`,
           bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME || 'wanderpaws-media',
           etag: uploadResponse.headers.get('ETag') || '',
           contentType,
+          tags: options.tags || [],
         };
+        return result;
       }
       
       // If we get here, the original upload failed but didn't throw an error
@@ -326,13 +329,15 @@ export const uploadFileToS3 = async (
             });
             
             if (jpegUploadResponse.ok) {
-              return {
+              const result: S3UploadResult = {
                 key: jpegKey,
                 location: `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${jpegKey}`,
                 bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME || 'wanderpaws-media',
                 etag: jpegUploadResponse.headers.get('ETag') || '',
                 contentType: 'image/jpeg',
+                tags: [...tags, 'converted-from-heic'],
               };
+              return result;
             }
           }
         }
@@ -384,8 +389,19 @@ export const getS3Assets = async (
       const assets = await response.json();
       console.log(`Retrieved ${assets.length} assets from API`);
       
+      // Make sure tags are available (in case the API didn't return them)
+      const assetsWithTags = assets.map((asset: S3Asset) => ({
+        ...asset,
+        tags: asset.tags || []
+      }));
+      
+      // Print sample asset for debugging
+      if (assetsWithTags.length > 0) {
+        console.log('Sample asset:', JSON.stringify(assetsWithTags[0]));
+      }
+      
       // Sort assets by upload date, newest first
-      return assets.sort((a: S3Asset, b: S3Asset) => {
+      return assetsWithTags.sort((a: S3Asset, b: S3Asset) => {
         return new Date(b.uploaded).getTime() - new Date(a.uploaded).getTime();
       });
     }

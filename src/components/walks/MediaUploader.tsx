@@ -149,6 +149,13 @@ export default function MediaUploader({
     setUploading(true);
     setUploadErrors([]);
     
+    // Extract walker ID from the walkId - in a real app, you'd use a proper auth context
+    // Assuming walkId contains information about the walker in some format
+    // This is a simplified approach - in production you'd want to use a proper auth system
+    const walkerIdFromWalk = extractWalkerId(walkId);
+    
+    console.log(`Using walkId ${walkId} to determine walkerId: ${walkerIdFromWalk || 'unknown'}`);
+    
     const uploads = files.map(async (file, index) => {
       try {
         // Create a unique ID for tracking progress
@@ -175,11 +182,29 @@ export default function MediaUploader({
           });
         }, 300);
         
+        console.log(`Starting upload of ${file.name} for walk ${walkId}`);
+        
+        // Prepare tags that identify this upload with the specific walker
+        const uploadTags = ['walk-media', 'user-uploaded'];
+        
+        // Add the walk ID as a tag to help with identification
+        uploadTags.push(`walk-${walkId}`);
+        
+        // Add the walker ID if we have it
+        if (walkerIdFromWalk) {
+          uploadTags.push(`walker-${walkerIdFromWalk}`);
+          uploadTags.push(walkerIdFromWalk);
+        }
+        
+        console.log(`Tagging upload with: ${uploadTags.join(', ')}`);
+        
         // Upload the file with the new API that uses PUT request
         const result = await uploadFileToS3(file, {
           walkId,
-          tags: ['walk-media', 'user-uploaded'],
+          tags: uploadTags,
         });
+        
+        console.log(`Successfully uploaded ${file.name} to ${result.key} with tags: ${result.tags?.join(', ') || 'none'}`);
         
         // Set progress to 100% when complete
         clearInterval(progressInterval);
@@ -224,6 +249,8 @@ export default function MediaUploader({
       const results = await Promise.all(uploads);
       const successfulUploads = results.filter(result => result !== null) as S3UploadResult[];
       
+      console.log(`${successfulUploads.length} files successfully uploaded`);
+      
       if (successfulUploads.length > 0) {
         // Convert S3UploadResult to S3Asset
         const newAssets: S3Asset[] = successfulUploads.map(result => ({
@@ -234,13 +261,19 @@ export default function MediaUploader({
           size: 0, // We don't have this info from the upload result
           uploaded: new Date().toISOString(),
           walkId,
+          tags: result.tags || [], // Include tags from the upload result
         }));
+        
+        console.log(`Created ${newAssets.length} S3Asset objects from uploads`);
         
         // Clear the files queue
         setFiles([]);
         
         // Reload assets from the server to ensure the latest data
+        console.log('Reloading assets after upload...');
         const freshAssets = await loadExistingAssets() || [];
+        
+        console.log(`Reloaded ${freshAssets.length} assets after upload`);
         
         // Call the onUploadComplete callback with the fresh assets
         if (onUploadComplete && freshAssets.length > 0) {
@@ -257,6 +290,21 @@ export default function MediaUploader({
     } finally {
       setUploading(false);
     }
+  };
+
+  // Helper function to extract walker ID from walk ID
+  // This is a simplified example - in a real app, you would use a proper system
+  const extractWalkerId = (walkId: string): string => {
+    // Example implementation - replace with your actual logic
+    // Assumes walkId might be formatted like "walk-123-walker-456"
+    const walkerMatch = walkId.match(/walker[-_]?(\w+)/i);
+    if (walkerMatch && walkerMatch[1]) {
+      return walkerMatch[1];
+    }
+    
+    // Alternative approach: use the walkId itself as identifier
+    // This assumes each walk is uniquely associated with one walker
+    return walkId;
   };
 
   const toggleAutoRefresh = () => {

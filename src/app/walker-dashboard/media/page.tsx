@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import { S3Asset, getS3Assets, uploadFileToS3, getThumbnailUrl } from '@/lib/s3Service';
-import { mockWalks, mockDogs } from '@/lib/mockData';
 import RouteGuard from '@/components/RouteGuard';
 import MediaViewer from '@/components/MediaViewer';
 
@@ -31,22 +30,14 @@ const supportedFileTypes = [
   'video/quicktime'
 ];
 
-// Add a local interface that extends S3Asset with our admin-specific fields
-interface AdminMediaAsset extends S3Asset {
-  uploaderInfo?: string;
-}
-
-export default function AdminMediaPage() {
+export default function WalkerMediaPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [mediaAssets, setMediaAssets] = useState<AdminMediaAsset[]>([]);
-  const [filteredAssets, setFilteredAssets] = useState<AdminMediaAsset[]>([]);
+  const { user, loading } = useAuth();
+  const [mediaAssets, setMediaAssets] = useState<S3Asset[]>([]);
+  const [filteredAssets, setFilteredAssets] = useState<S3Asset[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedAssets, setSelectedAssets] = useState<string[]>([]);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [sortBy, setSortBy] = useState<string>('date');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [loadingAssets, setLoadingAssets] = useState(true);
   
   // File upload states
   const [isUploading, setIsUploading] = useState(false);
@@ -87,49 +78,56 @@ export default function AdminMediaPage() {
 
   // Load assets on component mount
   useEffect(() => {
-    loadAssets();
-  }, []);
+    if (user?.profileId) {
+      loadAssets();
+    }
+  }, [user?.profileId]);
 
-  // Function to load assets from S3
   const loadAssets = async () => {
+    if (!user?.profileId) return;
+    
     try {
-      setLoading(true);
+      setLoadingAssets(true);
       
-      // Load ALL media from the root of bucket - admin sees everything
+      // Get all media assets from S3
       const assets = await getS3Assets({
         maxResults: 500
       });
       
-      console.log(`Admin view: Loaded ${assets.length} total assets from S3`);
+      console.log(`Loaded ${assets.length} total assets from S3`);
       
-      // No filtering by walker ID - admins see all media
-      // Add some additional metadata for display purposes
-      const enhancedAssets = assets.map(asset => {
-        // Log tags for debugging
+      // Filter to ONLY show the current walker's uploads
+      const walkerAssets = assets.filter(asset => {
+        // The walker's tag identifiers
+        const walkerTag = `walker-${user.profileId}`;
+        const walkerIdTag = user.profileId;
+        
+        // Check if the asset's tags include the walker's specific tag
+        const hasWalkerTag = asset.tags?.some(tag => 
+          tag === walkerTag || tag === walkerIdTag
+        );
+        
+        // DEBUG: Log all tags on this asset for debugging
         if (asset.tags && asset.tags.length > 0) {
           console.log(`Asset ${asset.key} has tags: ${asset.tags.join(', ')}`);
         }
         
-        // Check if this asset is associated with a specific walker
-        const walkerTag = asset.tags?.find(tag => tag.startsWith('walker-'));
-        const walkerInfo = walkerTag ? walkerTag.replace('walker-', '') : 'Unknown';
+        // Only include the asset if it has the walker's specific tag
+        if (hasWalkerTag) {
+          console.log(`Including asset ${asset.key} - has walker tag matching ${user.profileId}`);
+        }
         
-        // Return enhanced asset with additional metadata
-        return {
-          ...asset,
-          // Add information about the uploader - in a real app, you'd look up the walker name
-          uploaderInfo: walkerInfo
-        };
+        return hasWalkerTag;
       });
       
-      console.log(`Admin view: Processing ${enhancedAssets.length} assets for display`);
+      console.log(`Filtered to ${walkerAssets.length} assets for walker ID ${user.profileId}`);
       
-      setMediaAssets(enhancedAssets);
-      setFilteredAssets(enhancedAssets);
+      setMediaAssets(walkerAssets);
+      setFilteredAssets(walkerAssets);
     } catch (error) {
       console.error('Error loading assets:', error);
     } finally {
-      setLoading(false);
+      setLoadingAssets(false);
     }
   };
 
@@ -149,73 +147,17 @@ export default function AdminMediaPage() {
       const query = searchQuery.toLowerCase();
       result = result.filter(asset => 
         asset.key.toLowerCase().includes(query) || 
-        (asset as any).dogName?.toLowerCase().includes(query) ||
-        (asset as any).walkerName?.toLowerCase().includes(query) ||
         asset.walkId?.toLowerCase().includes(query)
       );
     }
     
-    // Apply sorting
+    // Sort by upload date, newest first
     result.sort((a, b) => {
-      let comparison = 0;
-      
-      if (sortBy === 'date') {
-        comparison = new Date(a.uploaded).getTime() - new Date(b.uploaded).getTime();
-      } else if (sortBy === 'size') {
-        comparison = a.size - b.size;
-      } else if (sortBy === 'name') {
-        comparison = a.key.localeCompare(b.key);
-      } else if (sortBy === 'type') {
-        comparison = a.contentType.localeCompare(b.contentType);
-      }
-      
-      return sortOrder === 'asc' ? comparison : -comparison;
+      return new Date(b.uploaded).getTime() - new Date(a.uploaded).getTime();
     });
     
     setFilteredAssets(result);
-  }, [mediaAssets, selectedFilter, searchQuery, sortBy, sortOrder]);
-
-  // Toggle asset selection
-  const toggleSelectAsset = (assetId: string) => {
-    if (selectedAssets.includes(assetId)) {
-      setSelectedAssets(selectedAssets.filter(id => id !== assetId));
-    } else {
-      setSelectedAssets([...selectedAssets, assetId]);
-    }
-  };
-
-  // Select/deselect all assets
-  const toggleSelectAll = () => {
-    if (selectedAssets.length === filteredAssets.length) {
-      setSelectedAssets([]);
-    } else {
-      setSelectedAssets(filteredAssets.map(asset => asset.id));
-    }
-  };
-
-  // Delete selected assets (mock implementation)
-  const handleDeleteSelected = async () => {
-    if (window.confirm(`Are you sure you want to delete ${selectedAssets.length} selected items?`)) {
-      setIsDeleting(true);
-      
-      try {
-        // In a real implementation, this would call an API to delete the assets
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Remove deleted assets from state
-        const remainingAssets = mediaAssets.filter(asset => !selectedAssets.includes(asset.id));
-        setMediaAssets(remainingAssets);
-        setSelectedAssets([]);
-        
-        alert('Selected media files have been deleted');
-      } catch (error) {
-        console.error('Error deleting assets:', error);
-        alert('Failed to delete media files');
-      } finally {
-        setIsDeleting(false);
-      }
-    }
-  };
+  }, [mediaAssets, selectedFilter, searchQuery]);
 
   // Get file icon based on content type
   const getFileIcon = (contentType: string) => {
@@ -247,11 +189,13 @@ export default function AdminMediaPage() {
     const selectedFiles = Array.from(e.target.files);
     // Filter files by type (images and videos only)
     const validFiles = selectedFiles.filter(file => 
-      file.type.startsWith('image/') || file.type.startsWith('video/')
+      supportedFileTypes.includes(file.type) || 
+      file.name.toLowerCase().endsWith('.heic') || 
+      file.name.toLowerCase().endsWith('.mov')
     );
     
     if (selectedFiles.length !== validFiles.length) {
-      setUploadErrors(prev => [...prev, 'Some files were excluded because they are not supported. Only images and videos are allowed.']);
+      setUploadErrors(prev => [...prev, 'Some files were excluded because they are not supported.']);
     }
     
     setFilesToUpload(prev => [...prev, ...validFiles]);
@@ -280,11 +224,13 @@ export default function AdminMediaPage() {
     const droppedFiles = Array.from(e.dataTransfer.files);
     // Filter files by type (images and videos only)
     const validFiles = droppedFiles.filter(file => 
-      file.type.startsWith('image/') || file.type.startsWith('video/')
+      supportedFileTypes.includes(file.type) || 
+      file.name.toLowerCase().endsWith('.heic') || 
+      file.name.toLowerCase().endsWith('.mov')
     );
     
     if (droppedFiles.length !== validFiles.length) {
-      setUploadErrors(prev => [...prev, 'Some files were excluded because they are not supported. Only images and videos are allowed.']);
+      setUploadErrors(prev => [...prev, 'Some files were excluded because they are not supported.']);
     }
     
     setFilesToUpload(prev => [...prev, ...validFiles]);
@@ -325,15 +271,37 @@ export default function AdminMediaPage() {
     });
     
     try {
+      // Ensure we have the walker's ID for tagging
+      if (!user?.profileId) {
+        throw new Error('Cannot upload files - walker ID is not available');
+      }
+      
+      console.log(`Starting upload of ${filesToUpload.length} files as walker: ${user.profileId}`);
+      
       // Upload each file to S3 using the updated S3 service
       const uploads = filesToUpload.map(async (file, index) => {
         const fileId = fileIds[index];
         
         try {
-          // Use the updated uploadFileToS3 function with no prefix to put in root of bucket
+          // Make sure we have proper walker identification tags
+          const walkerTag = user.profileId ? `walker-${user.profileId}` : 'unknown-walker';
+          
+          // These are the critical tags that will be used to filter assets for this walker
+          const walkerTags = [
+            'walk-media',
+            'user-uploaded',
+            walkerTag,
+            user.profileId // This is important - include the raw profile ID as a tag
+          ].filter(Boolean) as string[]; // Ensure all values are defined strings
+          
+          console.log(`Uploading ${file.name} with tags: ${walkerTags.join(', ')}`);
+          
+          // Use the updated uploadFileToS3 function with walker-specific tags
           const result = await uploadFileToS3(file, {
-            tags: ['admin-upload', 'media-library']
+            tags: walkerTags
           });
+          
+          console.log(`Successfully uploaded ${file.name} to ${result.key} with tags: ${result.tags?.join(', ') || 'none'}`);
           
           // Set progress to 100% when complete
           setUploadProgress(prev => ({
@@ -353,7 +321,9 @@ export default function AdminMediaPage() {
       });
       
       // Wait for all uploads to complete
-      await Promise.all(uploads);
+      const results = await Promise.all(uploads);
+      const successfulUploads = results.filter(Boolean);
+      console.log(`${successfulUploads.length} files successfully uploaded with walker tags`);
       
       // Clear all progress intervals
       progressIntervals.forEach(interval => clearInterval(interval));
@@ -362,6 +332,7 @@ export default function AdminMediaPage() {
       setFilesToUpload([]);
       
       // Reload assets to show the newly uploaded files
+      console.log('Reloading assets after upload to display walker-specific media...');
       await loadAssets();
       
       // Close the upload modal
@@ -389,26 +360,22 @@ export default function AdminMediaPage() {
     setPreviewAsset(null);
   };
 
-  // Function to copy URL to clipboard
-  const copyUrlToClipboard = (url: string) => {
-    navigator.clipboard.writeText(url)
-      .then(() => {
-        // Show success message (would implement toast notification in real app)
-        console.log('URL copied to clipboard');
-      })
-      .catch(err => {
-        console.error('Failed to copy URL: ', err);
-      });
-  };
+  if (loading || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
 
   return (
-    <RouteGuard requiredPermission={{ action: 'access', resource: 'admin-dashboard' }}>
+    <RouteGuard requiredPermission={{ action: 'access', resource: 'walker-dashboard' }}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Media Gallery</h1>
+            <h1 className="text-2xl font-bold text-gray-900">My Media Gallery</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Manage uploaded media from dog walkers and admin uploads
+              Manage your walk photos and videos
             </p>
           </div>
           
@@ -430,16 +397,10 @@ export default function AdminMediaPage() {
               Upload Media
             </button>
             <Link 
-              href="/admin/content-ai"
+              href="/walker-dashboard/walks"
               className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
             >
-              Content AI
-            </Link>
-            <Link 
-              href="/admin"
-              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              Dashboard
+              My Walks
             </Link>
           </div>
         </div>
@@ -497,57 +458,11 @@ export default function AdminMediaPage() {
               </div>
             </div>
           </div>
-          
-          {/* Sort controls and bulk actions */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0 mt-4">
-            <div className="flex items-center space-x-2">
-              <label htmlFor="sort" className="text-sm text-gray-500">Sort by:</label>
-              <select
-                id="sort"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="shadow-sm focus:ring-primary-500 focus:border-primary-500 text-sm border-gray-300 rounded-md"
-              >
-                <option value="date">Upload Date</option>
-                <option value="size">File Size</option>
-                <option value="name">File Name</option>
-                <option value="type">File Type</option>
-              </select>
-              <button 
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-                className="p-1 rounded-md hover:bg-gray-100"
-                title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-              >
-                {sortOrder === 'asc' ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h9m5-4v12m0 0l-4-4m4 4l4-4" />
-                  </svg>
-                )}
-              </button>
-            </div>
-            
-            {selectedAssets.length > 0 && (
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-500">{selectedAssets.length} selected</span>
-                <button
-                  onClick={handleDeleteSelected}
-                  disabled={isDeleting}
-                  className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
-                >
-                  {isDeleting ? 'Deleting...' : 'Delete Selected'}
-                </button>
-              </div>
-            )}
-          </div>
         </div>
         
         {/* Media grid */}
-        <div className="bg-white shadow rounded-lg">
-          {loading ? (
+        <div className="bg-white shadow rounded-lg p-6">
+          {loadingAssets ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
             </div>
@@ -568,129 +483,64 @@ export default function AdminMediaPage() {
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploader</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredAssets.map(asset => (
-                    <tr key={asset.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {asset.contentType.startsWith('image/') ? (
-                            <div 
-                              className="flex-shrink-0 h-16 w-16 rounded overflow-hidden cursor-pointer"
-                              onClick={() => openMediaPreview(asset)}
-                            >
-                              <img
-                                className="h-16 w-16 rounded object-cover hover:opacity-80 transition-opacity"
-                                src={getThumbnailUrl(asset, 'small')}
-                                alt=""
-                                loading="lazy"
-                              />
-                            </div>
-                          ) : asset.contentType.startsWith('video/') ? (
-                            <div 
-                              className="flex-shrink-0 h-16 w-16 rounded overflow-hidden relative cursor-pointer bg-gray-100"
-                              onClick={() => openMediaPreview(asset)}
-                            >
-                              <video
-                                className="h-16 w-16 object-cover"
-                                src={asset.url}
-                                muted
-                                preload="metadata"
-                              />
-                              <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex-shrink-0 h-16 w-16 bg-gray-100 rounded flex items-center justify-center">
-                              {getFileIcon(asset.contentType)}
-                            </div>
-                          )}
-                          <div className="ml-4 max-w-xs truncate">
-                            <div className="text-sm font-medium text-gray-900 truncate">
-                              {asset.key.split('/').pop()}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {asset.contentType}
-                            </div>
-                          </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {filteredAssets.map(asset => (
+                <div 
+                  key={asset.id} 
+                  className="relative group rounded-lg overflow-hidden border border-gray-200 cursor-pointer"
+                  onClick={() => openMediaPreview(asset)}
+                >
+                  {/* Media thumbnail */}
+                  <div className="aspect-w-1 aspect-h-1 bg-gray-100 overflow-hidden">
+                    {asset.contentType.startsWith('image/') ? (
+                      <img
+                        src={getThumbnailUrl(asset, 'medium')}
+                        alt=""
+                        className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-110"
+                        loading="lazy"
+                      />
+                    ) : asset.contentType.startsWith('video/') ? (
+                      <div className="relative h-full w-full">
+                        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-40">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          asset.contentType.startsWith('image/') 
-                            ? 'bg-blue-100 text-blue-800' 
-                            : asset.contentType.startsWith('video/') 
-                              ? 'bg-purple-100 text-purple-800' 
-                              : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {asset.contentType.split('/')[0]}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        {getFileIcon(asset.contentType)}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Overlay on hover */}
+                  <div className="absolute inset-0 bg-black bg-opacity-30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                    <span className="bg-white bg-opacity-90 p-2 rounded-full">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </span>
+                  </div>
+                  
+                  {/* File info */}
+                  <div className="p-2 text-xs text-gray-500">
+                    <div className="truncate" title={asset.key.split('/').pop() || ''}>
+                      {asset.key.split('/').pop()?.substring(0, 15)}{(asset.key.split('/').pop()?.length || 0) > 15 ? '...' : ''}
+                    </div>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-gray-400">{new Date(asset.uploaded).toLocaleDateString()}</span>
+                      {asset.walkId && (
+                        <span className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full">
+                          Walk
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(asset.uploaded)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {/* Display the uploader information */}
-                        <div className="text-sm text-gray-900">
-                          {asset.uploaderInfo && asset.uploaderInfo !== 'Unknown' ? (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                              Walker: {asset.uploaderInfo}
-                            </span>
-                          ) : asset.tags?.some(tag => tag === 'admin-upload') ? (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-800">
-                              Admin Upload
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
-                              Unknown
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {(asset.size / 1024 / 1024).toFixed(2)} MB
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex space-x-2 justify-end">
-                          <button
-                            onClick={() => openMediaPreview(asset)}
-                            className="text-primary-600 hover:text-primary-900"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() => copyUrlToClipboard(asset.url)}
-                            className="text-primary-600 hover:text-primary-900"
-                          >
-                            Copy URL
-                          </button>
-                          <button
-                            onClick={() => toggleSelectAsset(asset.id)}
-                            className="text-primary-600 hover:text-primary-900"
-                          >
-                            {selectedAssets.includes(asset.id) ? 'Deselect' : 'Select'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -719,7 +569,7 @@ export default function AdminMediaPage() {
                     </h3>
                     <div className="mt-2">
                       <p className="text-sm text-gray-500">
-                        Upload images and videos for use in content creation and marketing materials.
+                        Upload photos and videos from your walks
                       </p>
                     </div>
                     
@@ -738,7 +588,7 @@ export default function AdminMediaPage() {
                           Drag files here or click to browse
                         </h4>
                         <p className="mt-1 text-xs text-gray-500">
-                          Supported formats: JPEG, PNG, GIF, MP4, MOV
+                          Supported formats: JPEG, PNG, GIF, MP4, HEIC, MOV
                         </p>
                         <input
                           ref={fileInputRef}
