@@ -65,7 +65,7 @@ export default function WalkerSchedulePage() {
     );
   }
 
-  const walkerId = user.profileId;
+  const walkerId = user.profileId || '';
   const upcomingWalks = getUpcomingWalks(undefined, undefined, walkerId);
 
   // Get walker's holiday requests
