@@ -5,6 +5,12 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
 import { ContentItem, getAllContentItems } from '@/lib/contentAIService';
+import { 
+  SocialMediaConfig, 
+  InstagramCredentials, 
+  FacebookCredentials, 
+  TikTokCredentials 
+} from '@/lib/socialMediaService';
 
 // Define content types
 type ContentType = 'blog' | 'social' | 'email' | 'announcement' | 'video' | 'reel';
@@ -17,6 +23,37 @@ export default function ContentAIPage() {
   
   // Use state for content items, loaded from service
   const [recentContent, setRecentContent] = useState<ContentItem[]>([]);
+
+  // Social media configurations state
+  const [socialMediaConfig, setSocialMediaConfig] = useState<SocialMediaConfig | null>(null);
+  const [socialMediaLoading, setSocialMediaLoading] = useState(false);
+  const [socialMediaError, setSocialMediaError] = useState<string | null>(null);
+  
+  // Form states for connecting new platforms
+  const [tiktokForm, setTiktokForm] = useState({
+    clientKey: '',
+    clientSecret: ''
+  });
+  const [instagramForm, setInstagramForm] = useState({
+    apiKey: '',
+    apiSecret: ''
+  });
+  const [facebookForm, setFacebookForm] = useState({
+    appId: '',
+    appSecret: ''
+  });
+  
+  // Connection modal states
+  const [showInstagramModal, setShowInstagramModal] = useState(false);
+  const [showFacebookModal, setShowFacebookModal] = useState(false);
+  const [showTiktokModal, setShowTiktokModal] = useState(false);
+  
+  // UI states
+  const [showInstagramApiKey, setShowInstagramApiKey] = useState(false);
+  const [showInstagramApiSecret, setShowInstagramApiSecret] = useState(false);
+  const [showFacebookAppId, setShowFacebookAppId] = useState(false);
+  const [showFacebookAppSecret, setShowFacebookAppSecret] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Load content on component mount
   useEffect(() => {
@@ -33,6 +70,286 @@ export default function ContentAIPage() {
     
     loadContent();
   }, []);
+  
+  // Load social media configuration when settings tab is active
+  useEffect(() => {
+    if (activeTab === 'settings') {
+      loadSocialMediaConfig();
+    }
+  }, [activeTab]);
+  
+  // Function to load social media configuration
+  const loadSocialMediaConfig = async () => {
+    try {
+      setSocialMediaLoading(true);
+      setSocialMediaError(null);
+      
+      const response = await fetch('/api/social-media');
+      
+      if (!response.ok) {
+        throw new Error('Failed to load social media configuration');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setSocialMediaConfig(data.data);
+      } else {
+        throw new Error(data.error || 'Failed to load configuration');
+      }
+    } catch (error: any) {
+      console.error('Error loading social media config:', error);
+      setSocialMediaError(error.message || 'An error occurred');
+    } finally {
+      setSocialMediaLoading(false);
+    }
+  };
+  
+  // Function to disconnect a platform
+  const disconnectPlatform = async (platform: 'instagram' | 'facebook' | 'tiktok') => {
+    if (!confirm(`Are you sure you want to disconnect ${platform}?`)) {
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      
+      const response = await fetch('/api/social-media/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ platform }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to disconnect ${platform}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Reload the configuration
+        await loadSocialMediaConfig();
+        alert(`Successfully disconnected ${platform}`);
+      } else {
+        throw new Error(data.error || `Failed to disconnect ${platform}`);
+      }
+    } catch (error: any) {
+      console.error(`Error disconnecting ${platform}:`, error);
+      alert(error.message || `An error occurred while disconnecting ${platform}`);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
+  // Function to connect to TikTok
+  const connectTikTok = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!tiktokForm.clientKey || !tiktokForm.clientSecret) {
+      alert('Please enter both Client Key and Client Secret');
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      
+      const response = await fetch('/api/social-media/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform: 'tiktok',
+          credentials: {
+            clientKey: tiktokForm.clientKey,
+            clientSecret: tiktokForm.clientSecret
+          }
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to connect to TikTok');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Reload the configuration
+        await loadSocialMediaConfig();
+        // Reset the form
+        setTiktokForm({
+          clientKey: '',
+          clientSecret: ''
+        });
+        setShowTiktokModal(false);
+        alert('Successfully connected to TikTok');
+      } else {
+        throw new Error(data.error || 'Failed to connect to TikTok');
+      }
+    } catch (error: any) {
+      console.error('Error connecting to TikTok:', error);
+      alert(error.message || 'An error occurred while connecting to TikTok');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
+  // Function to connect to Instagram
+  const connectInstagram = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!instagramForm.apiKey || !instagramForm.apiSecret) {
+      alert('Please enter both API Key and API Secret');
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      
+      const response = await fetch('/api/social-media/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform: 'instagram',
+          credentials: {
+            apiKey: instagramForm.apiKey,
+            apiSecret: instagramForm.apiSecret
+          }
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to connect to Instagram');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Reload the configuration
+        await loadSocialMediaConfig();
+        // Reset the form
+        setInstagramForm({
+          apiKey: '',
+          apiSecret: ''
+        });
+        setShowInstagramModal(false);
+        alert('Successfully connected to Instagram');
+      } else {
+        throw new Error(data.error || 'Failed to connect to Instagram');
+      }
+    } catch (error: any) {
+      console.error('Error connecting to Instagram:', error);
+      alert(error.message || 'An error occurred while connecting to Instagram');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
+  // Function to connect to Facebook
+  const connectFacebook = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!facebookForm.appId || !facebookForm.appSecret) {
+      alert('Please enter both App ID and App Secret');
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      
+      const response = await fetch('/api/social-media/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          platform: 'facebook',
+          credentials: {
+            appId: facebookForm.appId,
+            appSecret: facebookForm.appSecret
+          }
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to connect to Facebook');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Reload the configuration
+        await loadSocialMediaConfig();
+        // Reset the form
+        setFacebookForm({
+          appId: '',
+          appSecret: ''
+        });
+        setShowFacebookModal(false);
+        alert('Successfully connected to Facebook');
+      } else {
+        throw new Error(data.error || 'Failed to connect to Facebook');
+      }
+    } catch (error: any) {
+      console.error('Error connecting to Facebook:', error);
+      alert(error.message || 'An error occurred while connecting to Facebook');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
+  // Function to save social media settings
+  const saveSettings = async () => {
+    if (!socialMediaConfig) return;
+    
+    try {
+      setSubmitting(true);
+      
+      const response = await fetch('/api/social-media', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          settings: socialMediaConfig.settings
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to save settings');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        alert('Settings saved successfully');
+      } else {
+        throw new Error(data.error || 'Failed to save settings');
+      }
+    } catch (error: any) {
+      console.error('Error saving settings:', error);
+      alert(error.message || 'An error occurred while saving settings');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
+  // Update social media settings
+  const updateSocialMediaSettings = (key: 'autoPost' | 'crossPosting' | 'platformAdaptation', value: boolean) => {
+    if (!socialMediaConfig) return;
+    
+    setSocialMediaConfig({
+      ...socialMediaConfig,
+      settings: {
+        ...socialMediaConfig.settings,
+        [key]: value
+      }
+    });
+  };
 
   // Get status badge color
   const getStatusBadgeClass = (status: string) => {
@@ -576,113 +893,186 @@ export default function ContentAIPage() {
                       </svg>
                       <div className="ml-3">
                         <h4 className="text-sm font-medium text-gray-900">Instagram</h4>
-                        <p className="text-xs text-gray-500">Connected as @wanderpaws_official</p>
+                        <p className="text-xs text-gray-500">
+                          {socialMediaLoading ? 'Loading...' : 
+                           socialMediaConfig?.instagram ? `Connected as @${socialMediaConfig.instagram.connectedUsername}` : 
+                           'Not connected'}
+                        </p>
                       </div>
                     </div>
                     <div className="flex space-x-3">
-                      <button className="text-sm text-primary-600 hover:text-primary-500">Configure</button>
-                      <button className="text-sm text-red-600 hover:text-red-500">Disconnect</button>
+                      {socialMediaConfig?.instagram ? (
+                        <>
+                          <button 
+                            className="text-sm text-primary-600 hover:text-primary-500"
+                            disabled={submitting}
+                          >
+                            Configure
+                          </button>
+                          <button 
+                            className="text-sm text-red-600 hover:text-red-500"
+                            onClick={() => disconnectPlatform('instagram')}
+                            disabled={submitting}
+                          >
+                            {submitting ? 'Disconnecting...' : 'Disconnect'}
+                          </button>
+                        </>
+                      ) : (
+                        <button 
+                          className="text-sm text-primary-600 hover:text-primary-500"
+                          disabled={submitting}
+                          onClick={() => setShowInstagramModal(true)}
+                        >
+                          Connect Account
+                        </button>
+                      )}
                     </div>
                   </div>
                   
-                  <div className="mt-4 ml-11 space-y-4">
-                    <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
-                      <div>
-                        <label htmlFor="instagram-api-key" className="block text-sm font-medium text-gray-700">API Key</label>
-                        <div className="mt-1 flex rounded-md shadow-sm">
-                          <input
-                            type="password"
-                            name="instagram-api-key"
-                            id="instagram-api-key"
-                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
-                            placeholder="••••••••••••••••"
-                            value="igkf_1234567890abcdef"
-                            readOnly
-                          />
-                          <button
-                            type="button"
-                            className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                          >
-                            Show
-                          </button>
+                  {socialMediaConfig?.instagram && (
+                    <div className="mt-4 ml-11 space-y-4">
+                      <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor="instagram-api-key" className="block text-sm font-medium text-gray-700">API Key</label>
+                          <div className="mt-1 flex rounded-md shadow-sm">
+                            <input
+                              type={showInstagramApiKey ? "text" : "password"}
+                              name="instagram-api-key"
+                              id="instagram-api-key"
+                              className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                              placeholder="••••••••••••••••"
+                              value={socialMediaConfig.instagram.apiKey}
+                              readOnly
+                            />
+                            <button
+                              type="button"
+                              className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                              onClick={() => setShowInstagramApiKey(!showInstagramApiKey)}
+                            >
+                              {showInstagramApiKey ? 'Hide' : 'Show'}
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="instagram-api-secret" className="block text-sm font-medium text-gray-700">API Secret</label>
+                          <div className="mt-1 flex rounded-md shadow-sm">
+                            <input
+                              type={showInstagramApiSecret ? "text" : "password"}
+                              name="instagram-api-secret"
+                              id="instagram-api-secret"
+                              className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                              placeholder="••••••••••••••••"
+                              value={socialMediaConfig.instagram.apiSecret}
+                              readOnly
+                            />
+                            <button
+                              type="button"
+                              className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                              onClick={() => setShowInstagramApiSecret(!showInstagramApiSecret)}
+                            >
+                              {showInstagramApiSecret ? 'Hide' : 'Show'}
+                            </button>
+                          </div>
                         </div>
                       </div>
                       
                       <div>
-                        <label htmlFor="instagram-api-secret" className="block text-sm font-medium text-gray-700">API Secret</label>
-                        <div className="mt-1 flex rounded-md shadow-sm">
-                          <input
-                            type="password"
-                            name="instagram-api-secret"
-                            id="instagram-api-secret"
-                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
-                            placeholder="••••••••••••••••"
-                            value="igs_9876543210fedcba"
-                            readOnly
-                          />
-                          <button
-                            type="button"
-                            className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                          >
-                            Show
-                          </button>
-                        </div>
+                        <fieldset>
+                          <legend className="text-sm font-medium text-gray-700">Post Types</legend>
+                          <div className="mt-2 space-y-3">
+                            <div className="relative flex items-start">
+                              <div className="flex items-center h-5">
+                                <input
+                                  id="instagram-feed"
+                                  name="instagram-feed"
+                                  type="checkbox"
+                                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                  checked={socialMediaConfig.instagram.enabledFeatures?.feed}
+                                  onChange={(e) => {
+                                    if (socialMediaConfig && socialMediaConfig.instagram && socialMediaConfig.instagram.enabledFeatures) {
+                                      setSocialMediaConfig({
+                                        ...socialMediaConfig,
+                                        instagram: {
+                                          ...socialMediaConfig.instagram,
+                                          enabledFeatures: {
+                                            ...socialMediaConfig.instagram.enabledFeatures,
+                                            feed: e.target.checked
+                                          }
+                                        }
+                                      });
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <div className="ml-3 text-sm">
+                                <label htmlFor="instagram-feed" className="font-medium text-gray-700">Feed Posts</label>
+                                <p className="text-gray-500">Standard posts to your Instagram feed</p>
+                              </div>
+                            </div>
+                            <div className="relative flex items-start">
+                              <div className="flex items-center h-5">
+                                <input
+                                  id="instagram-stories"
+                                  name="instagram-stories"
+                                  type="checkbox"
+                                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                  checked={socialMediaConfig.instagram.enabledFeatures?.stories}
+                                  onChange={(e) => {
+                                    if (socialMediaConfig && socialMediaConfig.instagram && socialMediaConfig.instagram.enabledFeatures) {
+                                      setSocialMediaConfig({
+                                        ...socialMediaConfig,
+                                        instagram: {
+                                          ...socialMediaConfig.instagram,
+                                          enabledFeatures: {
+                                            ...socialMediaConfig.instagram.enabledFeatures,
+                                            stories: e.target.checked
+                                          }
+                                        }
+                                      });
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <div className="ml-3 text-sm">
+                                <label htmlFor="instagram-stories" className="font-medium text-gray-700">Stories</label>
+                                <p className="text-gray-500">24-hour Instagram stories</p>
+                              </div>
+                            </div>
+                            <div className="relative flex items-start">
+                              <div className="flex items-center h-5">
+                                <input
+                                  id="instagram-reels"
+                                  name="instagram-reels"
+                                  type="checkbox"
+                                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                  checked={socialMediaConfig.instagram.enabledFeatures?.reels}
+                                  onChange={(e) => {
+                                    if (socialMediaConfig && socialMediaConfig.instagram && socialMediaConfig.instagram.enabledFeatures) {
+                                      setSocialMediaConfig({
+                                        ...socialMediaConfig,
+                                        instagram: {
+                                          ...socialMediaConfig.instagram,
+                                          enabledFeatures: {
+                                            ...socialMediaConfig.instagram.enabledFeatures,
+                                            reels: e.target.checked
+                                          }
+                                        }
+                                      });
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <div className="ml-3 text-sm">
+                                <label htmlFor="instagram-reels" className="font-medium text-gray-700">Reels</label>
+                                <p className="text-gray-500">Short-form vertical videos</p>
+                              </div>
+                            </div>
+                          </div>
+                        </fieldset>
                       </div>
                     </div>
-                    
-                    <div>
-                      <fieldset>
-                        <legend className="text-sm font-medium text-gray-700">Post Types</legend>
-                        <div className="mt-2 space-y-3">
-                          <div className="relative flex items-start">
-                            <div className="flex items-center h-5">
-                              <input
-                                id="instagram-feed"
-                                name="instagram-feed"
-                                type="checkbox"
-                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                                defaultChecked
-                              />
-                            </div>
-                            <div className="ml-3 text-sm">
-                              <label htmlFor="instagram-feed" className="font-medium text-gray-700">Feed Posts</label>
-                              <p className="text-gray-500">Standard posts to your Instagram feed</p>
-                            </div>
-                          </div>
-                          <div className="relative flex items-start">
-                            <div className="flex items-center h-5">
-                              <input
-                                id="instagram-stories"
-                                name="instagram-stories"
-                                type="checkbox"
-                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                                defaultChecked
-                              />
-                            </div>
-                            <div className="ml-3 text-sm">
-                              <label htmlFor="instagram-stories" className="font-medium text-gray-700">Stories</label>
-                              <p className="text-gray-500">24-hour Instagram stories</p>
-                            </div>
-                          </div>
-                          <div className="relative flex items-start">
-                            <div className="flex items-center h-5">
-                              <input
-                                id="instagram-reels"
-                                name="instagram-reels"
-                                type="checkbox"
-                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                                defaultChecked
-                              />
-                            </div>
-                            <div className="ml-3 text-sm">
-                              <label htmlFor="instagram-reels" className="font-medium text-gray-700">Reels</label>
-                              <p className="text-gray-500">Short-form vertical videos</p>
-                            </div>
-                          </div>
-                        </div>
-                      </fieldset>
-                    </div>
-                  </div>
+                  )}
                 </div>
                 
                 {/* Facebook Integration */}
@@ -694,125 +1084,199 @@ export default function ContentAIPage() {
                       </svg>
                       <div className="ml-3">
                         <h4 className="text-sm font-medium text-gray-900">Facebook</h4>
-                        <p className="text-xs text-gray-500">Connected as WanderPaws</p>
+                        <p className="text-xs text-gray-500">
+                          {socialMediaLoading ? 'Loading...' : 
+                           socialMediaConfig?.facebook ? `Connected as ${socialMediaConfig.facebook.pageName}` : 
+                           'Not connected'}
+                        </p>
                       </div>
                     </div>
                     <div className="flex space-x-3">
-                      <button className="text-sm text-primary-600 hover:text-primary-500">Configure</button>
-                      <button className="text-sm text-red-600 hover:text-red-500">Disconnect</button>
+                      {socialMediaConfig?.facebook ? (
+                        <>
+                          <button 
+                            className="text-sm text-primary-600 hover:text-primary-500"
+                            disabled={submitting}
+                          >
+                            Configure
+                          </button>
+                          <button 
+                            className="text-sm text-red-600 hover:text-red-500"
+                            onClick={() => disconnectPlatform('facebook')}
+                            disabled={submitting}
+                          >
+                            {submitting ? 'Disconnecting...' : 'Disconnect'}
+                          </button>
+                        </>
+                      ) : (
+                        <button 
+                          className="text-sm text-primary-600 hover:text-primary-500"
+                          disabled={submitting}
+                          onClick={() => setShowFacebookModal(true)}
+                        >
+                          Connect Account
+                        </button>
+                      )}
                     </div>
                   </div>
                   
-                  <div className="mt-4 ml-11 space-y-4">
-                    <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
-                      <div>
-                        <label htmlFor="facebook-app-id" className="block text-sm font-medium text-gray-700">App ID</label>
-                        <div className="mt-1 flex rounded-md shadow-sm">
-                          <input
-                            type="password"
-                            name="facebook-app-id"
-                            id="facebook-app-id"
-                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
-                            placeholder="••••••••••••••••"
-                            value="123456789012345"
-                            readOnly
-                          />
-                          <button
-                            type="button"
-                            className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                          >
-                            Show
-                          </button>
+                  {socialMediaConfig?.facebook && (
+                    <div className="mt-4 ml-11 space-y-4">
+                      <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor="facebook-app-id" className="block text-sm font-medium text-gray-700">App ID</label>
+                          <div className="mt-1 flex rounded-md shadow-sm">
+                            <input
+                              type={showFacebookAppId ? "text" : "password"}
+                              name="facebook-app-id"
+                              id="facebook-app-id"
+                              className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                              placeholder="••••••••••••••••"
+                              value={socialMediaConfig.facebook.appId}
+                              readOnly
+                            />
+                            <button
+                              type="button"
+                              className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                              onClick={() => setShowFacebookAppId(!showFacebookAppId)}
+                            >
+                              {showFacebookAppId ? 'Hide' : 'Show'}
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label htmlFor="facebook-app-secret" className="block text-sm font-medium text-gray-700">App Secret</label>
+                          <div className="mt-1 flex rounded-md shadow-sm">
+                            <input
+                              type={showFacebookAppSecret ? "text" : "password"}
+                              name="facebook-app-secret"
+                              id="facebook-app-secret"
+                              className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                              placeholder="••••••••••••••••"
+                              value={socialMediaConfig.facebook.appSecret}
+                              readOnly
+                            />
+                            <button
+                              type="button"
+                              className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                              onClick={() => setShowFacebookAppSecret(!showFacebookAppSecret)}
+                            >
+                              {showFacebookAppSecret ? 'Hide' : 'Show'}
+                            </button>
+                          </div>
                         </div>
                       </div>
                       
                       <div>
-                        <label htmlFor="facebook-app-secret" className="block text-sm font-medium text-gray-700">App Secret</label>
-                        <div className="mt-1 flex rounded-md shadow-sm">
-                          <input
-                            type="password"
-                            name="facebook-app-secret"
-                            id="facebook-app-secret"
-                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
-                            placeholder="••••••••••••••••"
-                            value="abcdef1234567890abcdef"
-                            readOnly
-                          />
-                          <button
-                            type="button"
-                            className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                          >
-                            Show
-                          </button>
-                        </div>
+                        <label htmlFor="facebook-page" className="block text-sm font-medium text-gray-700">Connected Page</label>
+                        <select
+                          id="facebook-page"
+                          name="facebook-page"
+                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                          value={socialMediaConfig.facebook.pageId || ''}
+                          disabled
+                        >
+                          <option value={socialMediaConfig.facebook.pageId}>{socialMediaConfig.facebook.pageName}</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <fieldset>
+                          <legend className="text-sm font-medium text-gray-700">Post Types</legend>
+                          <div className="mt-2 space-y-3">
+                            <div className="relative flex items-start">
+                              <div className="flex items-center h-5">
+                                <input
+                                  id="facebook-posts"
+                                  name="facebook-posts"
+                                  type="checkbox"
+                                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                  checked={socialMediaConfig.facebook.enabledFeatures?.posts}
+                                  onChange={(e) => {
+                                    if (socialMediaConfig && socialMediaConfig.facebook && socialMediaConfig.facebook.enabledFeatures) {
+                                      setSocialMediaConfig({
+                                        ...socialMediaConfig,
+                                        facebook: {
+                                          ...socialMediaConfig.facebook,
+                                          enabledFeatures: {
+                                            ...socialMediaConfig.facebook.enabledFeatures,
+                                            posts: e.target.checked
+                                          }
+                                        }
+                                      });
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <div className="ml-3 text-sm">
+                                <label htmlFor="facebook-posts" className="font-medium text-gray-700">Standard Posts</label>
+                                <p className="text-gray-500">Text, image, or video posts to your page's timeline</p>
+                              </div>
+                            </div>
+                            <div className="relative flex items-start">
+                              <div className="flex items-center h-5">
+                                <input
+                                  id="facebook-reels"
+                                  name="facebook-reels"
+                                  type="checkbox"
+                                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                  checked={socialMediaConfig.facebook.enabledFeatures?.reels}
+                                  onChange={(e) => {
+                                    if (socialMediaConfig && socialMediaConfig.facebook && socialMediaConfig.facebook.enabledFeatures) {
+                                      setSocialMediaConfig({
+                                        ...socialMediaConfig,
+                                        facebook: {
+                                          ...socialMediaConfig.facebook,
+                                          enabledFeatures: {
+                                            ...socialMediaConfig.facebook.enabledFeatures,
+                                            reels: e.target.checked
+                                          }
+                                        }
+                                      });
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <div className="ml-3 text-sm">
+                                <label htmlFor="facebook-reels" className="font-medium text-gray-700">Reels</label>
+                                <p className="text-gray-500">Short-form vertical videos</p>
+                              </div>
+                            </div>
+                            <div className="relative flex items-start">
+                              <div className="flex items-center h-5">
+                                <input
+                                  id="facebook-stories"
+                                  name="facebook-stories"
+                                  type="checkbox"
+                                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                                  checked={socialMediaConfig.facebook.enabledFeatures?.stories}
+                                  onChange={(e) => {
+                                    if (socialMediaConfig && socialMediaConfig.facebook && socialMediaConfig.facebook.enabledFeatures) {
+                                      setSocialMediaConfig({
+                                        ...socialMediaConfig,
+                                        facebook: {
+                                          ...socialMediaConfig.facebook,
+                                          enabledFeatures: {
+                                            ...socialMediaConfig.facebook.enabledFeatures,
+                                            stories: e.target.checked
+                                          }
+                                        }
+                                      });
+                                    }
+                                  }}
+                                />
+                              </div>
+                              <div className="ml-3 text-sm">
+                                <label htmlFor="facebook-stories" className="font-medium text-gray-700">Stories</label>
+                                <p className="text-gray-500">24-hour Facebook stories</p>
+                              </div>
+                            </div>
+                          </div>
+                        </fieldset>
                       </div>
                     </div>
-                    
-                    <div>
-                      <label htmlFor="facebook-page" className="block text-sm font-medium text-gray-700">Connected Page</label>
-                      <select
-                        id="facebook-page"
-                        name="facebook-page"
-                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
-                        defaultValue="wanderpaws-main"
-                      >
-                        <option value="wanderpaws-main">WanderPaws (Main Page)</option>
-                        <option value="wanderpaws-community">WanderPaws Community</option>
-                      </select>
-                    </div>
-                    
-                    <div>
-                      <fieldset>
-                        <legend className="text-sm font-medium text-gray-700">Post Types</legend>
-                        <div className="mt-2 space-y-3">
-                          <div className="relative flex items-start">
-                            <div className="flex items-center h-5">
-                              <input
-                                id="facebook-posts"
-                                name="facebook-posts"
-                                type="checkbox"
-                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                                defaultChecked
-                              />
-                            </div>
-                            <div className="ml-3 text-sm">
-                              <label htmlFor="facebook-posts" className="font-medium text-gray-700">Standard Posts</label>
-                              <p className="text-gray-500">Text, image, or video posts to your page's timeline</p>
-                            </div>
-                          </div>
-                          <div className="relative flex items-start">
-                            <div className="flex items-center h-5">
-                              <input
-                                id="facebook-reels"
-                                name="facebook-reels"
-                                type="checkbox"
-                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                                defaultChecked
-                              />
-                            </div>
-                            <div className="ml-3 text-sm">
-                              <label htmlFor="facebook-reels" className="font-medium text-gray-700">Reels</label>
-                              <p className="text-gray-500">Short-form vertical videos</p>
-                            </div>
-                          </div>
-                          <div className="relative flex items-start">
-                            <div className="flex items-center h-5">
-                              <input
-                                id="facebook-stories"
-                                name="facebook-stories"
-                                type="checkbox"
-                                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                              />
-                            </div>
-                            <div className="ml-3 text-sm">
-                              <label htmlFor="facebook-stories" className="font-medium text-gray-700">Stories</label>
-                              <p className="text-gray-500">24-hour Facebook stories</p>
-                            </div>
-                          </div>
-                        </div>
-                      </fieldset>
-                    </div>
-                  </div>
+                  )}
                 </div>
                 
                 {/* TikTok Integration */}
@@ -824,75 +1288,67 @@ export default function ContentAIPage() {
                       </svg>
                       <div className="ml-3">
                         <h4 className="text-sm font-medium text-gray-900">TikTok</h4>
-                        <p className="text-xs text-gray-500">Not connected</p>
+                        <p className="text-xs text-gray-500">
+                          {socialMediaLoading ? 'Loading...' : 
+                           socialMediaConfig?.tiktok ? `Connected as @${socialMediaConfig.tiktok.username}` : 
+                           'Not connected'}
+                        </p>
                       </div>
                     </div>
-                    <button className="text-sm text-primary-600 hover:text-primary-500">Connect Account</button>
+                    {socialMediaConfig?.tiktok ? (
+                      <div className="flex space-x-3">
+                        <button 
+                          className="text-sm text-primary-600 hover:text-primary-500"
+                          disabled={submitting}
+                        >
+                          Configure
+                        </button>
+                        <button 
+                          className="text-sm text-red-600 hover:text-red-500"
+                          onClick={() => disconnectPlatform('tiktok')}
+                          disabled={submitting}
+                        >
+                          {submitting ? 'Disconnecting...' : 'Disconnect'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        className="text-sm text-primary-600 hover:text-primary-500"
+                        disabled={submitting}
+                        onClick={() => setShowTiktokModal(true)}
+                      >
+                        Connect Account
+                      </button>
+                    )}
                   </div>
                   
-                  <div className="mt-4 ml-11 space-y-4">
-                    <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
-                      <div>
-                        <label htmlFor="tiktok-client-key" className="block text-sm font-medium text-gray-700">Client Key</label>
-                        <div className="mt-1 flex rounded-md shadow-sm">
-                          <input
-                            type="text"
-                            name="tiktok-client-key"
-                            id="tiktok-client-key"
-                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
-                            placeholder="Enter your TikTok Client Key"
-                          />
+                  {socialMediaConfig?.tiktok ? (
+                    <div className="mt-4 ml-11 space-y-4">
+                      <div className="grid grid-cols-1 gap-y-4 gap-x-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Client Key</label>
+                          <div className="mt-1">
+                            <p className="text-sm text-gray-500">{socialMediaConfig.tiktok.clientKey.substring(0, 8)}********</p>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700">Client Secret</label>
+                          <div className="mt-1">
+                            <p className="text-sm text-gray-500">••••••••••••••••</p>
+                          </div>
                         </div>
                       </div>
                       
                       <div>
-                        <label htmlFor="tiktok-client-secret" className="block text-sm font-medium text-gray-700">Client Secret</label>
-                        <div className="mt-1 flex rounded-md shadow-sm">
-                          <input
-                            type="password"
-                            name="tiktok-client-secret"
-                            id="tiktok-client-secret"
-                            className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
-                            placeholder="Enter your TikTok Client Secret"
-                          />
+                        <label className="block text-sm font-medium text-gray-700">Account Details</label>
+                        <div className="mt-1">
+                          <p className="text-sm text-gray-500">Username: @{socialMediaConfig.tiktok.username}</p>
+                          <p className="text-sm text-gray-500">Account ID: {socialMediaConfig.tiktok.accountId}</p>
                         </div>
                       </div>
                     </div>
-                    
-                    <div>
-                      <label htmlFor="tiktok-redirect-uri" className="block text-sm font-medium text-gray-700">Redirect URI</label>
-                      <div className="mt-1 flex rounded-md shadow-sm">
-                        <input
-                          type="text"
-                          name="tiktok-redirect-uri"
-                          id="tiktok-redirect-uri"
-                          className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
-                          placeholder="https://your-app-domain.com/tiktok/callback"
-                          value="https://wanderpaws.com/api/tiktok/callback"
-                          readOnly
-                        />
-                        <button
-                          type="button"
-                          className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                          onClick={() => navigator.clipboard.writeText("https://wanderpaws.com/api/tiktok/callback")}
-                        >
-                          Copy
-                        </button>
-                      </div>
-                      <p className="mt-1 text-sm text-gray-500">
-                        Add this URI to your TikTok Developer account OAuth settings.
-                      </p>
-                    </div>
-                    
-                    <div className="pt-2">
-                      <button
-                        type="button"
-                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                      >
-                        Save TikTok Settings
-                      </button>
-                    </div>
-                  </div>
+                  ) : null}
                 </div>
                 
                 <div className="mt-6 border-t border-gray-200 pt-6">
@@ -905,6 +1361,13 @@ export default function ContentAIPage() {
                           name="auto-post"
                           type="checkbox"
                           className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          checked={socialMediaConfig?.settings?.autoPost || false}
+                          onChange={(e) => {
+                            if (socialMediaConfig) {
+                              updateSocialMediaSettings('autoPost', e.target.checked);
+                            }
+                          }}
+                          disabled={socialMediaLoading || !socialMediaConfig}
                         />
                       </div>
                       <div className="ml-3 text-sm">
@@ -920,7 +1383,13 @@ export default function ContentAIPage() {
                           name="cross-posting"
                           type="checkbox"
                           className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                          defaultChecked
+                          checked={socialMediaConfig?.settings?.crossPosting || false}
+                          onChange={(e) => {
+                            if (socialMediaConfig) {
+                              updateSocialMediaSettings('crossPosting', e.target.checked);
+                            }
+                          }}
+                          disabled={socialMediaLoading || !socialMediaConfig}
                         />
                       </div>
                       <div className="ml-3 text-sm">
@@ -936,7 +1405,13 @@ export default function ContentAIPage() {
                           name="platform-adaptation"
                           type="checkbox"
                           className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                          defaultChecked
+                          checked={socialMediaConfig?.settings?.platformAdaptation || false}
+                          onChange={(e) => {
+                            if (socialMediaConfig) {
+                              updateSocialMediaSettings('platformAdaptation', e.target.checked);
+                            }
+                          }}
+                          disabled={socialMediaLoading || !socialMediaConfig}
                         />
                       </div>
                       <div className="ml-3 text-sm">
@@ -950,8 +1425,10 @@ export default function ContentAIPage() {
                     <button
                       type="button"
                       className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      onClick={saveSettings}
+                      disabled={submitting || socialMediaLoading || !socialMediaConfig}
                     >
-                      Save All Integration Settings
+                      {submitting ? 'Saving...' : 'Save All Integration Settings'}
                     </button>
                   </div>
                 </div>
@@ -960,6 +1437,253 @@ export default function ContentAIPage() {
           </div>
         )}
       </div>
+
+      {/* Connection Modals */}
+      {showInstagramModal && (
+        <div className="fixed inset-0 z-10 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div>
+                <div className="mt-3 text-center sm:mt-0 sm:text-left">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Connect Instagram Account</h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500">
+                      Enter your Instagram API credentials to connect your account.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <form onSubmit={connectInstagram} className="mt-5 space-y-4">
+                <div>
+                  <label htmlFor="instagram-api-key" className="block text-sm font-medium text-gray-700">API Key</label>
+                  <div className="mt-1">
+                    <input
+                      type="text"
+                      name="instagram-api-key"
+                      id="instagram-api-key"
+                      className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={instagramForm.apiKey}
+                      onChange={(e) => setInstagramForm({ ...instagramForm, apiKey: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="instagram-api-secret" className="block text-sm font-medium text-gray-700">API Secret</label>
+                  <div className="mt-1">
+                    <input
+                      type="password"
+                      name="instagram-api-secret"
+                      id="instagram-api-secret"
+                      className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={instagramForm.apiSecret}
+                      onChange={(e) => setInstagramForm({ ...instagramForm, apiSecret: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                  <button
+                    type="submit"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:col-start-2 sm:text-sm"
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Connecting...' : 'Connect'}
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                    onClick={() => setShowInstagramModal(false)}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFacebookModal && (
+        <div className="fixed inset-0 z-10 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div>
+                <div className="mt-3 text-center sm:mt-0 sm:text-left">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Connect Facebook Account</h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500">
+                      Enter your Facebook App credentials to connect your account.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <form onSubmit={connectFacebook} className="mt-5 space-y-4">
+                <div>
+                  <label htmlFor="facebook-app-id" className="block text-sm font-medium text-gray-700">App ID</label>
+                  <div className="mt-1">
+                    <input
+                      type="text"
+                      name="facebook-app-id"
+                      id="facebook-app-id"
+                      className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={facebookForm.appId}
+                      onChange={(e) => setFacebookForm({ ...facebookForm, appId: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="facebook-app-secret" className="block text-sm font-medium text-gray-700">App Secret</label>
+                  <div className="mt-1">
+                    <input
+                      type="password"
+                      name="facebook-app-secret"
+                      id="facebook-app-secret"
+                      className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={facebookForm.appSecret}
+                      onChange={(e) => setFacebookForm({ ...facebookForm, appSecret: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                  <button
+                    type="submit"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:col-start-2 sm:text-sm"
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Connecting...' : 'Connect'}
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                    onClick={() => setShowFacebookModal(false)}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTiktokModal && (
+        <div className="fixed inset-0 z-10 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+              <div>
+                <div className="mt-3 text-center sm:mt-0 sm:text-left">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Connect TikTok Account</h3>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-500">
+                      Enter your TikTok Developer credentials to connect your account.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              <form onSubmit={connectTikTok} className="mt-5 space-y-4">
+                <div>
+                  <label htmlFor="tiktok-client-key" className="block text-sm font-medium text-gray-700">Client Key</label>
+                  <div className="mt-1">
+                    <input
+                      type="text"
+                      name="tiktok-client-key"
+                      id="tiktok-client-key"
+                      className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={tiktokForm.clientKey}
+                      onChange={(e) => setTiktokForm({ ...tiktokForm, clientKey: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="tiktok-client-secret" className="block text-sm font-medium text-gray-700">Client Secret</label>
+                  <div className="mt-1">
+                    <input
+                      type="password"
+                      name="tiktok-client-secret"
+                      id="tiktok-client-secret"
+                      className="shadow-sm focus:ring-primary-500 focus:border-primary-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                      value={tiktokForm.clientSecret}
+                      onChange={(e) => setTiktokForm({ ...tiktokForm, clientSecret: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label htmlFor="tiktok-redirect-uri" className="block text-sm font-medium text-gray-700">Redirect URI</label>
+                  <div className="mt-1 flex rounded-md shadow-sm">
+                    <input
+                      type="text"
+                      name="tiktok-redirect-uri"
+                      id="tiktok-redirect-uri"
+                      className="flex-1 focus:ring-primary-500 focus:border-primary-500 block w-full min-w-0 rounded-md sm:text-sm border-gray-300"
+                      value="https://wanderpaws.com/api/tiktok/callback"
+                      readOnly
+                    />
+                    <button
+                      type="button"
+                      className="ml-3 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      onClick={() => {
+                        navigator.clipboard.writeText("https://wanderpaws.com/api/tiktok/callback");
+                        alert("Redirect URI copied to clipboard!");
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                  <p className="mt-1 text-sm text-gray-500">
+                    Add this URI to your TikTok Developer account OAuth settings.
+                  </p>
+                </div>
+                
+                <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                  <button
+                    type="submit"
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:col-start-2 sm:text-sm"
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Connecting...' : 'Connect'}
+                  </button>
+                  <button
+                    type="button"
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                    onClick={() => setShowTiktokModal(false)}
+                    disabled={submitting}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </RouteGuard>
   );
 } 
