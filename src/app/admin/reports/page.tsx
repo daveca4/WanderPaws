@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, 
   Tooltip, Legend, ResponsiveContainer,
-  ComposedChart
+  ComposedChart, AreaChart, Area, ScatterChart, Scatter
 } from 'recharts';
 import RouteGuard from '@/components/RouteGuard';
 import { formatPrice } from '@/lib/mockSubscriptions';
@@ -163,6 +163,50 @@ const creditUsageColors = ['#FF8042', '#FFBB28', '#00C49F', '#0088FE'];
 
 // COLORS for the pie chart
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
+
+// Owner spending data
+const ownerSpendingData = [
+  { id: 'OWN001', name: 'Sophia Anderson', totalSpent: 6240, subscriptionType: 'Premium', lastPurchase: '2023-07-15', lifetime: 12850, dogs: 2, walkFrequency: 3.2 },
+  { id: 'OWN002', name: 'James Wilson', totalSpent: 4850, subscriptionType: 'Standard', lastPurchase: '2023-07-12', lifetime: 15600, dogs: 1, walkFrequency: 2.7 },
+  { id: 'OWN003', name: 'Emma Garcia', totalSpent: 9200, subscriptionType: 'Premium', lastPurchase: '2023-07-18', lifetime: 22400, dogs: 3, walkFrequency: 4.5 },
+  { id: 'OWN004', name: 'Noah Martinez', totalSpent: 3600, subscriptionType: 'Basic', lastPurchase: '2023-07-10', lifetime: 8700, dogs: 1, walkFrequency: 1.8 },
+  { id: 'OWN005', name: 'Olivia Johnson', totalSpent: 7150, subscriptionType: 'Premium', lastPurchase: '2023-07-16', lifetime: 19500, dogs: 2, walkFrequency: 3.7 },
+  { id: 'OWN006', name: 'William Taylor', totalSpent: 2900, subscriptionType: 'Basic', lastPurchase: '2023-07-08', lifetime: 6200, dogs: 1, walkFrequency: 1.4 },
+  { id: 'OWN007', name: 'Charlotte Brown', totalSpent: 5680, subscriptionType: 'Standard', lastPurchase: '2023-07-17', lifetime: 14300, dogs: 2, walkFrequency: 2.9 },
+  { id: 'OWN008', name: 'Benjamin Davis', totalSpent: 8400, subscriptionType: 'Premium', lastPurchase: '2023-07-14', lifetime: 20100, dogs: 2, walkFrequency: 4.1 },
+  { id: 'OWN009', name: 'Amelia Miller', totalSpent: 3250, subscriptionType: 'Basic', lastPurchase: '2023-07-09', lifetime: 7800, dogs: 1, walkFrequency: 1.6 },
+  { id: 'OWN010', name: 'Elijah Smith', totalSpent: 6900, subscriptionType: 'Standard', lastPurchase: '2023-07-13', lifetime: 16700, dogs: 2, walkFrequency: 3.3 },
+  { id: 'OWN011', name: 'Mia Wilson', totalSpent: 5100, subscriptionType: 'Standard', lastPurchase: '2023-07-11', lifetime: 12600, dogs: 1, walkFrequency: 2.5 },
+  { id: 'OWN012', name: 'Lucas Johnson', totalSpent: 7800, subscriptionType: 'Premium', lastPurchase: '2023-07-15', lifetime: 18900, dogs: 2, walkFrequency: 3.8 },
+];
+
+// Spending distribution by subscription type
+const spendingBySubscriptionType = [
+  { name: 'Basic', value: 9750, count: 3, avgSpend: 3250 },
+  { name: 'Standard', value: 22530, count: 4, avgSpend: 5632 },
+  { name: 'Premium', value: 38790, count: 5, avgSpend: 7758 },
+];
+
+// Monthly spending trends by top owners
+const topOwnerSpendingTrends = [
+  { month: 'Jan', 'Emma Garcia': 1200, 'Benjamin Davis': 1100, 'Olivia Johnson': 950, 'Other Owners': 6750 },
+  { month: 'Feb', 'Emma Garcia': 1250, 'Benjamin Davis': 1150, 'Olivia Johnson': 1000, 'Other Owners': 7100 },
+  { month: 'Mar', 'Emma Garcia': 1300, 'Benjamin Davis': 1200, 'Olivia Johnson': 1050, 'Other Owners': 7450 },
+  { month: 'Apr', 'Emma Garcia': 1350, 'Benjamin Davis': 1250, 'Olivia Johnson': 1100, 'Other Owners': 7800 },
+  { month: 'May', 'Emma Garcia': 1400, 'Benjamin Davis': 1300, 'Olivia Johnson': 1150, 'Other Owners': 8150 },
+  { month: 'Jun', 'Emma Garcia': 1450, 'Benjamin Davis': 1350, 'Olivia Johnson': 1200, 'Other Owners': 8500 },
+  { month: 'Jul', 'Emma Garcia': 1500, 'Benjamin Davis': 1400, 'Olivia Johnson': 1250, 'Other Owners': 8850 },
+];
+
+// Spending frequency distribution
+const spendingFrequencyDistribution = [
+  { range: '£0 - £999', count: 0, percentage: 0 },
+  { range: '£1,000 - £2,999', count: 1, percentage: 8.3 },
+  { range: '£3,000 - £4,999', count: 3, percentage: 25.0 },
+  { range: '£5,000 - £6,999', count: 4, percentage: 33.3 },
+  { range: '£7,000 - £8,999', count: 3, percentage: 25.0 },
+  { range: '£9,000+', count: 1, percentage: 8.3 },
+];
 
 export default function AdminReportsPage() {
   const [selectedReport, setSelectedReport] = useState('walks');
@@ -685,363 +729,197 @@ export default function AdminReportsPage() {
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
-            
-            {selectedReport === 'subscriptions' && (
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <dt className="text-sm font-medium text-gray-500 truncate">Total Active Subscriptions</dt>
-                      <dd className="mt-1 text-3xl font-semibold text-gray-900">{reportData.totalSubscriptions}</dd>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <dt className="text-sm font-medium text-gray-500 truncate">New Subscriptions</dt>
-                      <dd className="mt-1 text-3xl font-semibold text-green-600">{reportData.newSubscriptions}</dd>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <dt className="text-sm font-medium text-gray-500 truncate">Renewals</dt>
-                      <dd className="mt-1 text-3xl font-semibold text-primary-600">{reportData.renewals}</dd>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <dt className="text-sm font-medium text-gray-500 truncate">Cancellations</dt>
-                      <dd className="mt-1 text-3xl font-semibold text-red-600">{reportData.cancellations}</dd>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <dt className="text-sm font-medium text-gray-500 truncate">Conversion Rate</dt>
-                      <dd className="mt-1 text-3xl font-semibold text-blue-600">{reportData.conversionRate}</dd>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <dt className="text-sm font-medium text-gray-500 truncate">Revenue</dt>
-                      <dd className="mt-1 text-3xl font-semibold text-gray-900">{formatCurrency(reportData.revenue)}</dd>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-white shadow rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <h3 className="text-lg leading-6 font-medium text-gray-900">Subscription Activity</h3>
-                      <div className="mt-6 h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={subscriptionActivityData}
-                            margin={{
-                              top: 20,
-                              right: 30,
-                              left: 20,
-                              bottom: 5,
-                            }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="month" />
-                            <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                            <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                            <Tooltip 
-                              formatter={(value, name) => {
-                                if (name === 'revenue') {
-                                  return [formatCurrency(Number(value)), 'Revenue'];
-                                }
-                                return [value, typeof name === 'string' ? name.charAt(0).toUpperCase() + name.slice(1) : name];
-                              }}
-                            />
-                            <Legend />
-                            <Bar yAxisId="left" dataKey="newSubscriptions" fill="#8884d8" name="New Subscriptions" />
-                            <Bar yAxisId="left" dataKey="renewals" fill="#4ADE80" name="Renewals" />
-                            <Bar yAxisId="left" dataKey="cancellations" fill="#ff8042" name="Cancellations" />
-                            <Bar yAxisId="right" dataKey="revenue" fill="#82ca9d" name="Revenue (£)" />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-white shadow rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <h3 className="text-lg leading-6 font-medium text-gray-900">Subscription Plan Distribution</h3>
-                      <div className="mt-6 h-64">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={subscriptionPlanData}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={true}
-                              label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(0)}%)`}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                            >
-                              {subscriptionPlanData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip formatter={(value) => [value, 'Subscribers']} />
-                            <Legend />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
+
+                {/* Owner Spending Analysis - New Section */}
                 <div className="bg-white shadow rounded-lg">
-                  <div className="px-4 py-5 sm:p-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Subscription Plan Comparison</h3>
-                    <div className="mt-6 overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Plan
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Conversion Rate
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Avg. Credits Used
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Retention Rate
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Total Revenue
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {subscriptionPlanComparisonData.map((plan) => (
-                            <tr key={plan.name}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {plan.name}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {plan.conversionRate}%
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {plan.averageCreditsUsed}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {plan.retentionRate}%
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {formatCurrency(plan.revenue)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    <div className="mt-6 h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          data={subscriptionPlanComparisonData}
-                          margin={{
-                            top: 20,
-                            right: 30,
-                            left: 20,
-                            bottom: 5,
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="name" />
-                          <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
-                          <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
-                          <Tooltip 
-                            formatter={(value, name) => {
-                              if (name === 'revenue') {
-                                return [formatCurrency(Number(value)), 'Revenue'];
-                              } else if (name === 'conversionRate' || name === 'retentionRate') {
-                                return [`${value}%`, name === 'conversionRate' ? 'Conversion Rate' : 'Retention Rate'];
-                              }
-                              return [value, name === 'averageCreditsUsed' ? 'Avg. Credits Used' : name];
-                            }}
-                          />
-                          <Legend />
-                          <Bar yAxisId="left" dataKey="conversionRate" fill="#8884d8" name="Conversion Rate" />
-                          <Bar yAxisId="left" dataKey="averageCreditsUsed" fill="#4ADE80" name="Avg. Credits Used" />
-                          <Bar yAxisId="left" dataKey="retentionRate" fill="#ffc658" name="Retention Rate" />
-                          <Bar yAxisId="right" dataKey="revenue" fill="#ff8042" name="Revenue" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white shadow rounded-lg">
-                  <div className="px-4 py-5 sm:p-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Subscription Expiry Forecast</h3>
-                    <p className="mt-1 text-sm text-gray-500">Upcoming subscription expirations and renewal probabilities</p>
-                    
-                    <div className="mt-6 h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart
-                          data={subscriptionExpiryForecastData}
-                          margin={{
-                            top: 20,
-                            right: 30,
-                            left: 20,
-                            bottom: 5,
-                          }}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="month" />
-                          <YAxis yAxisId="left" orientation="left" />
-                          <YAxis yAxisId="right" orientation="right" />
-                          <Tooltip 
-                            formatter={(value, name) => {
-                              if (name === 'potentialLoss') {
-                                return [formatCurrency(Number(value)), 'Potential Revenue Loss'];
-                              } else if (name === 'renewalProbability') {
-                                return [`${value}%`, 'Renewal Probability'];
-                              }
-                              return [value, 'Expiring Subscriptions'];
-                            }}
-                          />
-                          <Legend />
-                          <Bar yAxisId="left" dataKey="expirations" fill="#8884d8" name="Expiring Subscriptions" />
-                          <Line 
-                            yAxisId="left" 
-                            type="monotone" 
-                            dataKey="renewalProbability" 
-                            stroke="#4ADE80" 
-                            name="Renewal Probability (%)"
-                            strokeWidth={2}
-                          />
-                          <Line 
-                            yAxisId="right" 
-                            type="monotone" 
-                            dataKey="potentialLoss" 
-                            stroke="#ff8042" 
-                            name="Potential Revenue Loss (£)"
-                            strokeWidth={2}
-                          />
-                        </ComposedChart>
-                      </ResponsiveContainer>
-                    </div>
-                    
-                    <div className="mt-6 overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Month
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Expiring Subscriptions
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Renewal Probability
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Potential Revenue Loss
-                            </th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                              Actions
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {subscriptionExpiryForecastData.map((month) => (
-                            <tr key={month.month}>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {month.month}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {month.expirations}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <div className="flex items-center">
-                                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                                    <div 
-                                      className={`h-2.5 rounded-full ${
-                                        month.renewalProbability >= 70 
-                                          ? 'bg-green-600' 
-                                          : month.renewalProbability >= 50 
-                                            ? 'bg-yellow-500' 
-                                            : 'bg-red-600'
-                                      }`} 
-                                      style={{ width: `${month.renewalProbability}%` }}
-                                    ></div>
-                                  </div>
-                                  <span className="ml-2">{month.renewalProbability}%</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {formatCurrency(month.potentialLoss)}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                <button className="text-primary-600 hover:text-primary-900">
-                                  Plan Campaign
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white shadow rounded-lg">
-                  <div className="px-4 py-5 sm:p-6">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Subscription Credit Usage Analysis</h3>
+                  <div className="px-4 py-5 sm:px-6 border-b border-gray-200">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">Owner Spending Analysis</h3>
                     <p className="mt-1 text-sm text-gray-500">
-                      Understanding how effectively users utilize their subscription credits
+                      Detailed breakdown of spending patterns by individual owners
                     </p>
+                  </div>
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Top Spender (This Month)</h4>
+                        <p className="text-xl font-semibold text-gray-900">{ownerSpendingData[2].name}</p>
+                        <p className="text-3xl font-bold text-primary-600">{formatCurrency(ownerSpendingData[2].totalSpent)}</p>
+                        <p className="text-sm text-gray-500 mt-1">{ownerSpendingData[2].dogs} dogs • {ownerSpendingData[2].walkFrequency} walks/week</p>
+                      </div>
+                      
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Average Monthly Spend</h4>
+                        <p className="text-3xl font-bold text-gray-900">
+                          {formatCurrency(
+                            Math.round(
+                              ownerSpendingData.reduce((acc, owner) => acc + owner.totalSpent, 0) / 
+                              ownerSpendingData.length
+                            )
+                          )}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          across {ownerSpendingData.length} active owners
+                        </p>
+                      </div>
+                      
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <h4 className="text-sm font-medium text-gray-500 mb-2">Highest Lifetime Value</h4>
+                        <p className="text-xl font-semibold text-gray-900">
+                          {ownerSpendingData.sort((a, b) => b.lifetime - a.lifetime)[0].name}
+                        </p>
+                        <p className="text-3xl font-bold text-green-600">
+                          {formatCurrency(ownerSpendingData.sort((a, b) => b.lifetime - a.lifetime)[0].lifetime)}
+                        </p>
+                        <p className="text-sm text-gray-500 mt-1">total lifetime spend</p>
+                      </div>
+                    </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                       <div>
+                        <h4 className="text-md font-medium text-gray-900 mb-3">Spending by Subscription Type</h4>
                         <div className="h-64">
                           <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                              <Pie
-                                data={subscriptionCreditUsageData}
-                                cx="50%"
-                                cy="50%"
-                                labelLine={true}
-                                label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                                outerRadius={80}
-                                fill="#8884d8"
-                                dataKey="value"
-                                nameKey="category"
-                              >
-                                {subscriptionCreditUsageData.map((entry, index) => (
-                                  <Cell key={`cell-${index}`} fill={creditUsageColors[index % creditUsageColors.length]} />
-                                ))}
-                              </Pie>
-                              <Tooltip formatter={(value) => [value, 'Users']} />
+                            <BarChart
+                              data={spendingBySubscriptionType}
+                              margin={{
+                                top: 20,
+                                right: 30,
+                                left: 20,
+                                bottom: 5,
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
+                              <YAxis yAxisId="right" orientation="right" stroke="#82ca9d" />
+                              <Tooltip formatter={(value, name) => {
+                                if (name === 'value') return [formatCurrency(Number(value)), 'Total Revenue'];
+                                if (name === 'avgSpend') return [formatCurrency(Number(value)), 'Average Spend'];
+                                return [value, name];
+                              }} />
                               <Legend />
-                            </PieChart>
+                              <Bar yAxisId="left" dataKey="value" fill="#8884d8" name="Total Revenue" />
+                              <Bar yAxisId="right" dataKey="avgSpend" fill="#82ca9d" name="Average Spend" />
+                            </BarChart>
                           </ResponsiveContainer>
-                        </div>
-                        <div className="text-center text-sm text-gray-500 mt-2">
-                          Distribution of users by credit usage percentage
                         </div>
                       </div>
                       
-                      <div className="overflow-hidden">
+                      <div>
+                        <h4 className="text-md font-medium text-gray-900 mb-3">Top Owner Spending Trends</h4>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart
+                              data={topOwnerSpendingTrends}
+                              margin={{
+                                top: 20,
+                                right: 30,
+                                left: 20,
+                                bottom: 5,
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="month" />
+                              <YAxis />
+                              <Tooltip formatter={(value) => [formatCurrency(Number(value)), '']} />
+                              <Legend />
+                              <Area type="monotone" dataKey="Emma Garcia" stackId="1" stroke="#8884d8" fill="#8884d8" />
+                              <Area type="monotone" dataKey="Benjamin Davis" stackId="1" stroke="#82ca9d" fill="#82ca9d" />
+                              <Area type="monotone" dataKey="Olivia Johnson" stackId="1" stroke="#ffc658" fill="#ffc658" />
+                              <Area type="monotone" dataKey="Other Owners" stackId="1" stroke="#ff8042" fill="#ff8042" />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                      <div>
+                        <h4 className="text-md font-medium text-gray-900 mb-3">Spending Distribution</h4>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={spendingFrequencyDistribution}
+                              margin={{
+                                top: 20,
+                                right: 30,
+                                left: 20,
+                                bottom: 5,
+                              }}
+                              layout="vertical"
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis type="number" />
+                              <YAxis type="category" dataKey="range" tick={{ fontSize: 12 }} width={100} />
+                              <Tooltip formatter={(value, name) => {
+                                if (name === 'count') return [value, 'Number of Owners'];
+                                if (name === 'percentage') return [value + '%', 'Percentage'];
+                                return [value, name];
+                              }} />
+                              <Legend />
+                              <Bar dataKey="count" fill="#8884d8" name="Number of Owners" />
+                              <Bar dataKey="percentage" fill="#82ca9d" name="Percentage" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-md font-medium text-gray-900 mb-3">Spending vs. Walk Frequency</h4>
+                        <div className="h-64">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <ScatterChart
+                              margin={{
+                                top: 20,
+                                right: 30,
+                                left: 20,
+                                bottom: 5,
+                              }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis 
+                                type="number" 
+                                dataKey="walkFrequency" 
+                                name="Walks per Week" 
+                                unit=" walks"
+                              />
+                              <YAxis 
+                                type="number" 
+                                dataKey="totalSpent" 
+                                name="Monthly Spend" 
+                                tickFormatter={(value) => `£${value/1000}k`}
+                              />
+                              <Tooltip 
+                                formatter={(value, name) => {
+                                  if (name === 'walkFrequency') return [value, 'Walks per Week'];
+                                  if (name === 'totalSpent') return [formatCurrency(Number(value)), 'Monthly Spend'];
+                                  return [value, name];
+                                }}
+                                labelFormatter={(label) => ''}
+                                contentStyle={{ padding: '10px' }}
+                                itemStyle={{ padding: '2px 0' }}
+                              />
+                              <Legend />
+                              <Scatter 
+                                name="Owner Spending Patterns" 
+                                data={ownerSpendingData} 
+                                fill="#8884d8"
+                                shape="circle"
+                              />
+                            </ScatterChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <h4 className="text-md font-medium text-gray-900 mb-3">Individual Owner Spending Details</h4>
+                      <div className="mt-2 overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Usage Tier
+                                Owner Name
                               </th>
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                 Users
