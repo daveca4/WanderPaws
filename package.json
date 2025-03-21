@@ -23,6 +23,7 @@
     "react-calendar": "^4.8.0",
     "react-dom": "^18.3.1",
     "react-grid-layout": "^1.5.1",
+    "recharts": "^2.15.1",
     "tailwindcss": "^3.4.17",
     "uuid": "^11.1.0",
     "zod": "^3.24.2"
