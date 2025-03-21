@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { CloudinaryAsset, getAssets, uploadMedia } from '@/lib/cloudinaryService';
+import { S3Asset, getS3Assets } from '@/lib/s3Service';
 import Image from 'next/image';
 
 interface MediaLibraryProps {
@@ -9,77 +10,59 @@ interface MediaLibraryProps {
   maxSelection?: number;
   selectedAssets?: CloudinaryAsset[];
   resourceType?: 'image' | 'video' | 'all';
+  includeWalkerUploads?: boolean;
 }
+
+// Convert S3Asset to CloudinaryAsset format for compatibility
+const convertS3ToCloudinaryFormat = (s3Asset: S3Asset): CloudinaryAsset => {
+  return {
+    id: s3Asset.id,
+    publicId: s3Asset.key,
+    url: s3Asset.url,
+    format: s3Asset.contentType.split('/')[1] || 'unknown',
+    type: s3Asset.contentType.startsWith('image/') ? 'image' : 'video',
+    createdAt: s3Asset.uploaded,
+    fileSize: s3Asset.size,
+    tags: s3Asset.tags || [],
+  };
+};
 
 export default function MediaLibrary({
   onSelect,
   maxSelection = 0,
   selectedAssets = [],
-  resourceType = 'all'
+  resourceType = 'all',
+  includeWalkerUploads = true
 }: MediaLibraryProps) {
   const [assets, setAssets] = useState<CloudinaryAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState<string[]>(selectedAssets.map(a => a.id));
-  const [filter, setFilter] = useState<'all' | 'image' | 'video'>('all');
+  const [filter, setFilter] = useState<'all' | 'image' | 'video' | 'walker' | 'admin'>('all');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [isSelectionThrottled, setIsSelectionThrottled] = useState(false);
   
   useEffect(() => {
-    loadAssets();
+    const delayedLoad = setTimeout(() => {
+      loadAssets();
+    }, 100);
+    
+    return () => clearTimeout(delayedLoad);
   }, []);
   
   const loadAssets = async () => {
     setLoading(true);
     try {
-      // Use a flag to determine if we should load real assets or mock data
-      const useMockData = true; // Change to false when API endpoint is properly configured
+      // Load existing Cloudinary assets
+      const cloudinaryAssets = await loadCloudinaryAssets();
       
-      if (useMockData) {
-        // Mock data for development
-        const imageAssets: CloudinaryAsset[] = Array.from({ length: 8 }).map((_, index) => ({
-          id: `img-${index + 1}`,
-          publicId: `sample-image-${index + 1}`,
-          url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1623456789/sample-${index + 1}.jpg`,
-          format: 'jpg',
-          type: 'image',
-          createdAt: new Date(Date.now() - Math.random() * 10000000).toISOString(),
-          fileSize: Math.floor(Math.random() * 1000000) + 500000,
-          width: 1200,
-          height: 800,
-          tags: ['dogs', 'walking', 'outdoors'],
-        }));
-        
-        const videoAssets: CloudinaryAsset[] = Array.from({ length: 4 }).map((_, index) => ({
-          id: `vid-${index + 1}`,
-          publicId: `sample-video-${index + 1}`,
-          url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/v1623456789/sample-video-${index + 1}.mp4`,
-          format: 'mp4',
-          type: 'video',
-          createdAt: new Date(Date.now() - Math.random() * 10000000).toISOString(),
-          fileSize: Math.floor(Math.random() * 50000000) + 1000000,
-          width: 1920,
-          height: 1080,
-          duration: Math.floor(Math.random() * 60) + 10,
-          tags: ['dogs', 'walking', 'promotional'],
-        }));
-        
-        setAssets([...imageAssets, ...videoAssets]);
-      } else {
-        // Call our new API endpoint
-        const queryParams = new URLSearchParams();
-        if (resourceType !== 'all') {
-          queryParams.set('resourceType', resourceType);
-        }
-        
-        const response = await fetch(`/api/cloudinary/assets?${queryParams.toString()}`);
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch assets');
-        }
-        
-        const data = await response.json();
-        setAssets(data);
-      }
+      // Load walker uploads from S3 if that option is enabled
+      const walkerAssets = includeWalkerUploads ? await loadWalkerUploads() : [];
+      
+      // Combine both sets of assets
+      setAssets([...cloudinaryAssets, ...walkerAssets]);
     } catch (error) {
       console.error('Error loading media assets:', error);
       // Fallback to empty array on error
@@ -88,15 +71,86 @@ export default function MediaLibrary({
       setLoading(false);
     }
   };
+
+  // Load Cloudinary assets (existing implementation)
+  const loadCloudinaryAssets = async (): Promise<CloudinaryAsset[]> => {
+    // Mock data flag for development
+    const useMockData = true; // Change to false when API endpoint is properly configured
+    
+    if (useMockData) {
+      // Mock data for development
+      const imageAssets: CloudinaryAsset[] = Array.from({ length: 8 }).map((_, index) => ({
+        id: `img-${index + 1}`,
+        publicId: `sample-image-${index + 1}`,
+        url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload/v1623456789/sample-${index + 1}.jpg`,
+        format: 'jpg',
+        type: 'image',
+        createdAt: new Date(Date.now() - Math.random() * 10000000).toISOString(),
+        fileSize: Math.floor(Math.random() * 1000000) + 500000,
+        width: 1200,
+        height: 800,
+        tags: ['dogs', 'walking', 'outdoors'],
+      }));
+      
+      const videoAssets: CloudinaryAsset[] = Array.from({ length: 4 }).map((_, index) => ({
+        id: `vid-${index + 1}`,
+        publicId: `sample-video-${index + 1}`,
+        url: `https://res.cloudinary.com/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/video/upload/v1623456789/sample-video-${index + 1}.mp4`,
+        format: 'mp4',
+        type: 'video',
+        createdAt: new Date(Date.now() - Math.random() * 10000000).toISOString(),
+        fileSize: Math.floor(Math.random() * 50000000) + 1000000,
+        width: 1920,
+        height: 1080,
+        duration: Math.floor(Math.random() * 60) + 10,
+        tags: ['dogs', 'walking', 'promotional'],
+      }));
+      
+      return [...imageAssets, ...videoAssets];
+    } else {
+      // Call our API endpoint
+      const queryParams = new URLSearchParams();
+      if (resourceType !== 'all') {
+        queryParams.set('resourceType', resourceType);
+      }
+      
+      const response = await fetch(`/api/cloudinary/assets?${queryParams.toString()}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch Cloudinary assets');
+      }
+      
+      return await response.json();
+    }
+  };
+
+  // Load walker uploads from S3
+  const loadWalkerUploads = async (): Promise<CloudinaryAsset[]> => {
+    try {
+      // Get S3 assets using the updated AWS SDK v3 implementation
+      const s3Assets = await getS3Assets();
+      
+      // Convert S3 assets to CloudinaryAsset format for compatibility
+      return s3Assets.map(asset => convertS3ToCloudinaryFormat(asset));
+    } catch (error) {
+      console.error('Error loading walker uploads:', error);
+      return [];
+    }
+  };
   
   const handleAssetSelect = (asset: CloudinaryAsset) => {
+    if (isSelectionThrottled) return;
+    
+    setIsSelectionThrottled(true);
+    setTimeout(() => setIsSelectionThrottled(false), 50);
+    
     if (selectedIds.includes(asset.id)) {
       // Deselect
-      setSelectedIds(selectedIds.filter(id => id !== asset.id));
+      setSelectedIds(prevSelected => prevSelected.filter(id => id !== asset.id));
     } else {
       // Select (if within max selection limit)
       if (maxSelection === 0 || selectedIds.length < maxSelection) {
-        setSelectedIds([...selectedIds, asset.id]);
+        setSelectedIds(prevSelected => [...prevSelected, asset.id]);
       } else if (maxSelection === 1) {
         // Replace if only one selection allowed
         setSelectedIds([asset.id]);
@@ -106,8 +160,12 @@ export default function MediaLibrary({
   
   useEffect(() => {
     if (onSelect) {
-      const selected = assets.filter(asset => selectedIds.includes(asset.id));
-      onSelect(selected);
+      const debouncedSelection = setTimeout(() => {
+        const selected = assets.filter(asset => selectedIds.includes(asset.id));
+        onSelect(selected);
+      }, 100);
+      
+      return () => clearTimeout(debouncedSelection);
     }
   }, [selectedIds, assets, onSelect]);
   
@@ -149,9 +207,27 @@ export default function MediaLibrary({
     }
   };
   
-  const filteredAssets = filter === 'all' 
-    ? assets 
-    : assets.filter(asset => asset.type === filter);
+  const filteredAssets = useMemo(() => {
+    if (filter === 'all') return assets;
+    if (filter === 'image') return assets.filter(asset => asset.type === 'image');
+    if (filter === 'video') return assets.filter(asset => asset.type === 'video');
+    if (filter === 'walker') return assets.filter(asset => asset.tags.includes('user-uploaded') || asset.tags.includes('walk-media'));
+    if (filter === 'admin') return assets.filter(asset => asset.tags.includes('admin-upload') || asset.publicId.includes('admin-uploads'));
+    return assets;
+  }, [assets, filter]);
+  
+  const paginatedAssets = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredAssets.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredAssets, currentPage, itemsPerPage]);
+  
+  const totalPages = Math.ceil(filteredAssets.length / itemsPerPage);
+  
+  const handlePageChange = (newPage: number) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setCurrentPage(newPage);
+    document.querySelector('.media-library-grid')?.scrollTo(0, 0);
+  };
   
   return (
     <div className="bg-white rounded-lg shadow">
@@ -161,7 +237,7 @@ export default function MediaLibrary({
           <div className="flex items-center space-x-2">
             <div className="flex items-center space-x-1">
               <button
-                onClick={() => setFilter('all')}
+                onClick={() => {setFilter('all'); setCurrentPage(1);}}
                 className={`px-3 py-1 text-sm rounded-md ${
                   filter === 'all' 
                     ? 'bg-primary-100 text-primary-800' 
@@ -171,7 +247,7 @@ export default function MediaLibrary({
                 All
               </button>
               <button
-                onClick={() => setFilter('image')}
+                onClick={() => {setFilter('image'); setCurrentPage(1);}}
                 className={`px-3 py-1 text-sm rounded-md ${
                   filter === 'image' 
                     ? 'bg-primary-100 text-primary-800' 
@@ -181,7 +257,7 @@ export default function MediaLibrary({
                 Images
               </button>
               <button
-                onClick={() => setFilter('video')}
+                onClick={() => {setFilter('video'); setCurrentPage(1);}}
                 className={`px-3 py-1 text-sm rounded-md ${
                   filter === 'video' 
                     ? 'bg-primary-100 text-primary-800' 
@@ -189,6 +265,28 @@ export default function MediaLibrary({
                 }`}
               >
                 Videos
+              </button>
+              {includeWalkerUploads && (
+                <button
+                  onClick={() => {setFilter('walker'); setCurrentPage(1);}}
+                  className={`px-3 py-1 text-sm rounded-md ${
+                    filter === 'walker' 
+                      ? 'bg-primary-100 text-primary-800' 
+                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                  }`}
+                >
+                  Walker Uploads
+                </button>
+              )}
+              <button
+                onClick={() => {setFilter('admin'); setCurrentPage(1);}}
+                className={`px-3 py-1 text-sm rounded-md ${
+                  filter === 'admin' 
+                    ? 'bg-primary-100 text-primary-800' 
+                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                }`}
+              >
+                Admin Uploads
               </button>
             </div>
             <label className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 cursor-pointer">
@@ -215,9 +313,30 @@ export default function MediaLibrary({
             <p className="text-xs text-gray-500 mt-1">Uploading... {uploadProgress}%</p>
           </div>
         )}
+        
+        {!loading && filteredAssets.length > 0 && (
+          <div className="flex justify-between items-center mt-4 text-sm text-gray-500">
+            <span>Showing {paginatedAssets.length} of {filteredAssets.length} items</span>
+            <div className="flex items-center space-x-2">
+              <span>Page {currentPage} of {totalPages}</span>
+              <select 
+                value={itemsPerPage} 
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="text-sm border-gray-300 rounded-md"
+              >
+                <option value="20">20 per page</option>
+                <option value="40">40 per page</option>
+                <option value="60">60 per page</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
       
-      <div className="px-4 py-5 sm:p-6">
+      <div className="px-4 py-5 sm:p-6 media-library-grid" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
         {loading ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600"></div>
@@ -228,7 +347,7 @@ export default function MediaLibrary({
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {filteredAssets.map(asset => (
+            {paginatedAssets.map(asset => (
               <div 
                 key={asset.id}
                 onClick={() => handleAssetSelect(asset)}
@@ -241,6 +360,7 @@ export default function MediaLibrary({
                 {asset.type === 'image' ? (
                   <div className="relative pt-[56.25%] bg-gray-100">
                     <img
+                      loading="lazy" 
                       src={asset.url}
                       alt=""
                       className="absolute inset-0 w-full h-full object-cover"
@@ -249,11 +369,7 @@ export default function MediaLibrary({
                 ) : (
                   <div className="relative pt-[56.25%] bg-gray-100">
                     <div className="absolute inset-0 w-full h-full flex items-center justify-center">
-                      <video
-                        src={asset.url}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-full h-full bg-gray-900 flex items-center justify-center">
                         <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                         </svg>
@@ -274,6 +390,20 @@ export default function MediaLibrary({
                       {(asset.fileSize / 1024 / 1024).toFixed(1)} MB
                     </span>
                   </div>
+                  {asset.tags.includes('user-uploaded') && (
+                    <div className="mt-1">
+                      <span className="text-xs bg-blue-100 px-2 py-0.5 rounded text-blue-600">
+                        Walker Upload
+                      </span>
+                    </div>
+                  )}
+                  {(asset.tags.includes('admin-upload') || asset.publicId.includes('admin-uploads')) && (
+                    <div className="mt-1">
+                      <span className="text-xs bg-purple-100 px-2 py-0.5 rounded text-purple-600">
+                        Admin Upload
+                      </span>
+                    </div>
+                  )}
                 </div>
                 
                 {selectedIds.includes(asset.id) && (
@@ -288,6 +418,92 @@ export default function MediaLibrary({
           </div>
         )}
       </div>
+      
+      {!loading && totalPages > 1 && (
+        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 sm:px-6">
+          <nav className="flex items-center justify-between">
+            <div className="flex-1 flex justify-between sm:hidden">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{' '}
+                  <span className="font-medium">
+                    {Math.min(currentPage * itemsPerPage, filteredAssets.length)}
+                  </span>{' '}
+                  of <span className="font-medium">{filteredAssets.length}</span> results
+                </p>
+              </div>
+              <div>
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="sr-only">Previous</span>
+                    <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                          currentPage === pageNum
+                            ? 'z-10 bg-primary-50 border-primary-500 text-primary-600'
+                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <span className="sr-only">Next</span>
+                    <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </nav>
+              </div>
+            </div>
+          </nav>
+        </div>
+      )}
       
       {maxSelection > 0 && (
         <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 sm:px-6">

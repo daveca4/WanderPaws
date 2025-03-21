@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { MediaAsset } from '@/lib/contentAIService';
 import { 
   ReelTemplate, 
@@ -29,20 +29,26 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
   const [isCreating, setIsCreating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [reelUrl, setReelUrl] = useState<string>('');
+  const [loadingMedia, setLoadingMedia] = useState(false);
   
   useEffect(() => {
     // Load templates
     try {
       const templates = getReelTemplates();
       setTemplates(templates);
+      if (templates.length > 0) {
+        setSelectedTemplate(templates[0].id);
+        setAspectRatio(templates[0].aspectRatio);
+        setDuration(templates[0].duration);
+      }
     } catch (error) {
       console.error('Error loading templates:', error);
       // Fallback templates in case the server-side function fails
-      setTemplates([
+      const fallbackTemplates = [
         {
           id: 'instagram-story',
           name: 'Instagram Story',
-          aspectRatio: '9:16',
+          aspectRatio: '9:16' as const,
           duration: 15,
           sections: [
             { type: 'intro', duration: 3, transition: 'fade' },
@@ -53,7 +59,7 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
         {
           id: 'tiktok-vertical',
           name: 'TikTok Video',
-          aspectRatio: '9:16',
+          aspectRatio: '9:16' as const,
           duration: 30,
           sections: [
             { type: 'intro', duration: 3, transition: 'slide' },
@@ -61,11 +67,15 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
             { type: 'outro', duration: 3, transition: 'fade' },
           ],
         },
-      ]);
+      ];
+      setTemplates(fallbackTemplates);
+      setSelectedTemplate(fallbackTemplates[0].id);
+      setAspectRatio(fallbackTemplates[0].aspectRatio);
+      setDuration(fallbackTemplates[0].duration);
     }
   }, []);
   
-  const handleTemplateChange = (templateId: string) => {
+  const handleTemplateChange = useCallback((templateId: string) => {
     setSelectedTemplate(templateId);
     
     if (templateId) {
@@ -75,14 +85,21 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
         setDuration(template.duration);
       }
     }
-  };
+  }, [templates]);
   
-  const handleAssetsSelected = (assets: CloudinaryAsset[]) => {
-    setSelectedAssets(assets);
-  };
+  const handleAssetsSelected = useCallback((assets: CloudinaryAsset[]) => {
+    setLoadingMedia(true);
+    setTimeout(() => {
+      setSelectedAssets(assets);
+      setLoadingMedia(false);
+    }, 50);
+  }, []);
   
   const handleCreateReel = async () => {
-    if (selectedAssets.length === 0) return;
+    if (selectedAssets.length === 0) {
+      alert("Please select at least one media item to create a reel");
+      return;
+    }
     
     setIsCreating(true);
     setProgress(0);
@@ -99,8 +116,11 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
     }, 500);
     
     try {
+      // Limit the number of assets processed at once to prevent overload
+      const limitedAssets = selectedAssets.slice(0, 20); // Limit to 20 assets max
+      
       // Use the server-side API through our client-side API wrapper function
-      const mediaItems = selectedAssets.map(asset => ({
+      const mediaItems = limitedAssets.map(asset => ({
         publicId: asset.publicId,
         // Include additional metadata if needed
         startTime: 0,
@@ -135,13 +155,99 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
     }
   };
   
-  const handleReorderAsset = (dragIndex: number, dropIndex: number) => {
-    const newAssets = [...selectedAssets];
-    const draggedItem = newAssets[dragIndex];
-    newAssets.splice(dragIndex, 1);
-    newAssets.splice(dropIndex, 0, draggedItem);
-    setSelectedAssets(newAssets);
-  };
+  const handleReorderAsset = useCallback((dragIndex: number, dropIndex: number) => {
+    setSelectedAssets(prev => {
+      const newAssets = [...prev];
+      const draggedItem = newAssets[dragIndex];
+      newAssets.splice(dragIndex, 1);
+      newAssets.splice(dropIndex, 0, draggedItem);
+      return newAssets;
+    });
+  }, []);
+  
+  const mediaGallery = useMemo(() => (
+    <MediaLibrary 
+      onSelect={handleAssetsSelected}
+      selectedAssets={selectedAssets}
+      maxSelection={20} // Limit selection to prevent performance issues
+      includeWalkerUploads={true}
+    />
+  ), [handleAssetsSelected, selectedAssets]);
+
+  const selectedAssetsDisplay = useMemo(() => {
+    if (loadingMedia) {
+      return (
+        <div className="flex justify-center py-8">
+          <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-600"></div>
+        </div>
+      );
+    }
+    
+    if (selectedAssets.length === 0) {
+      return null;
+    }
+    
+    // Only display a maximum of 20 selected assets to maintain performance
+    const displayAssets = selectedAssets.slice(0, 20);
+    
+    return (
+      <div className="mt-6">
+        <h4 className="font-medium text-gray-900 mb-2">Selected Media ({selectedAssets.length})</h4>
+        <p className="text-sm text-gray-500 mb-2">
+          {selectedAssets.length > 20 ? 
+            `Showing 20 of ${selectedAssets.length} assets. All selected assets will be used in the reel.` : 
+            'These will appear in the order shown.'}
+        </p>
+        <div className="grid grid-cols-4 gap-2">
+          {displayAssets.map((asset, index) => (
+            <div 
+              key={asset.id}
+              className="relative border border-gray-200 rounded-md overflow-hidden"
+            >
+              {asset.type === 'image' ? (
+                <img 
+                  src={asset.url} 
+                  alt=""
+                  className="w-full h-16 object-cover"
+                />
+              ) : (
+                <div className="w-full h-16 bg-gray-100 flex items-center justify-center relative">
+                  <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              )}
+              <div className="absolute top-0 left-0 bg-gray-800 bg-opacity-70 text-white text-xs px-1">
+                {index + 1}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }, [selectedAssets, loadingMedia]);
+
+  const templatesDisplay = useMemo(() => (
+    <div className="grid grid-cols-2 gap-4">
+      {templates.map(template => (
+        <div 
+          key={template.id}
+          onClick={() => handleTemplateChange(template.id)}
+          className={`border rounded-lg p-4 cursor-pointer transition-all ${
+            selectedTemplate === template.id 
+              ? 'border-primary-500 bg-primary-50' 
+              : 'border-gray-200 hover:border-gray-300'
+          }`}
+        >
+          <div className="text-sm font-medium">{template.name}</div>
+          <div className="mt-2 flex justify-between text-xs text-gray-500">
+            <span>{template.aspectRatio}</span>
+            <span>{template.duration}s</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  ), [templates, selectedTemplate, handleTemplateChange]);
   
   return (
     <div className="space-y-6">
@@ -157,25 +263,7 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
               <h4 className="font-medium text-gray-900 mb-4">1. Select Template</h4>
-              <div className="grid grid-cols-2 gap-4">
-                {templates.map(template => (
-                  <div 
-                    key={template.id}
-                    onClick={() => handleTemplateChange(template.id)}
-                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                      selectedTemplate === template.id 
-                        ? 'border-primary-500 bg-primary-50' 
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="text-sm font-medium">{template.name}</div>
-                    <div className="mt-2 flex justify-between text-xs text-gray-500">
-                      <span>{template.aspectRatio}</span>
-                      <span>{template.duration}s</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              {templatesDisplay}
               
               <div className="mt-6">
                 <button
@@ -282,54 +370,32 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
             
             <div>
               <h4 className="font-medium text-gray-900 mb-4">2. Select & Arrange Media</h4>
-              <MediaLibrary 
-                onSelect={handleAssetsSelected}
-                selectedAssets={selectedAssets}
-              />
+              {mediaGallery}
               
-              {selectedAssets.length > 0 && (
-                <div className="mt-6">
-                  <h4 className="font-medium text-gray-900 mb-2">Selected Media ({selectedAssets.length})</h4>
-                  <p className="text-sm text-gray-500 mb-2">Drag to reorder. These will appear in the order shown.</p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {selectedAssets.map((asset, index) => (
-                      <div 
-                        key={asset.id}
-                        className="relative border border-gray-200 rounded-md overflow-hidden"
-                      >
-                        {asset.type === 'image' ? (
-                          <img 
-                            src={asset.url} 
-                            alt=""
-                            className="w-full h-16 object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-16 bg-gray-100 flex items-center justify-center relative">
-                            <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                        )}
-                        <div className="absolute top-0 left-0 bg-gray-800 bg-opacity-70 text-white text-xs px-1">
-                          {index + 1}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {selectedAssetsDisplay}
             </div>
           </div>
           
-          <div className="mt-8">
-            <button
-              type="button"
-              onClick={handleCreateReel}
-              disabled={selectedAssets.length === 0 || isCreating}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              {isCreating ? 'Creating Reel...' : 'Create Reel'}
-            </button>
+          <div className="mt-8 border-t border-gray-200 pt-8">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center">
+              <div className="mb-4 sm:mb-0">
+                <h4 className="font-medium text-gray-900">3. Create Your Reel</h4>
+                <p className="text-sm text-gray-500">
+                  {selectedAssets.length === 0
+                    ? 'Select media assets first to create your reel'
+                    : `Ready to create a ${aspectRatio} reel with ${selectedAssets.length} media items`}
+                </p>
+              </div>
+              
+              <button
+                type="button"
+                onClick={handleCreateReel}
+                disabled={isCreating || selectedAssets.length === 0}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCreating ? 'Creating Reel...' : 'Create Reel'}
+              </button>
+            </div>
             
             {isCreating && (
               <div className="mt-4">
@@ -339,49 +405,14 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
                     style={{ width: `${progress}%` }}
                   ></div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">Processing... {progress}%</p>
-              </div>
-            )}
-            
-            {reelUrl && (
-              <div className="mt-6">
-                <h4 className="font-medium text-gray-900 mb-2">Preview</h4>
-                <div className="relative pt-[177.78%] bg-black rounded-lg overflow-hidden">
-                  {reelUrl.endsWith('.mp4') || reelUrl.includes('/video/') ? (
-                    <video 
-                      src={reelUrl} 
-                      controls 
-                      className="absolute inset-0 w-full h-full object-contain"
-                    />
-                  ) : (
-                    <img 
-                      src={reelUrl} 
-                      alt="Generated reel preview" 
-                      className="absolute inset-0 w-full h-full object-contain"
-                    />
-                  )}
-                </div>
-                
-                <div className="mt-4 flex space-x-4">
-                  <a
-                    href={reelUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1 flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-                  >
-                    Download
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // This would integrate with social media platforms in a real implementation
-                      alert('This would open a social media sharing dialog in a real implementation.');
-                    }}
-                    className="flex-1 flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    Share to Social Media
-                  </button>
-                </div>
+                <p className="mt-2 text-sm text-gray-500 text-center">
+                  {progress < 100 ? 'Processing your reel...' : 'Reel created!'}
+                </p>
+                {progress === 100 && reelUrl && (
+                  <div className="mt-4 text-center">
+                    <p className="text-green-500 mb-2">Reel successfully created!</p>
+                  </div>
+                )}
               </div>
             )}
           </div>

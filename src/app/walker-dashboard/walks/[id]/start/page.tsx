@@ -67,10 +67,10 @@ export default function StartWalkPage({ params }: { params: { id: string } }) {
     // In a real app, this would make an API call to update the status
     setWalkStatus(newStatus);
     
-    // Redirect to walk details page after a delay if completed
+    // Redirect to media upload page after a delay if completed
     if (newStatus === 'completed') {
       setTimeout(() => {
-        router.push(`/walker-dashboard/walks/${walkId}`);
+        router.push(`/walker-dashboard/walks/${walkId}/media`);
       }, 2000);
     }
   };
@@ -245,7 +245,7 @@ export default function StartWalkPage({ params }: { params: { id: string } }) {
               {walkStatus === 'completed' && (
                 <div className="bg-green-50 p-4 rounded-lg">
                   <p className="text-green-800">
-                    This walk has been completed. You'll be redirected to the walk details page.
+                    This walk has been completed. You'll be redirected to the media upload page.
                   </p>
                 </div>
               )}

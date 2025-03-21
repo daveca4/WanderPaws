@@ -15,6 +15,7 @@ import { AIRecommendationsWidget } from '@/components/dashboard/AIRecommendation
 import { RecentActivitiesWidget } from '@/components/dashboard/RecentActivitiesWidget';
 import ContentQuickActionCard from '@/components/admin/content-ai/ContentQuickActionCard';
 import { ContentAIWidget } from '@/components/dashboard/ContentAIWidget';
+import { MediaGalleryWidget } from '@/components/dashboard/MediaGalleryWidget';
 
 import {
   dashboardWidgets,
@@ -70,28 +71,30 @@ export default function AdminDashboard() {
     saveLayout(defaultLayouts);
   };
 
-  // Render the appropriate widget based on id
-  const renderWidget = (id: string) => {
-    const widget = getWidgetById(id);
+  // Render widget based on widget id
+  const renderWidget = (widgetId: string) => {
+    const widget = getWidgetById(widgetId);
     if (!widget) return null;
 
-    switch (id) {
-      case 'summaryWidget':
+    switch (widget.type) {
+      case 'summary':
         return <SummaryWidget />;
-      case 'pendingAssessmentsWidget':
+      case 'pendingAssessments':
         return <PendingAssessmentsWidget />;
-      case 'activeSubscriptionsWidget':
+      case 'activeSubscriptions':
         return <ActiveSubscriptionsWidget />;
-      case 'upcomingWalksWidget':
+      case 'upcomingWalks':
         return <UpcomingWalksWidget />;
-      case 'aiRecommendationsWidget':
+      case 'aiRecommendations':
         return <AIRecommendationsWidget />;
-      case 'recentActivitiesWidget':
+      case 'recentActivities':
         return <RecentActivitiesWidget />;
-      case 'contentAIWidget':
+      case 'contentAI':
         return <ContentAIWidget />;
+      case 'mediaGallery':
+        return <MediaGalleryWidget />;
       default:
-        return <div className="p-4">Widget {id} not found</div>;
+        return <div>Unknown widget type: {widget.type}</div>;
     }
   };
 
@@ -185,6 +188,31 @@ export default function AdminDashboard() {
               <div className="mt-5">
                 <a href="/admin/content-ai" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
                   Manage Content
+                </a>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-blue-100 rounded-md p-3">
+                  <svg className="h-6 w-6 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Media Gallery</dt>
+                    <dd>
+                      <div className="text-lg font-medium text-gray-900">Manage Walker Media</div>
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+              <div className="mt-5">
+                <a href="/admin/media" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+                  View Gallery
                 </a>
               </div>
             </div>

@@ -8,7 +8,8 @@ export type WidgetType =
   | 'upcomingWalks' 
   | 'aiRecommendations' 
   | 'recentActivities'
-  | 'contentAI';
+  | 'contentAI'
+  | 'mediaGallery';
 
 // Interface for dashboard widgets
 export interface DashboardWidget {
@@ -69,6 +70,13 @@ export const dashboardWidgets: DashboardWidget[] = [
     title: 'Content AI', 
     minH: 4,
     minW: 2
+  },
+  { 
+    id: 'mediaGalleryWidget', 
+    type: 'mediaGallery', 
+    title: 'Media Gallery', 
+    minH: 4,
+    minW: 2
   }
 ];
 
@@ -80,7 +88,8 @@ export const defaultDesktopLayout: Layout[] = [
   { i: 'upcomingWalksWidget', x: 0, y: 6, w: 4, h: 4, static: false },
   { i: 'aiRecommendationsWidget', x: 4, y: 6, w: 2, h: 4, static: false },
   { i: 'recentActivitiesWidget', x: 0, y: 10, w: 6, h: 4, static: false },
-  { i: 'contentAIWidget', x: 0, y: 14, w: 6, h: 4, static: false }
+  { i: 'contentAIWidget', x: 0, y: 14, w: 3, h: 4, static: false },
+  { i: 'mediaGalleryWidget', x: 3, y: 14, w: 3, h: 4, static: false }
 ];
 
 // Default layout for mobile screens
@@ -91,7 +100,8 @@ export const defaultMobileLayout: Layout[] = [
   { i: 'upcomingWalksWidget', x: 0, y: 10, w: 1, h: 4, static: false },
   { i: 'aiRecommendationsWidget', x: 0, y: 14, w: 1, h: 4, static: false },
   { i: 'recentActivitiesWidget', x: 0, y: 18, w: 1, h: 4, static: false },
-  { i: 'contentAIWidget', x: 0, y: 22, w: 1, h: 4, static: false }
+  { i: 'contentAIWidget', x: 0, y: 22, w: 1, h: 4, static: false },
+  { i: 'mediaGalleryWidget', x: 0, y: 26, w: 1, h: 4, static: false }
 ];
 
 // Constants for localStorage keys
