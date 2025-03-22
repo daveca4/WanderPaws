@@ -189,28 +189,52 @@ export const createReel = async (
       }
     }
     
-    // Client-side - use the API endpoint
-    const response = await fetch('/api/cloudinary/create-reel', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ...options,
-        // Add indicator if the media items are from S3 vs Cloudinary
-        mediaItems: options.mediaItems.map(item => ({
-          ...item,
-          // Add a flag to indicate if this is an S3 asset (publicId contains no slashes)
-          isS3Asset: !item.publicId.includes('/') && !item.publicId.startsWith('sample-')
-        }))
-      }),
-    });
+    // Client-side - use the API endpoint with retry mechanism
+    const maxRetries = 2;
+    let retryCount = 0;
+    let lastError;
     
-    if (!response.ok) {
-      throw new Error('Failed to create reel via API');
+    while (retryCount <= maxRetries) {
+      try {
+        console.log(`Creating reel - attempt ${retryCount + 1} of ${maxRetries + 1}`);
+        
+        const response = await fetch('/api/cloudinary/create-reel', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...options,
+            // Add indicator if the media items are from S3 vs Cloudinary
+            mediaItems: options.mediaItems.map(item => ({
+              ...item,
+              // Add a flag to indicate if this is an S3 asset (publicId contains no slashes)
+              isS3Asset: !item.publicId.includes('/') && !item.publicId.startsWith('sample-')
+            }))
+          }),
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+          throw new Error(`API error (${response.status}): ${errorData.error || errorData.message || 'Unknown error'}`);
+        }
+        
+        // If successful, return the result
+        return await response.json();
+      } catch (error) {
+        console.error(`Attempt ${retryCount + 1} failed:`, error);
+        lastError = error;
+        retryCount++;
+        
+        if (retryCount <= maxRetries) {
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+        }
+      }
     }
     
-    return await response.json();
+    // If we're here, all retries failed
+    throw lastError || new Error('Failed to create reel after multiple attempts');
   } catch (error) {
     console.error('Error creating reel:', error);
     throw error;

@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import MediaUploader from '@/components/walks/MediaUploader';
-import { useAuth } from '@/lib/auth';
-import { getMockWalkById, getMockDogById } from '@/lib/mockBookings';
+import { useAuth } from '@/lib/AuthContext';
+import { getBookingById } from '@/lib/mockBookings';
+import { mockDogs } from '@/lib/mockData';
 
 export default function WalkMediaPage({ params }: { params: { id: string } }) {
   const { user, loading } = useAuth();
@@ -20,7 +21,7 @@ export default function WalkMediaPage({ params }: { params: { id: string } }) {
 
     // Load walk details
     try {
-      const walkData = getMockWalkById(params.id);
+      const walkData = getBookingById(params.id);
       if (!walkData) {
         setError('Walk not found');
         return;
@@ -35,7 +36,7 @@ export default function WalkMediaPage({ params }: { params: { id: string } }) {
       setWalk(walkData);
 
       // Get dog information
-      const dogData = getMockDogById(walkData.dogId);
+      const dogData = mockDogs.find(d => d.id === walkData.dogId);
       if (!dogData) {
         setError('Dog information not found');
         return;
