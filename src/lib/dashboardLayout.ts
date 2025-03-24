@@ -9,7 +9,8 @@ export type WidgetType =
   | 'aiRecommendations' 
   | 'recentActivities'
   | 'contentAI'
-  | 'mediaGallery';
+  | 'mediaGallery'
+  | 'weatherMonitoring';
 
 // Interface for dashboard widgets
 export interface DashboardWidget {
@@ -77,6 +78,13 @@ export const dashboardWidgets: DashboardWidget[] = [
     title: 'Media Gallery', 
     minH: 4,
     minW: 2
+  },
+  { 
+    id: 'weatherMonitoringWidget', 
+    type: 'weatherMonitoring', 
+    title: 'Weather Monitoring', 
+    minH: 4,
+    minW: 4
   }
 ];
 
@@ -89,7 +97,8 @@ export const defaultDesktopLayout: Layout[] = [
   { i: 'aiRecommendationsWidget', x: 4, y: 6, w: 2, h: 4, static: false },
   { i: 'recentActivitiesWidget', x: 0, y: 10, w: 6, h: 4, static: false },
   { i: 'contentAIWidget', x: 0, y: 14, w: 3, h: 4, static: false },
-  { i: 'mediaGalleryWidget', x: 3, y: 14, w: 3, h: 4, static: false }
+  { i: 'mediaGalleryWidget', x: 3, y: 14, w: 3, h: 4, static: false },
+  { i: 'weatherMonitoringWidget', x: 0, y: 18, w: 4, h: 4, static: false }
 ];
 
 // Default layout for mobile screens
@@ -101,7 +110,8 @@ export const defaultMobileLayout: Layout[] = [
   { i: 'aiRecommendationsWidget', x: 0, y: 14, w: 1, h: 4, static: false },
   { i: 'recentActivitiesWidget', x: 0, y: 18, w: 1, h: 4, static: false },
   { i: 'contentAIWidget', x: 0, y: 22, w: 1, h: 4, static: false },
-  { i: 'mediaGalleryWidget', x: 0, y: 26, w: 1, h: 4, static: false }
+  { i: 'mediaGalleryWidget', x: 0, y: 26, w: 1, h: 4, static: false },
+  { i: 'weatherMonitoringWidget', x: 0, y: 30, w: 1, h: 4, static: false }
 ];
 
 // Constants for localStorage keys

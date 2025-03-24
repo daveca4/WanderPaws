@@ -16,6 +16,7 @@ import { RecentActivitiesWidget } from '@/components/dashboard/RecentActivitiesW
 import ContentQuickActionCard from '@/components/admin/content-ai/ContentQuickActionCard';
 import { ContentAIWidget } from '@/components/dashboard/ContentAIWidget';
 import { MediaGalleryWidget } from '@/components/dashboard/MediaGalleryWidget';
+import { WeatherMonitoringWidget } from '@/components/dashboard/WeatherMonitoringWidget';
 
 import {
   dashboardWidgets,
@@ -93,6 +94,8 @@ export default function AdminDashboard() {
         return <ContentAIWidget />;
       case 'mediaGallery':
         return <MediaGalleryWidget />;
+      case 'weatherMonitoring':
+        return <WeatherMonitoringWidget />;
       default:
         return <div>Unknown widget type: {widget.type}</div>;
     }
