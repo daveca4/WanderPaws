@@ -1,3 +1,15 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
 model WeatherLocation {
   id        String   @id @default(cuid())
   name      String
@@ -17,4 +29,59 @@ model Notification {
   metadata  Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model User {
+  id            String            @id @default(cuid())
+  email         String            @unique
+  passwordHash   String?
+  name          String?
+  role          String            @default("owner")
+  emailVerified Boolean           @default(false)
+  image         String?
+  stripeCustomer StripeCustomer?
+  subscriptions UserSubscription[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model UserSubscription {
+  id               String         @id @default(cuid())
+  userId           String
+  user             User           @relation(fields: [userId], references: [id])
+  planId           String
+  planName         String
+  walkCredits      Int
+  walkDuration     Int
+  creditsRemaining Int
+  startDate        DateTime       @default(now())
+  endDate          DateTime
+  status           String         @default("active")
+  purchaseAmount   Int
+  purchaseDate     DateTime       @default(now())
+  stripePayments   StripePayment[]
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+}
+
+model StripeCustomer {
+  id        String   @id
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  email     String
+  createdAt DateTime @default(now())
+}
+
+model StripePayment {
+  id               String           @id
+  stripeCustomerId String?
+  subscriptionId   String?
+  subscription     UserSubscription? @relation(fields: [subscriptionId], references: [id])
+  amount           Int
+  currency         String           @default("gbp")
+  status           String
+  paymentIntentId  String?
+  checkoutSessionId String?
+  metadata         Json?
+  createdAt        DateTime         @default(now())
 } 

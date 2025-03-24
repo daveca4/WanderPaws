@@ -8,19 +8,19 @@ import { useAuth } from '@/lib/AuthContext';
 import { 
   mockSubscriptionPlans, 
   mockUserSubscriptions, 
-  createUserSubscription,
   getUserSubscriptions
 } from '@/lib/mockSubscriptions';
 import { SubscriptionPlan, UserSubscription } from '@/lib/types';
+import StripeCheckoutButton from '@/components/StripeCheckoutButton';
 
 export default function SubscriptionsPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [subscribing, setSubscribing] = useState(false);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [userSubscriptions, setUserSubscriptions] = useState<UserSubscription[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   useEffect(() => {
     if (!user) return;
@@ -37,30 +37,20 @@ export default function SubscriptionsPage() {
     };
     
     setTimeout(loadData, 500);
+    
+    // Check for success parameter in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const sessionId = urlParams.get('session_id');
+    
+    if (success === 'true' && sessionId) {
+      setSuccessMessage('Payment successful! Your subscription has been activated.');
+      loadData(); // Reload data to get the new subscription
+    }
   }, [user]);
   
   const handleSelectPlan = (planId: string) => {
     setSelectedPlanId(planId);
-  };
-  
-  const handleSubscribe = () => {
-    if (!user || !selectedPlanId) return;
-    
-    setSubscribing(true);
-    
-    // In a real app, this would make an API call to create a subscription
-    setTimeout(() => {
-      const newSubscription = createUserSubscription(
-        selectedPlanId,
-        user.id,
-        user.profileId || ''
-      );
-      
-      console.log('New subscription created:', newSubscription);
-      
-      // Redirect to booking page
-      router.push('/owner-dashboard/create-booking');
-    }, 1500);
   };
   
   // Find active subscription
@@ -104,6 +94,36 @@ export default function SubscriptionsPage() {
             </div>
           )}
         </div>
+
+        {/* Success Message */}
+        {successMessage && (
+          <div className="bg-green-50 border-l-4 border-green-400 p-4 mb-6">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-green-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-green-700">{successMessage}</p>
+              </div>
+              <div className="ml-auto pl-3">
+                <div className="-mx-1.5 -my-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSuccessMessage(null)}
+                    className="inline-flex bg-green-50 rounded-md p-1.5 text-green-500 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    <span className="sr-only">Dismiss</span>
+                    <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Active Subscription Banner */}
         {activeSubscription && (
@@ -228,21 +248,21 @@ export default function SubscriptionsPage() {
                   </div>
                   
                   <div className="mt-8">
-                    <button
-                      type="button"
-                      onClick={() => handleSelectPlan(plan.id)}
-                      className={`
-                        w-full flex items-center justify-center px-5 py-3 border border-transparent 
-                        text-base font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 
-                        ${
-                          selectedPlanId === plan.id
-                            ? 'text-white bg-primary-600 hover:bg-primary-700 focus:ring-primary-500'
-                            : 'text-primary-700 bg-primary-100 hover:bg-primary-200 focus:ring-primary-500'
-                        }
-                      `}
-                    >
-                      {selectedPlanId === plan.id ? 'Selected' : 'Select Plan'}
-                    </button>
+                    {selectedPlanId === plan.id ? (
+                      <StripeCheckoutButton 
+                        plan={plan} 
+                        buttonText="Subscribe Now" 
+                        className="w-full"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectPlan(plan.id)}
+                        className="w-full flex items-center justify-center px-5 py-2 border border-transparent text-base font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                      >
+                        Select Plan
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -250,31 +270,16 @@ export default function SubscriptionsPage() {
           })}
         </div>
 
-        {/* Subscribe Button */}
+        {/* Floating Button for Selected Plan */}
         {selectedPlanId && (
-          <div className="mt-8 flex flex-col items-center">
-            <button
-              type="button"
-              onClick={handleSubscribe}
-              disabled={subscribing}
-              className="w-full sm:w-auto inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-            >
-              {subscribing ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Processing...
-                </>
-              ) : (
-                'Subscribe Now'
-              )}
-            </button>
-            <p className="mt-3 text-sm text-gray-500">
-              You will be charged {formatPrice(plans.find(p => p.id === selectedPlanId)?.price || 0)}.
-              No actual payment will be processed in this demo.
-            </p>
+          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-between items-center shadow-lg transform transition-transform duration-300 z-10">
+            <div className="text-gray-800 font-semibold">
+              Selected: {plans.find(p => p.id === selectedPlanId)?.name}
+            </div>
+            <StripeCheckoutButton 
+              plan={plans.find(p => p.id === selectedPlanId)!} 
+              buttonText="Subscribe Now"
+            />
           </div>
         )}
       </div>
