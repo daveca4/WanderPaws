@@ -41,6 +41,8 @@ model User {
   image         String?
   stripeCustomer StripeCustomer?
   subscriptions UserSubscription[]
+  owner         Owner?
+  walker        Walker?
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
 }
@@ -84,4 +86,146 @@ model StripePayment {
   checkoutSessionId String?
   metadata         Json?
   createdAt        DateTime         @default(now())
+}
+
+model Dog {
+  id                String   @id @default(cuid())
+  name              String
+  breed             String
+  age               Int
+  size              String   // 'small', 'medium', 'large'
+  temperament       String[] // Stored as a JSON array
+  specialNeeds      String[] // Stored as a JSON array
+  ownerId           String
+  owner             Owner    @relation(fields: [ownerId], references: [id])
+  imageUrl          String?
+  walkingPreferences Json    // Stored as JSON object
+  assessmentStatus  String?  // 'pending', 'approved', 'denied', 'not_required'
+  walks             Walk[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model Owner {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  phone     String
+  address   Json     // Stored as JSON object
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  dogs      Dog[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Walker {
+  id                      String   @id @default(cuid())
+  name                    String
+  email                   String
+  phone                   String
+  bio                     String
+  rating                  Float
+  availability            Json     // Stored as JSON object
+  specialties             String[] // Stored as a JSON array
+  preferredDogSizes       String[] // Stored as a JSON array
+  certificationsOrTraining String[] // Stored as a JSON array
+  imageUrl                String?
+  userId                  String   @unique
+  user                    User     @relation(fields: [userId], references: [id])
+  walks                   Walk[]
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+}
+
+model Walk {
+  id           String   @id @default(cuid())
+  dogId        String
+  dog          Dog      @relation(fields: [dogId], references: [id])
+  walkerId     String
+  walker       Walker   @relation(fields: [walkerId], references: [id])
+  date         DateTime
+  startTime    String
+  timeSlot     String   // 'AM', 'PM'
+  duration     Int
+  status       String   // 'scheduled', 'completed', 'cancelled'
+  notes        String?
+  route        Json?    // Stored as JSON object
+  feedback     Json?    // Stored as JSON object
+  metrics      Json?    // Stored as JSON object
+  subscriptionId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model TimeSlot {
+  id        String   @id @default(cuid())
+  start     String
+  end       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Assessment {
+  id              String    @id @default(cuid())
+  dogId           String
+  ownerId         String
+  createdDate     DateTime  @default(now())
+  scheduledDate   DateTime
+  assignedWalkerId String?
+  status          String    // 'pending', 'scheduled', 'completed', 'cancelled'
+  result          String?   // 'approved', 'denied'
+  adminNotes      String?
+  resultNotes     String?
+  feedback        Json?     // Stored as JSON object
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model Conversation {
+  id           String    @id @default(cuid())
+  participants String[]  // Array of user IDs
+  title        String?
+  type         String    // 'direct', 'group'
+  messages     Message[]
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
+  senderId       String
+  content        String
+  timestamp      DateTime     @default(now())
+  readStatus     String       // 'read', 'unread'
+  attachments    Json?        // Stored as JSON array
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+model SubscriptionPlan {
+  id                String   @id @default(cuid())
+  name              String
+  description       String
+  price             Int
+  walkCredits       Int
+  walkDuration      Int      // In minutes
+  isActive          Boolean  @default(true)
+  discountPercentage Int?
+  features          String[]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// Add HolidayRequest model
+model HolidayRequest {
+  id        String   @id @default(cuid())
+  walkerId  String
+  date      String
+  reason    String
+  status    String   @default("pending") // 'pending', 'approved', 'denied'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 } 

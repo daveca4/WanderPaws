@@ -1,82 +1,92 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from './types';
-import { login as authLogin, logout as authLogout, getCurrentUser, hasPermission, getUserPermissions } from './auth';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User, Role, Permission } from './types';
+import { login, logout, getCurrentUser, hasPermission } from './auth';
 
-type AuthContextType = {
+// Define the context type
+interface AuthContextType {
   user: User | null;
+  isLoading: boolean;
   loading: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<User | null>;
   logout: () => Promise<void>;
+  hasPermission: (action: string, resource: string, resourceOwnerId?: string) => boolean;
   checkPermission: (action: string, resource: string, resourceOwnerId?: string) => boolean;
-};
+}
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Create the context with a default value
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isLoading: true,
+  loading: true,
+  login: async () => null,
+  logout: async () => {},
+  hasPermission: () => false,
+  checkPermission: () => false,
+});
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+// Hook to use the auth context
+export const useAuth = () => useContext(AuthContext);
+
+// Provider component
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Load user from storage on mount
   useEffect(() => {
-    // Load the current user when the app starts
     const loadUser = async () => {
-      const currentUser = getCurrentUser();
-      setUser(currentUser);
-      setLoading(false);
+      const storedUser = getCurrentUser();
+      setUser(storedUser);
+      setIsLoading(false);
     };
 
     loadUser();
   }, []);
 
-  const login = async (email: string, password: string): Promise<boolean> => {
+  // Handle login
+  const handleLogin = async (email: string, password: string) => {
     try {
-      const loggedInUser = await authLogin(email, password);
-      if (loggedInUser) {
-        setUser(loggedInUser);
-        return true;
-      }
-      return false;
+      const user = await login(email, password);
+      setUser(user);
+      return user;
     } catch (error) {
       console.error('Login error:', error);
-      return false;
+      return null;
     }
   };
 
-  const logout = async (): Promise<void> => {
-    try {
-      await authLogout();
-      setUser(null);
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
+  // Handle logout
+  const handleLogout = async () => {
+    await logout();
+    setUser(null);
   };
 
-  const checkPermission = (action: string, resource: string, resourceOwnerId?: string): boolean => {
+  // Check permissions
+  const checkPermission = (action: string, resource: string, resourceOwnerId?: string) => {
     return hasPermission(user, action, resource, resourceOwnerId);
   };
 
-  const value = {
-    user,
-    loading,
-    login,
-    logout,
-    checkPermission,
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+  return (
+    <AuthContext.Provider
+      value={{
+        user,
+        isLoading,
+        loading: isLoading,
+        login: handleLogin,
+        logout: handleLogout,
+        hasPermission: checkPermission,
+        checkPermission,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
 
 // Custom hook to check permissions
 export function usePermission(action: string, resource: string, resourceOwnerId?: string) {
-  const { checkPermission } = useAuth();
-  return checkPermission(action, resource, resourceOwnerId);
+  const { hasPermission } = useAuth();
+  return hasPermission(action, resource, resourceOwnerId);
 } 

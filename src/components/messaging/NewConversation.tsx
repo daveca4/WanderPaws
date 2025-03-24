@@ -4,122 +4,136 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMessages } from '@/lib/MessageContext';
 import { useAuth } from '@/lib/AuthContext';
-import { mockUsers } from '@/lib/mockUsers';
-import { mockOwners, mockWalkers, mockWalks } from '@/lib/mockData';
+import { useData } from '@/lib/DataContext';
 import { User } from '@/lib/types';
+import { getWalksByDogId, getWalksByWalkerId } from '@/utils/dataHelpers';
 
 export default function NewConversation({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { createConversation } = useMessages();
   const { user: currentUser } = useAuth();
+  const { owners, walkers, walks, dogs } = useData();
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isGroup, setIsGroup] = useState(false);
   const [groupTitle, setGroupTitle] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Get allowed recipients based on user role
-  const getAllowedRecipients = () => {
-    if (!currentUser) return [];
-
-    // Admin can message everyone
-    if (currentUser.role === 'admin') {
-      return mockUsers;
-    }
-
-    // Owner can only message admins or walkers assigned to them
-    if (currentUser.role === 'owner') {
-      // Get owner's profile
-      const owner = mockOwners.find(o => {
-        const user = mockUsers.find(u => u.id === currentUser.id);
-        return user && o.id === user.profileId;
-      });
+  // Fetch users based on role
+  useEffect(() => {
+    async function fetchAllowedUsers() {
+      if (!currentUser) return;
+      setIsLoading(true);
       
-      if (!owner) return mockUsers.filter(u => u.role === 'admin');
-
-      // Find walkers assigned to owner's dogs
-      const assignedWalkerIds = new Set<string>();
-      mockWalks.forEach(walk => {
-        if (owner.dogs.includes(walk.dogId)) {
-          const walker = mockWalkers.find(w => w.id === walk.walkerId);
-          if (walker) {
-            const walkerUser = mockUsers.find(u => u.profileId === walker.id);
-            if (walkerUser) assignedWalkerIds.add(walkerUser.id);
+      try {
+        // For admins, get all users
+        if (currentUser.role === 'admin') {
+          const response = await fetch('/api/users');
+          if (response.ok) {
+            const data = await response.json();
+            setAvailableUsers(data.users.filter((u: User) => u.id !== currentUser.id));
           }
-        }
-      });
-
-      // Return admins and assigned walkers
-      return mockUsers.filter(
-        u => u.role === 'admin' || (u.role === 'walker' && assignedWalkerIds.has(u.id))
-      );
-    }
-
-    // Walker can only message admins or owners assigned to them
-    if (currentUser.role === 'walker') {
-      // Get walker's profile
-      const walker = mockWalkers.find(w => {
-        const user = mockUsers.find(u => u.id === currentUser.id);
-        return user && w.id === user.profileId;
-      });
-      
-      if (!walker) return mockUsers.filter(u => u.role === 'admin');
-
-      // Find owners whose dogs are walked by this walker
-      const assignedOwnerIds = new Set<string>();
-      mockWalks.forEach(walk => {
-        if (walk.walkerId === walker.id) {
-          // Find the dog's owner
-          const dogOwner = mockOwners.find(owner => 
-            owner.dogs.includes(walk.dogId)
-          );
+        } 
+        // For owners, get admins and assigned walkers
+        else if (currentUser.role === 'owner') {
+          const owner = owners.find(o => o.userId === currentUser.id);
           
-          if (dogOwner) {
-            const ownerUser = mockUsers.find(u => u.profileId === dogOwner.id);
-            if (ownerUser) assignedOwnerIds.add(ownerUser.id);
+          if (owner) {
+            // Get admin users
+            const adminResponse = await fetch('/api/users?role=admin');
+            let adminUsers: User[] = [];
+            
+            if (adminResponse.ok) {
+              const adminData = await adminResponse.json();
+              adminUsers = adminData.users;
+            }
+            
+            // Find assigned walkers
+            const ownerDogs = dogs.filter(dog => dog.ownerId === owner.id);
+            const assignedWalkerIds = new Set<string>();
+            
+            ownerDogs.forEach(dog => {
+              const dogWalks = getWalksByDogId(walks, dog.id);
+              dogWalks.forEach(walk => {
+                assignedWalkerIds.add(walk.walkerId);
+              });
+            });
+            
+            if (assignedWalkerIds.size > 0) {
+              // Fetch walker users
+              const walkerResponse = await fetch(`/api/users?walkerIds=${Array.from(assignedWalkerIds).join(',')}`);
+              if (walkerResponse.ok) {
+                const walkerData = await walkerResponse.json();
+                setAvailableUsers([...adminUsers, ...walkerData.users].filter(u => u.id !== currentUser.id));
+              } else {
+                setAvailableUsers(adminUsers.filter(u => u.id !== currentUser.id));
+              }
+            } else {
+              setAvailableUsers(adminUsers.filter(u => u.id !== currentUser.id));
+            }
+          }
+        } 
+        // For walkers, get admins and assigned owners
+        else if (currentUser.role === 'walker') {
+          const walker = walkers.find(w => w.userId === currentUser.id);
+          
+          if (walker) {
+            // Get admin users
+            const adminResponse = await fetch('/api/users?role=admin');
+            let adminUsers: User[] = [];
+            
+            if (adminResponse.ok) {
+              const adminData = await adminResponse.json();
+              adminUsers = adminData.users;
+            }
+            
+            // Find assigned owners
+            const walkerWalks = getWalksByWalkerId(walks, walker.id);
+            const assignedOwnerIds = new Set<string>();
+            
+            walkerWalks.forEach(walk => {
+              const dog = dogs.find(d => d.id === walk.dogId);
+              if (dog) {
+                assignedOwnerIds.add(dog.ownerId);
+              }
+            });
+            
+            if (assignedOwnerIds.size > 0) {
+              // Fetch owner users
+              const ownerResponse = await fetch(`/api/users?ownerIds=${Array.from(assignedOwnerIds).join(',')}`);
+              if (ownerResponse.ok) {
+                const ownerData = await ownerResponse.json();
+                setAvailableUsers([...adminUsers, ...ownerData.users].filter(u => u.id !== currentUser.id));
+              } else {
+                setAvailableUsers(adminUsers.filter(u => u.id !== currentUser.id));
+              }
+            } else {
+              setAvailableUsers(adminUsers.filter(u => u.id !== currentUser.id));
+            }
           }
         }
-      });
-
-      // Return admins and assigned owners
-      return mockUsers.filter(
-        u => u.role === 'admin' || (u.role === 'owner' && assignedOwnerIds.has(u.id))
-      );
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      } finally {
+        setIsLoading(false);
+      }
     }
-
-    return [];
-  };
-
-  // Filter users based on search query and permissions
-  const filteredUsers = getAllowedRecipients().filter(user => {
-    // Exclude current user
-    if (user.id === currentUser?.id) return false;
     
+    fetchAllowedUsers();
+  }, [currentUser, owners, walkers, walks, dogs]);
+
+  // Filter users based on search query
+  const filteredUsers = availableUsers.filter(user => {
     if (searchQuery.trim() === '') return true;
     
-    // Get user's full name from profile if available
-    const userName = getUserDisplayName(user);
-    
     return (
-      userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
       user.role.toLowerCase().includes(searchQuery.toLowerCase())
     );
   });
-
-  // Get display name from user profile
-  const getUserDisplayName = (user: User): string => {
-    if (user.role === 'admin') {
-      return 'Admin';
-    } else if (user.role === 'owner') {
-      const owner = mockOwners.find(o => o.id === user.profileId);
-      return owner ? owner.name : user.email.split('@')[0];
-    } else if (user.role === 'walker') {
-      const walker = mockWalkers.find(w => w.id === user.profileId);
-      return walker ? walker.name : user.email.split('@')[0];
-    }
-    return user.email.split('@')[0];
-  };
 
   // Handle user selection
   const toggleUserSelection = (userId: string) => {
@@ -177,7 +191,6 @@ export default function NewConversation({ onClose }: { onClose: () => void }) {
   // Render user item with checkbox
   const renderUserItem = (user: User) => {
     const isSelected = selectedUsers.includes(user.id);
-    const displayName = getUserDisplayName(user);
 
     return (
       <div 
@@ -190,11 +203,11 @@ export default function NewConversation({ onClose }: { onClose: () => void }) {
       >
         <div className="flex-shrink-0">
           <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 font-medium">
-            {displayName.charAt(0).toUpperCase()}
+            {user.name?.charAt(0).toUpperCase() || 'U'}
           </div>
         </div>
         <div className="ml-4 flex-1">
-          <p className="text-sm font-medium text-gray-900">{displayName}</p>
+          <p className="text-sm font-medium text-gray-900">{user.name || 'Unknown User'}</p>
           <p className="text-xs text-gray-500 capitalize">{user.role}</p>
         </div>
         <div className="ml-2">

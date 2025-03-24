@@ -1,8 +1,5 @@
-import { mockWalks, mockDogs, mockWalkers } from '@/lib/mockData';
-import { mockUserSubscriptions } from '@/lib/mockSubscriptions';
-import { getPendingAssessments } from '@/lib/mockAssessments';
 import { useAuth } from '@/lib/AuthContext';
-import { getPastWalks } from '@/utils/helpers';
+import { useData } from '@/lib/DataContext';
 import Link from 'next/link';
 
 interface StatItem {
@@ -17,13 +14,17 @@ interface StatItem {
 
 export function DashboardSummary() {
   const { user } = useAuth();
+  const { walks, dogs, walkers, assessments } = useData();
   
   // Get stats based on user role
   let stats: StatItem[] = [];
   
   if (user?.role === 'walker') {
-    // Get completed walks that need feedback (no feedback property)
-    const completedWalks = getPastWalks(undefined, undefined, user.profileId);
+    // Get completed walks for this walker
+    const completedWalks = walks.filter(walk => 
+      walk.walkerId === user.profileId && 
+      walk.status === 'completed'
+    );
     const needsFeedback = completedWalks.filter(walk => !walk.feedback);
     
     stats = [
@@ -40,16 +41,59 @@ export function DashboardSummary() {
       // Add more stats as needed
     ];
   } else if (user?.role === 'owner') {
+    // Get dogs for this owner
+    const ownerDogs = dogs.filter(dog => 
+      dog.ownerId === user.profileId
+    );
+    
+    // Get upcoming walks for owner's dogs
+    const today = new Date();
+    const upcomingWalks = walks.filter(walk => {
+      // Check if walk is for one of the owner's dogs
+      if (!ownerDogs.some(dog => dog.id === walk.dogId)) return false;
+      
+      // Check if walk is scheduled
+      if (walk.status !== 'scheduled') return false;
+      
+      // Check if walk is in the future
+      const walkDate = new Date(walk.date);
+      return walkDate >= today;
+    });
+    
+    // Get all walks this month for the owner's dogs
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const walksThisMonth = walks.filter(walk => {
+      // Check if walk is for one of the owner's dogs
+      if (!ownerDogs.some(dog => dog.id === walk.dogId)) return false;
+      
+      // Check if walk was this month
+      const walkDate = new Date(walk.date);
+      return walkDate >= firstDayOfMonth;
+    });
+    
     stats = [
-      { label: 'Active Dogs', value: 3 },
-      { label: 'Walks This Month', value: 12 },
-      { label: 'Upcoming Walks', value: 2 },
+      { label: 'Active Dogs', value: ownerDogs.length },
+      { label: 'Walks This Month', value: walksThisMonth.length },
+      { label: 'Upcoming Walks', value: upcomingWalks.length },
     ];
   } else if (user?.role === 'admin') {
+    // Pending assessments 
+    const pendingAssessments = assessments.filter(assessment => 
+      assessment.status === 'pending'
+    );
+    
     stats = [
-      { label: 'Active Walkers', value: 12 },
-      { label: 'Active Owners', value: 28 },
-      { label: 'Walks Today', value: 15 },
+      { label: 'Active Walkers', value: walkers.length },
+      { label: 'Active Dogs', value: dogs.length },
+      { 
+        label: 'Pending Assessments', 
+        value: pendingAssessments.length,
+        highlight: pendingAssessments.length > 0,
+        action: pendingAssessments.length > 0 ? {
+          label: 'Review Assessments',
+          href: '/admin/assessments'
+        } : undefined
+      },
     ];
   }
   

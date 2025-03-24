@@ -1,26 +1,19 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { getPendingAssessments } from '@/lib/mockAssessments';
-import { mockDogs, mockOwners } from '@/lib/mockData';
+import { useData } from '@/lib/DataContext';
 import { formatDate } from '@/utils/helpers';
 import { Assessment } from '@/lib/types';
 import { DashboardWidget } from '../DashboardWidget';
 
-// Helper functions to get objects by ID
-const getDogById = (dogId: string) => {
-  return mockDogs.find(dog => dog.id === dogId) || { name: 'Unknown dog', breed: 'Unknown' };
-};
-
-const getOwnerById = (ownerId: string) => {
-  return mockOwners.find(owner => owner.id === ownerId) || { name: 'Unknown owner' };
-};
-
 export const PendingAssessmentsWidget = () => {
-  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const { assessments, dogs, owners, getDogById, getOwnerById } = useData();
+  const [pendingAssessments, setPendingAssessments] = useState<Assessment[]>([]);
 
   useEffect(() => {
-    setAssessments(getPendingAssessments().slice(0, 5)); // Only show top 5
-  }, []);
+    // Filter to get only pending assessments and take the top 5
+    const pending = assessments.filter(a => a.status === 'pending').slice(0, 5);
+    setPendingAssessments(pending);
+  }, [assessments]);
 
   return (
     <DashboardWidget title="Pending Assessments">
@@ -31,19 +24,21 @@ export const PendingAssessmentsWidget = () => {
         </Link>
       </div>
       
-      {assessments.length === 0 ? (
+      {pendingAssessments.length === 0 ? (
         <p className="text-gray-500">No pending assessments</p>
       ) : (
         <div className="divide-y divide-gray-200">
-          {assessments.map((assessment) => {
+          {pendingAssessments.map((assessment) => {
             const dog = getDogById(assessment.dogId);
             const owner = getOwnerById(assessment.ownerId);
             return (
               <div key={assessment.id} className="py-3">
                 <div className="flex justify-between">
                   <div>
-                    <p className="font-medium text-gray-900">{dog.name}</p>
-                    <p className="text-sm text-gray-500">{dog.breed} • Owner: {owner.name}</p>
+                    <p className="font-medium text-gray-900">{dog?.name || 'Unknown dog'}</p>
+                    <p className="text-sm text-gray-500">
+                      {dog?.breed || 'Unknown'} • Owner: {owner?.name || 'Unknown owner'}
+                    </p>
                   </div>
                   <div className="text-right">
                     <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">

@@ -8,6 +8,7 @@ export interface Dog {
   specialNeeds: string[];
   ownerId: string;
   imageUrl?: string;
+  profileImage?: string; // Added for DogList component
   walkingPreferences: {
     frequency: number; // walks per week
     duration: number; // minutes per walk
@@ -15,6 +16,8 @@ export interface Dog {
     preferredRoutes?: string[];
   };
   assessmentStatus?: 'pending' | 'approved' | 'denied' | 'not_required'; // Dog assessment status
+  weight?: number; // Dog's weight in kg for health assessment
+  behavioralIssues?: string[]; // Any behavioral issues the dog has
 }
 
 export interface Owner {
@@ -53,6 +56,8 @@ export interface Walker {
   certificationsOrTraining: string[];
   imageUrl?: string;
   userId: string; // Reference to user account
+  canHandleLargeDogs?: boolean; // Added for AI recommendations
+  canHandleBehavioralIssues?: boolean; // Added for AI recommendations
 }
 
 export interface TimeSlot {
@@ -104,6 +109,7 @@ export type Role = 'admin' | 'walker' | 'owner';
 export interface User {
   id: string;
   email: string;
+  name?: string;         // User's name
   passwordHash: string; // In a real app, we would never expose this
   role: Role;
   emailVerified: boolean;
@@ -111,6 +117,7 @@ export interface User {
   updatedAt: string; // ISO date string
   lastLogin?: string; // ISO date string
   profileId?: string; // ID of the related profile (owner or walker)
+  image?: string;     // User's profile image URL
 }
 
 export interface Permission {
@@ -227,4 +234,84 @@ export interface Conversation {
   lastMessageId?: string; // ID of the last message
   unreadCount?: {[userId: string]: number}; // Count of unread messages per user
   type: 'direct' | 'group';
+}
+
+// User authentication context
+export interface AuthContext {
+  user: User | null;
+  loading: boolean;
+  error?: string;
+}
+
+// Reports System Types
+export interface RevenueReport {
+  month: string;
+  subscriptions: number;
+  oneTimeBookings: number;
+  refunds: number;
+  total: number;
+}
+
+export interface SubscriptionActivity {
+  month: string;
+  newSubscriptions: number;
+  renewals: number;
+  cancellations: number;
+  revenue: number;
+}
+
+export interface SubscriptionPlanData {
+  name: string;
+  value: number;
+  subscribers: number;
+}
+
+// Marketing System Types
+export interface MarketingCampaign {
+  id: string;
+  name: string;
+  type: 'email' | 'in-app' | 'sms';
+  status: 'active' | 'completed' | 'draft' | 'scheduled';
+  audience: string;
+  sent: number;
+  opened: number;
+  clicked: number;
+  converted: number;
+  conversionRate: number;
+  revenue: number;
+  startDate: string;
+  endDate: string;
+  createdAt: string;
+  creator: string;
+  description: string;
+}
+
+// AI Insights System Types
+export interface AIInsight {
+  id: string;
+  type: 'walker_recommendation' | 'route_optimization' | 'customer_behavior' | 'scheduling';
+  title: string;
+  description: string;
+  confidenceScore: number;
+  impact: 'high' | 'medium' | 'low';
+  status: 'new' | 'acknowledged' | 'implemented' | 'dismissed';
+  createdAt: string;
+  category: 'revenue' | 'customer_satisfaction' | 'operational_efficiency';
+  relatedEntities?: {
+    type: string;
+    id: string;
+    name: string;
+  }[];
+  recommendations?: string[];
+}
+
+// Add HolidayRequest type
+export interface HolidayRequest {
+  id: string;
+  walkerId: string;
+  date: string;
+  status: 'pending' | 'approved' | 'denied';
+  reason: string;
+  createdAt?: string;
+  updatedAt?: string;
 } 

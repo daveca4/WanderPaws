@@ -1,20 +1,90 @@
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
-import { getAssessmentsByWalkerId } from '@/lib/mockAssessments';
-import { getDogById, getOwnerById, formatDate } from '@/utils/helpers';
+import { formatDate } from '@/utils/helpers';
+import { 
+  fetchAssessments, 
+  fetchDogs, 
+  fetchOwners, 
+  getAssessmentsByWalkerId 
+} from '@/utils/dataHelpers';
+import { Assessment, Dog, Owner } from '@/lib/types';
 
 export function AssessmentList() {
   const { user } = useAuth();
   const walkerId = user?.profileId;
+  
+  const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [dogs, setDogs] = useState<Dog[]>([]);
+  const [owners, setOwners] = useState<Owner[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!walkerId) return;
+      
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch assessments, dogs, and owners
+        const [assessmentsData, dogsData, ownersData] = await Promise.all([
+          fetchAssessments(),
+          fetchDogs(),
+          fetchOwners()
+        ]);
+        
+        setAssessments(assessmentsData);
+        setDogs(dogsData);
+        setOwners(ownersData);
+      } catch (err) {
+        setError('Error loading data');
+        console.error('Error fetching assessment data:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchData();
+  }, [walkerId]);
   
   // If no walkerId found, return early
   if (!walkerId) {
     return null;
   }
   
+  // Handle loading state
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Upcoming Assessments</h2>
+        </div>
+        <div className="flex justify-center py-6">
+          <p className="text-gray-500">Loading assessments...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Handle error state
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Upcoming Assessments</h2>
+        </div>
+        <div className="flex justify-center py-6">
+          <p className="text-red-500">Failed to load assessments. Please try again.</p>
+        </div>
+      </div>
+    );
+  }
+  
   // Get assessments assigned to this walker
-  const assessments = getAssessmentsByWalkerId(walkerId)
+  const walkerAssessments = getAssessmentsByWalkerId(assessments, walkerId)
     // Filter out completed assessments
     .filter(assessment => assessment.status !== 'completed')
     // Sort by scheduled date (soonest first)
@@ -23,9 +93,25 @@ export function AssessmentList() {
     .slice(0, 3);
     
   // If no assessments, return early
-  if (assessments.length === 0) {
-    return null;
+  if (walkerAssessments.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold text-gray-900">Upcoming Assessments</h2>
+          <Link href="/walker-dashboard/assessments" className="text-sm text-primary-600 hover:text-primary-700">
+            View All
+          </Link>
+        </div>
+        <div className="flex justify-center py-6">
+          <p className="text-gray-500">No upcoming assessments scheduled.</p>
+        </div>
+      </div>
+    );
   }
+  
+  // Helper functions
+  const getDogById = (id: string): Dog | undefined => dogs.find(dog => dog.id === id);
+  const getOwnerById = (id: string): Owner | undefined => owners.find(owner => owner.id === id);
   
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
@@ -37,7 +123,7 @@ export function AssessmentList() {
       </div>
       
       <div className="space-y-4">
-        {assessments.map((assessment) => {
+        {walkerAssessments.map((assessment) => {
           const dog = getDogById(assessment.dogId);
           const owner = getOwnerById(assessment.ownerId);
           

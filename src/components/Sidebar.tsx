@@ -2,35 +2,22 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
 import PermissionGate from './PermissionGate';
 import { useAuth } from '@/lib/AuthContext';
-import { mockWalks } from '@/lib/mockData';
+import { useData } from '@/lib/DataContext';
 import { useMessages } from '@/lib/MessageContext';
+import { getPendingHolidayRequestsCount } from '@/lib/holidayRequestService';
 
 // Helper function to get count of walks needing feedback
-function getWalkerPendingFeedbackCount(walkerId?: string): number {
+function getWalkerPendingFeedbackCount(walkerId: string, walks: any[]): number {
   if (!walkerId) return 0;
   
-  return mockWalks.filter(walk => 
+  return walks.filter(walk => 
     walk.walkerId === walkerId && 
     walk.status === 'completed' && 
     !walk.feedback
   ).length;
-}
-
-// Mock holiday requests for demonstration - in a real app would come from an API
-const mockHolidayRequests = [
-  { id: 'h1', walkerId: 'w1', date: '2025-06-05', status: 'approved', reason: 'Family vacation' },
-  { id: 'h2', walkerId: 'w1', date: '2025-06-15', status: 'pending', reason: 'Doctor appointment' },
-  { id: 'h3', walkerId: 'w1', date: '2025-06-25', status: 'denied', reason: 'Personal day' },
-  { id: 'h4', walkerId: 'w2', date: '2025-06-10', status: 'pending', reason: 'Wedding attendance' },
-  { id: 'h5', walkerId: 'w2', date: '2025-07-04', status: 'approved', reason: 'Independence Day' },
-  { id: 'h6', walkerId: 'w3', date: '2025-06-30', status: 'pending', reason: 'Family emergency' },
-];
-
-// Helper function to get count of pending holiday requests
-function getPendingHolidayRequestsCount(): number {
-  return mockHolidayRequests.filter(req => req.status === 'pending').length;
 }
 
 // Mock function to get the number of pending owner requests
@@ -48,7 +35,30 @@ function getNewDogProfilesCount() {
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { walks } = useData();
   const { unreadCount } = useMessages();
+  const [pendingHolidayCount, setPendingHolidayCount] = useState(0);
+  
+  // Fetch pending holiday requests count
+  useEffect(() => {
+    async function fetchPendingHolidayCount() {
+      try {
+        const count = await getPendingHolidayRequestsCount();
+        setPendingHolidayCount(count);
+      } catch (error) {
+        console.error('Error fetching pending holiday count:', error);
+      }
+    }
+    
+    if (user?.role === 'admin') {
+      fetchPendingHolidayCount();
+    }
+  }, [user?.role]);
+  
+  // Get pending feedback count for the current walker
+  const pendingFeedbackCount = user?.role === 'walker' && user?.profileId 
+    ? getWalkerPendingFeedbackCount(user.profileId, walks)
+    : 0;
   
   // Common menu items that appear for all users
   const commonMenuItems = [
@@ -71,7 +81,7 @@ export function Sidebar() {
       name: 'Holiday Requests', 
       href: '/admin/holiday-requests', 
       icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
-      badge: getPendingHolidayRequestsCount()
+      badge: pendingHolidayCount
     },
     { name: 'Assessments', href: '/admin/assessments', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2' },
     { name: 'Subscriptions', href: '/admin/subscriptions', icon: 'M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z' },
@@ -106,7 +116,7 @@ export function Sidebar() {
       name: 'My Walks', 
       href: '/walker-dashboard/walks', 
       icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
-      badge: getWalkerPendingFeedbackCount(user?.profileId)
+      badge: pendingFeedbackCount
     },
     { name: 'Assigned Dogs', href: '/walker-dashboard/dogs', icon: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z' },
     { name: 'Media Gallery', href: '/walker-dashboard/media', icon: 'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z' },
@@ -146,7 +156,11 @@ export function Sidebar() {
     <div className="w-64 bg-white h-screen border-r border-gray-200 py-6 px-4 overflow-y-auto">
       <nav className="space-y-1">
         {/* Common menu items for all users */}
-        {commonMenuItems.map(renderMenuItem)}
+        {commonMenuItems.map(item => (
+          <div key={item.href}>
+            {renderMenuItem(item)}
+          </div>
+        ))}
         
         {/* Admin menu items - only show if the user's primary role is admin */}
         {user?.role === 'admin' && (
@@ -155,7 +169,11 @@ export function Sidebar() {
               Admin
             </p>
             <div className="mt-3 space-y-1">
-              {adminMenuItems.map(renderMenuItem)}
+              {adminMenuItems.map(item => (
+                <div key={item.href}>
+                  {renderMenuItem(item)}
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -167,7 +185,11 @@ export function Sidebar() {
               Owner
             </p>
             <div className="mt-3 space-y-1">
-              {ownerMenuItems.map(renderMenuItem)}
+              {ownerMenuItems.map(item => (
+                <div key={item.href}>
+                  {renderMenuItem(item)}
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -179,7 +201,11 @@ export function Sidebar() {
               Walker
             </p>
             <div className="mt-3 space-y-1">
-              {walkerMenuItems.map(renderMenuItem)}
+              {walkerMenuItems.map(item => (
+                <div key={item.href}>
+                  {renderMenuItem(item)}
+                </div>
+              ))}
             </div>
           </div>
         )}

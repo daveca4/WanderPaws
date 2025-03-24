@@ -1,177 +1,192 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  Message, 
-  Conversation, 
-  MessageAttachment 
-} from './types';
-import { 
-  mockMessages, 
-  mockConversations, 
-  getUserConversations, 
-  getConversationMessages, 
-  createMessage as createMockMessage,
-  markMessagesAsRead as markMockMessagesAsRead,
-  createConversation as createMockConversation,
-  getTotalUnreadMessages
-} from './mockMessages';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { Message, Conversation } from './types';
+import { useData } from './DataContext';
 import { useAuth } from './AuthContext';
 
+// Define the shape of our context
 interface MessageContextType {
-  conversations: Conversation[];
-  currentConversation: Conversation | null;
   messages: Message[];
-  isLoading: boolean;
+  conversations: Conversation[];
   unreadCount: number;
-  setCurrentConversation: (conversation: Conversation | null) => void;
-  sendMessage: (content: string, attachments?: MessageAttachment[]) => Promise<Message | null>;
-  markAsRead: (conversationId: string) => Promise<void>;
-  createConversation: (participants: string[], title?: string) => Promise<Conversation | null>;
-  refreshConversations: () => Promise<void>;
+  activeConversationId: string | null;
+  setActiveConversationId: (id: string | null) => void;
+  sendMessage: (conversationId: string, content: string) => Promise<void>;
+  markAsRead: (messageIds: string[]) => Promise<void>;
+  createConversation: (participants: string[], initialMessage?: string) => Promise<string>;
 }
 
 const MessageContext = createContext<MessageContextType | undefined>(undefined);
 
-export function MessageProvider({ children }: { children: React.ReactNode }) {
+export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
+  const { messages: dbMessages, conversations: dbConversations } = useData();
+  
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  // Load user's conversations
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  
+  // Update messages and conversations from DataContext when they change
   useEffect(() => {
-    if (user) {
-      refreshConversations();
-    } else {
-      setConversations([]);
-      setCurrentConversation(null);
-      setMessages([]);
-      setUnreadCount(0);
-    }
-  }, [user]);
-
-  // Load messages when currentConversation changes
-  useEffect(() => {
-    if (currentConversation) {
-      setMessages(getConversationMessages(currentConversation.id));
-      
-      // Mark messages as read when conversation is opened
-      if (user) {
-        markAsRead(currentConversation.id);
-      }
-    } else {
-      setMessages([]);
-    }
-  }, [currentConversation, user]);
-
-  const refreshConversations = async () => {
+    setMessages(dbMessages);
+    setConversations(dbConversations);
+  }, [dbMessages, dbConversations]);
+  
+  // Calculate unread messages count
+  const unreadCount = user 
+    ? messages.filter(msg => 
+        msg.readStatus === 'unread' && 
+        msg.senderId !== user.id
+      ).length 
+    : 0;
+  
+  const sendMessage = async (conversationId: string, content: string) => {
     if (!user) return;
     
-    setIsLoading(true);
-    
     try {
-      // In a real app, this would be an API call
-      const userConversations = getUserConversations(user.id);
-      setConversations(userConversations);
-      
-      // Get total unread message count
-      const totalUnread = getTotalUnreadMessages(user.id);
-      setUnreadCount(totalUnread);
-    } catch (error) {
-      console.error('Error loading conversations:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const sendMessage = async (content: string, attachments?: MessageAttachment[]): Promise<Message | null> => {
-    if (!user || !currentConversation) return null;
-    
-    try {
-      // In a real app, this would be an API call
-      const newMessage = createMockMessage(
-        currentConversation.id,
-        user.id,
+      // Create message structure
+      const messageData = {
+        conversationId,
+        senderId: user.id,
         content,
-        attachments
-      );
+        timestamp: new Date().toISOString(),
+        readStatus: 'unread',
+      };
       
-      // Update messages in state
+      // Create message using API
+      const response = await fetch('/api/data/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(messageData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create message');
+      }
+      
+      const newMessage = await response.json();
+      
+      // Update local state
       setMessages(prev => [...prev, newMessage]);
       
-      // Refresh conversations to update last message and timestamps
-      await refreshConversations();
+      // Update conversation timestamp using the conversation update API
+      try {
+        await fetch(`/api/data/conversations/${conversationId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ updatedAt: new Date().toISOString() }),
+        });
+      } catch (updateError) {
+        console.error('Error updating conversation timestamp:', updateError);
+        // Continue anyway since the message was created successfully
+      }
       
-      return newMessage;
+      // Update local state for the conversation
+      setConversations(prev => 
+        prev.map(convo => 
+          convo.id === conversationId 
+            ? { ...convo, updatedAt: new Date().toISOString() }
+            : convo
+        )
+      );
     } catch (error) {
       console.error('Error sending message:', error);
-      return null;
+      throw error;
     }
   };
-
-  const markAsRead = async (conversationId: string): Promise<void> => {
-    if (!user) return;
-    
+  
+  const markAsRead = async (messageIds: string[]) => {
     try {
-      // In a real app, this would be an API call
-      markMockMessagesAsRead(conversationId, user.id);
-      
-      // Refresh conversations to update unread counts
-      await refreshConversations();
+      // For now, just update the local state
+      // In a real implementation, you would call the API endpoint
+      setMessages(prev => 
+        prev.map(msg => 
+          messageIds.includes(msg.id) 
+            ? { ...msg, readStatus: 'read' } 
+            : msg
+        )
+      );
+
+      console.log('Marked messages as read (local state only):', messageIds);
     } catch (error) {
       console.error('Error marking messages as read:', error);
+      throw error;
     }
   };
-
-  const createConversation = async (participants: string[], title?: string): Promise<Conversation | null> => {
-    if (!user) return null;
-    
-    // Make sure the current user is included in participants
-    if (!participants.includes(user.id)) {
-      participants = [user.id, ...participants];
-    }
+  
+  const createConversation = async (participants: string[], initialMessage?: string): Promise<string> => {
+    if (!user) throw new Error('Must be logged in to create a conversation');
     
     try {
-      // In a real app, this would be an API call
-      const newConversation = createMockConversation(participants, title);
+      // Make sure the current user is included in participants
+      if (!participants.includes(user.id)) {
+        participants = [...participants, user.id];
+      }
       
-      // Refresh conversations
-      await refreshConversations();
+      // Create conversation using API
+      const conversationData = {
+        participants,
+        title: null, // Could be generated based on participants
+        type: participants.length > 2 ? 'group' : 'direct',
+      };
       
-      return newConversation;
+      const response = await fetch('/api/data/conversations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(conversationData),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create conversation');
+      }
+      
+      const newConversation = await response.json();
+      const conversationId = newConversation.id;
+      
+      // Update local state
+      setConversations(prev => [...prev, newConversation]);
+      
+      // If an initial message was provided, send it
+      if (initialMessage) {
+        await sendMessage(conversationId, initialMessage);
+      }
+      
+      return conversationId;
     } catch (error) {
       console.error('Error creating conversation:', error);
-      return null;
+      throw error;
     }
   };
-
+  
   return (
     <MessageContext.Provider
       value={{
-        conversations,
-        currentConversation,
         messages,
-        isLoading,
+        conversations,
         unreadCount,
-        setCurrentConversation,
+        activeConversationId,
+        setActiveConversationId,
         sendMessage,
         markAsRead,
         createConversation,
-        refreshConversations
       }}
     >
       {children}
     </MessageContext.Provider>
   );
-}
+};
 
-export function useMessages() {
+export const useMessages = () => {
   const context = useContext(MessageContext);
   if (context === undefined) {
     throw new Error('useMessages must be used within a MessageProvider');
   }
   return context;
-} 
+}; 

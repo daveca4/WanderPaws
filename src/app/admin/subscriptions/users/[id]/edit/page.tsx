@@ -4,10 +4,11 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { 
-  mockUserSubscriptions,
-  mockSubscriptionPlans,
+  getUserSubscriptionById,
+  getSubscriptionPlans,
+  updateUserSubscription,
   formatPrice
-} from '@/lib/mockSubscriptions';
+} from '@/lib/subscriptionService';
 import { UserSubscription } from '@/lib/types';
 import RouteGuard from '@/components/RouteGuard';
 
@@ -29,14 +30,32 @@ export default function EditUserSubscriptionPage({ params }: { params: { id: str
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [formData, setFormData] = useState<ExtendedUserSubscription | null>(null);
+  const [subscriptionPlans, setSubscriptionPlans] = useState<Array<{id: string, name: string}>>([]);
 
   useEffect(() => {
-    // Find the user subscription by ID
-    const subscription = mockUserSubscriptions.find(sub => sub.id === id);
-    if (subscription) {
-      setFormData(subscription as ExtendedUserSubscription);
+    async function fetchData() {
+      try {
+        // Fetch the user subscription by ID
+        const subscription = await getUserSubscriptionById(id);
+        
+        if (subscription) {
+          setFormData(subscription as ExtendedUserSubscription);
+        }
+        
+        // Fetch subscription plans for the dropdown
+        const plans = await getSubscriptionPlans();
+        setSubscriptionPlans(plans.map(plan => ({
+          id: plan.id,
+          name: plan.name
+        })));
+      } catch (error) {
+        console.error('Error fetching data:', error);
+      } finally {
+        setLoading(false);
+      }
     }
-    setLoading(false);
+    
+    fetchData();
   }, [id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -82,11 +101,12 @@ export default function EditUserSubscriptionPage({ params }: { params: { id: str
       setSaving(true);
       setFormError(null);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Update the subscription using the API service
+      const updatedSubscription = await updateUserSubscription(id, formData);
       
-      // In a real app, this would make an API call to update the subscription
-      console.log('Updating subscription with data:', formData);
+      if (!updatedSubscription) {
+        throw new Error('Failed to update subscription');
+      }
       
       // Redirect to user subscription detail page after successful update
       router.push(`/admin/subscriptions/users/${id}`);
@@ -100,10 +120,7 @@ export default function EditUserSubscriptionPage({ params }: { params: { id: str
 
   // Helper function to get subscription plans for the dropdown
   const getSubscriptionPlans = () => {
-    return mockSubscriptionPlans.map(plan => ({
-      id: plan.id,
-      name: plan.name
-    }));
+    return subscriptionPlans;
   };
 
   if (loading) {

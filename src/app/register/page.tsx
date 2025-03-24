@@ -3,6 +3,8 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { registerUser } from '@/lib/auth';
+import { Role } from '@/lib/types';
 
 export default function RegisterPage() {
   const [formData, setFormData] = useState({
@@ -10,9 +12,10 @@ export default function RegisterPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    role: 'owner' // Default role is owner
+    role: 'owner' as Role // Default role is owner
   });
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(''); // Add success state
   const [loading, setLoading] = useState(false);
   
   const router = useRouter();
@@ -25,6 +28,7 @@ export default function RegisterPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess(''); // Clear any previous success messages
     
     // Validate form
     if (formData.password !== formData.confirmPassword) {
@@ -40,15 +44,35 @@ export default function RegisterPage() {
     setLoading(true);
     
     try {
-      // In a real app, this would make an API call to register the user
-      // For demo, we simulate a successful registration
-      setTimeout(() => {
-        // Registration successful, redirect to login
-        router.push('/login?registered=true');
-      }, 1000);
+      // Register the user in the database
+      const result = await registerUser(
+        formData.name,
+        formData.email,
+        formData.password,
+        formData.role
+      );
+      
+      if (result) {
+        // Registration successful, show success message and redirect after delay
+        setError(''); // Clear any previous errors
+        setSuccess('Registration successful! Redirecting to login page...'); // Show success message
+        
+        // Add a small delay to show success message
+        setTimeout(() => {
+          router.push('/login?registered=true');
+        }, 2000); // Give more time to see the success message
+      } else {
+        setError('Failed to register user. Please try again.');
+      }
     } catch (err) {
-      setError('An error occurred during registration');
+      if (err instanceof Error) {
+        // Show the exact error message from the API
+        setError(err.message);
+      } else {
+        setError('An error occurred during registration');
+      }
       console.error(err);
+    } finally {
       setLoading(false);
     }
   };
@@ -156,6 +180,10 @@ export default function RegisterPage() {
 
           {error && (
             <div className="text-red-500 text-sm text-center">{error}</div>
+          )}
+          
+          {success && (
+            <div className="text-green-500 text-sm text-center">{success}</div>
           )}
 
           <div>

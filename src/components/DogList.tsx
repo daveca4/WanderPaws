@@ -1,76 +1,152 @@
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { mockDogs, mockWalks } from '@/lib/mockData';
 import { useAuth } from '@/lib/AuthContext';
+import { fetchDogs, fetchOwners, fetchWalks, getDogsByOwnerId } from '@/utils/dataHelpers';
+import { Dog, Owner, Walk } from '@/lib/types';
 
-export function DogList() {
+export default function DogList() {
   const { user } = useAuth();
   
-  // Filter dogs based on the current walker's assigned walks
-  const walkerDogs = user?.profileId ? 
-    mockDogs.filter(dog => 
-      mockWalks.some(walk => 
-        walk.dogId === dog.id && 
-        walk.walkerId === user.profileId && 
-        (walk.status === 'scheduled' || walk.status === 'completed')
-      )
-    ) : [];
+  const [dogs, setDogs] = useState<Dog[]>([]);
+  const [owners, setOwners] = useState<Owner[]>([]);
+  const [walks, setWalks] = useState<Walk[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  // Only show walker's dogs if the user is a walker
-  const dogsToShow = user?.role === 'walker' ? walkerDogs : walkerDogs.length > 0 ? walkerDogs.slice(0, 4) : mockDogs.slice(0, 4);
+  useEffect(() => {
+    async function loadData() {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Fetch all necessary data in parallel
+        const [dogsData, ownersData, walksData] = await Promise.all([
+          fetchDogs(),
+          fetchOwners(),
+          fetchWalks()
+        ]);
+        
+        setDogs(dogsData);
+        setOwners(ownersData);
+        setWalks(walksData);
+      } catch (err) {
+        console.error('Error fetching dog data:', err);
+        setError('Failed to load dog data');
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    loadData();
+  }, []);
   
+  // Handle loading state
+  if (loading) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Dogs</h2>
+        <div className="text-center py-6">
+          <p className="text-gray-500">Loading dogs...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Handle error state
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Dogs</h2>
+        <div className="text-center py-6">
+          <p className="text-red-500">{error}</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // If user is an owner, show only their dogs
+  // If user is a walker, show dogs they've walked
+  // If user is admin, show all dogs
+  let filteredDogs = dogs;
+  
+  if (user) {
+    if (user.role === 'owner' && user.profileId) {
+      filteredDogs = dogs.filter(dog => dog.ownerId === user.profileId);
+    } else if (user.role === 'walker' && user.profileId) {
+      // Get all walks for this walker
+      const walkerWalks = walks.filter(walk => walk.walkerId === user.profileId);
+      // Get unique dog IDs from those walks
+      const dogIds = Array.from(new Set(walkerWalks.map(walk => walk.dogId)));
+      // Filter dogs by those IDs
+      filteredDogs = dogs.filter(dog => dogIds.includes(dog.id));
+    }
+  }
+
+  if (filteredDogs.length === 0) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Dogs</h2>
+        <div className="text-gray-500 text-center py-4">
+          {user?.role === 'owner' 
+            ? "You don't have any dogs yet. Add your first dog to get started."
+            : "No dogs found."}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-semibold text-gray-900">Your Dogs</h2>
-        <Link href="/dogs" className="text-sm text-primary-600 hover:text-primary-700">
-          View All
-        </Link>
+        <h2 className="text-lg font-semibold text-gray-900">Dogs</h2>
+        {user?.role === 'owner' && (
+          <Link 
+            href="/owner-dashboard/dogs/add" 
+            className="text-sm px-3 py-1 bg-primary-500 text-white rounded-md hover:bg-primary-600 transition"
+          >
+            Add Dog
+          </Link>
+        )}
       </div>
-      
-      {dogsToShow.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-gray-500">No dogs assigned to you yet</p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {dogsToShow.map((dog) => (
-            <Link key={dog.id} href={`/dogs/${dog.id}`} className="flex items-center p-3 rounded-lg hover:bg-gray-50">
-              <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 relative flex-shrink-0">
-                <Image
-                  src={dog.imageUrl || 'https://via.placeholder.com/48'}
-                  alt={dog.name}
-                  width={48}
-                  height={48}
-                  className="object-cover"
-                />
-              </div>
-              
-              <div className="ml-4">
-                <p className="font-medium text-gray-900">{dog.name}</p>
-                <p className="text-sm text-gray-500">{dog.breed} · {dog.size}</p>
-              </div>
-              
-              <div className="ml-auto">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                </svg>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        {filteredDogs.map(dog => {
+          const dogOwner = owners.find(owner => owner.id === dog.ownerId);
+          const dogImage = dog.profileImage || dog.imageUrl;
+          
+          return (
+            <Link href={`/dogs/${dog.id}`} key={dog.id} className="group">
+              <div className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition">
+                {dogImage ? (
+                  <div className="aspect-square relative">
+                    <Image 
+                      src={dogImage} 
+                      alt={dog.name}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="aspect-square bg-gray-200 flex items-center justify-center">
+                    <svg className="h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3zm9-7h-1V7c0-1.1-.9-2-2-2h-4c0-1.1-.9-2-2-2s-2 .9-2 2H5C3.9 5 3 5.9 3 7v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zM5 19V7h14v12H5z"/>
+                    </svg>
+                  </div>
+                )}
+                <div className="p-3">
+                  <h3 className="font-medium text-gray-900 group-hover:text-primary-600 transition">{dog.name}</h3>
+                  <p className="text-sm text-gray-500">{dog.breed}, {dog.age} year{dog.age !== 1 && 's'} old</p>
+                  {dogOwner && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Owner: {dogOwner.name}
+                    </p>
+                  )}
+                </div>
               </div>
             </Link>
-          ))}
-        </div>
-      )}
-      
-      {user?.role !== 'walker' && (
-        <div className="mt-6 pt-4 border-t border-gray-100">
-          <button className="w-full flex items-center justify-center px-4 py-2 border border-dashed border-gray-300 rounded-md text-sm font-medium text-gray-600 hover:text-primary-600 hover:border-primary-300">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            Add a Dog
-          </button>
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 } 

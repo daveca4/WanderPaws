@@ -1,9 +1,7 @@
 import './globals.css';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import { AuthProvider } from '@/lib/AuthContext';
-import { MessageProvider } from '@/lib/MessageContext';
-import { LandingLayout } from '@/components/LandingLayout';
+import { Providers } from '@/components/Providers';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -17,19 +15,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Note: We'll determine auth state at the component level
-  // since this is a server component and can't use hooks
-  
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>
-          <MessageProvider>
-            <LandingLayout>
-              {children}
-            </LandingLayout>
-          </MessageProvider>
-        </AuthProvider>
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );

@@ -3,7 +3,6 @@
 import { useState, FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
-import { mockUsers } from '@/lib/mockUsers';
 import { getDashboardUrlForRole } from '@/lib/authUtils';
 import Link from 'next/link';
 
@@ -25,22 +24,19 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
-        // Find the user to get their role
-        const user = mockUsers.find(u => u.email === email);
-        if (user) {
-          // If a returnUrl was specified, use that, otherwise use role-based dashboard
-          const redirectUrl = returnUrl || getDashboardUrlForRole(user.role);
-          router.push(redirectUrl);
-        } else {
-          router.push('/');
-        }
-      } else {
-        setError('Invalid email or password');
+      const user = await login(email, password);
+      if (user) {
+        // If a returnUrl was specified, use that, otherwise use role-based dashboard
+        const redirectUrl = returnUrl || getDashboardUrlForRole(user.role);
+        router.push(redirectUrl);
       }
     } catch (err) {
-      setError('An error occurred during login');
+      // Display the actual error message from the API
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An error occurred during login');
+      }
       console.error(err);
     } finally {
       setLoading(false);
@@ -53,22 +49,19 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const success = await login(userEmail, 'password123');
-      if (success) {
-        // Find the user to get their role
-        const user = mockUsers.find(u => u.email === userEmail);
-        if (user) {
-          // If a returnUrl was specified, use that, otherwise use role-based dashboard
-          const redirectUrl = returnUrl || getDashboardUrlForRole(user.role);
-          router.push(redirectUrl);
-        } else {
-          router.push('/');
-        }
-      } else {
-        setError('Quick login failed');
+      const user = await login(userEmail, 'password123');
+      if (user) {
+        // If a returnUrl was specified, use that, otherwise use role-based dashboard
+        const redirectUrl = returnUrl || getDashboardUrlForRole(user.role);
+        router.push(redirectUrl);
       }
     } catch (err) {
-      setError('An error occurred during login');
+      // Display the actual error message from the API
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An error occurred during login');
+      }
       console.error(err);
     } finally {
       setLoading(false);

@@ -1,10 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/AuthContext';
+import { DataSourceToggle } from '@/components/DataSourceToggle';
 
 export default function AdminSettingsPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
     maxWalksPerDay: 2,
@@ -62,6 +67,8 @@ export default function AdminSettingsPage() {
           
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <DataSourceToggle />
+              
               {/* Max Walks Per Day */}
               <div>
                 <label htmlFor="maxWalksPerDay" className="block text-sm font-medium text-gray-700">

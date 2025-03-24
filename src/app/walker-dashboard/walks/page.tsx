@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
-import { mockWalks, mockDogs } from '@/lib/mockData';
+import { useData } from '@/lib/DataContext';
 import { Walk, Dog } from '@/lib/types';
 
 // Function to format date in a readable format
@@ -17,11 +17,9 @@ const formatDate = (dateString: string) => {
 // Function to format time
 const formatTime = (timeString: string) => {
   const [hours, minutes] = timeString.split(':').map(Number);
-  return new Date(0, 0, 0, hours, minutes).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const formattedHours = hours % 12 || 12;
+  return `${formattedHours}:${minutes.toString().padStart(2, '0')} ${period}`;
 };
 
 // Function to get dog details by ID
@@ -30,20 +28,79 @@ const getDogById = (dogId: string): Dog | undefined => {
 };
 
 export default function WalkerWalksPage() {
-  const { user, loading } = useAuth();
+  const { user } = useAuth();
+  const { walks, dogs, getDogById } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const tab = searchParams?.get('tab') || 'upcoming';
   
-  // Check if there's a tab parameter in the URL
-  const tabParam = searchParams.get('tab');
+  const [loading, setLoading] = useState(true);
+  const [upcomingWalks, setUpcomingWalks] = useState<Walk[]>([]);
+  const [pastWalks, setPastWalks] = useState<Walk[]>([]);
   
-  const [activeTab, setActiveTab] = useState<'completed' | 'scheduled' | 'needs-feedback' | 'group-walks'>(
-    tabParam === 'needs-feedback' ? 'needs-feedback' : 
-    tabParam === 'completed' ? 'completed' :
-    tabParam === 'scheduled' ? 'scheduled' : 'group-walks'
-  );
-  const [walkerWalks, setWalkerWalks] = useState<Walk[]>([]);
-  const [groupedWalks, setGroupedWalks] = useState<Record<string, Walk[]>>({});
+  // Load walker walks based on authentication
+  useEffect(() => {
+    if (!user) return;
+    
+    const loadWalks = () => {
+      // Filter walks for this walker
+      const walkerWalks = walks.filter(walk => walk.walkerId === user.profileId);
+      
+      // Sort walks by date and time
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const upcoming: Walk[] = [];
+      const past: Walk[] = [];
+      
+      walkerWalks.forEach(walk => {
+        const walkDate = new Date(walk.date);
+        
+        if (walkDate >= today && walk.status !== 'cancelled') {
+          upcoming.push(walk);
+        } else if (walk.status === 'completed') {
+          past.push(walk);
+        }
+      });
+      
+      // Sort upcoming walks by date (nearest first)
+      upcoming.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateA.getTime() - dateB.getTime(); // Ascending by date
+        }
+        
+        // If dates are the same, compare by time
+        const [hoursA, minutesA] = a.startTime.split(':').map(Number);
+        const [hoursB, minutesB] = b.startTime.split(':').map(Number);
+        return (hoursA * 60 + minutesA) - (hoursB * 60 + minutesB); // Ascending by time
+      });
+      
+      // Sort past walks by date (most recent first)
+      past.sort((a, b) => {
+        const dateA = new Date(a.date);
+        const dateB = new Date(b.date);
+        
+        if (dateA.getTime() !== dateB.getTime()) {
+          return dateB.getTime() - dateA.getTime(); // Descending by date
+        }
+        
+        // If dates are the same, compare by time
+        const [hoursA, minutesA] = a.startTime.split(':').map(Number);
+        const [hoursB, minutesB] = b.startTime.split(':').map(Number);
+        return (hoursB * 60 + minutesB) - (hoursA * 60 + minutesA); // Descending by time
+      });
+      
+      setUpcomingWalks(upcoming);
+      setPastWalks(past);
+      setLoading(false);
+    };
+    
+    // Simulate API call
+    setTimeout(loadWalks, 500);
+  }, [user, walks]);
 
   // Redirect if not a walker or admin
   useEffect(() => {
@@ -52,73 +109,8 @@ export default function WalkerWalksPage() {
     }
   }, [user, loading, router]);
 
-  // Load walker's walks
-  useEffect(() => {
-    if (user?.profileId) {
-      const walks = mockWalks.filter(walk => walk.walkerId === user.profileId);
-      setWalkerWalks(walks);
-      
-      // Group walks by date and time slot
-      const walkGroups: Record<string, Walk[]> = {};
-      
-      walks.filter(walk => walk.status === 'scheduled').forEach(walk => {
-        const groupKey = `${walk.date}_${walk.startTime}_${walk.timeSlot}`;
-        if (!walkGroups[groupKey]) {
-          walkGroups[groupKey] = [];
-        }
-        walkGroups[groupKey].push(walk);
-      });
-      
-      // Filter to only include groups with multiple dogs
-      const multiDogGroups: Record<string, Walk[]> = {};
-      Object.entries(walkGroups).forEach(([key, walks]) => {
-        if (walks.length > 1) {
-          multiDogGroups[key] = walks;
-        }
-      });
-      
-      setGroupedWalks(multiDogGroups);
-    }
-  }, [user]);
-  
-  // Update activeTab when URL parameter changes
-  useEffect(() => {
-    if (tabParam) {
-      if (tabParam === 'needs-feedback') {
-        setActiveTab('needs-feedback');
-      } else if (tabParam === 'group-walks') {
-        setActiveTab('group-walks');
-      } else if (tabParam === 'scheduled') {
-        setActiveTab('scheduled');
-      } else if (tabParam === 'completed') {
-        setActiveTab('completed');
-      }
-    }
-  }, [tabParam]);
-
-  // Filter walks based on active tab
-  const filteredWalks = walkerWalks.filter(walk => {
-    if (activeTab === 'needs-feedback') {
-      return walk.status === 'completed' && !walk.feedback;
-    } else if (activeTab === 'completed') {
-      return walk.status === 'completed';
-    } else if (activeTab === 'scheduled') {
-      return walk.status === 'scheduled';
-    } else {
-      return false; // Group walks are handled separately
-    }
-  });
-
-  // Sort walks by date (most recent first for completed, soonest first for scheduled)
-  const sortedWalks = [...filteredWalks].sort((a, b) => {
-    const dateA = new Date(`${a.date}T${a.startTime}`).getTime();
-    const dateB = new Date(`${b.date}T${b.startTime}`).getTime();
-    
-    return activeTab === 'completed' || activeTab === 'needs-feedback' ? dateB - dateA : dateA - dateB;
-  });
-
   // Count walks needing feedback
-  const needsFeedbackCount = walkerWalks.filter(walk => 
+  const needsFeedbackCount = walks.filter(walk => 
     walk.status === 'completed' && !walk.feedback
   ).length;
   
@@ -190,7 +182,7 @@ export default function WalkerWalksPage() {
   const FeedbackWalkthrough = () => {
     const [isOpen, setIsOpen] = useState(true);
     
-    if (!isOpen || activeTab !== 'needs-feedback') return null;
+    if (!isOpen || tab !== 'needs-feedback') return null;
     
     return (
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
@@ -261,7 +253,7 @@ export default function WalkerWalksPage() {
             <button
               onClick={() => setActiveTab('group-walks')}
               className={`px-6 py-3 text-sm font-medium flex items-center ${
-                activeTab === 'group-walks'
+                tab === 'group-walks'
                   ? 'text-blue-600 border-b-2 border-blue-600'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
@@ -276,7 +268,7 @@ export default function WalkerWalksPage() {
             <button
               onClick={() => setActiveTab('completed')}
               className={`px-6 py-3 text-sm font-medium ${
-                activeTab === 'completed'
+                tab === 'completed'
                   ? 'text-primary-600 border-b-2 border-primary-600'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
@@ -286,7 +278,7 @@ export default function WalkerWalksPage() {
             <button
               onClick={() => setActiveTab('scheduled')}
               className={`px-6 py-3 text-sm font-medium ${
-                activeTab === 'scheduled'
+                tab === 'scheduled'
                   ? 'text-primary-600 border-b-2 border-primary-600'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
@@ -297,7 +289,7 @@ export default function WalkerWalksPage() {
               <button
                 onClick={() => setActiveTab('needs-feedback')}
                 className={`px-6 py-3 text-sm font-medium flex items-center ${
-                  activeTab === 'needs-feedback'
+                  tab === 'needs-feedback'
                     ? 'text-amber-600 border-b-2 border-amber-600'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
@@ -312,7 +304,7 @@ export default function WalkerWalksPage() {
         </div>
         
         <div className="p-6">
-          {activeTab === 'group-walks' ? (
+          {tab === 'group-walks' ? (
             // Group walks tab content
             Object.keys(groupedWalks).length === 0 ? (
               <div className="text-center py-8">
@@ -327,77 +319,141 @@ export default function WalkerWalksPage() {
             )
           ) : (
             // Other tabs content
-            sortedWalks.length === 0 ? (
+            upcomingWalks.length === 0 && pastWalks.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-500">
-                  {activeTab === 'needs-feedback' 
+                  {tab === 'needs-feedback' 
                     ? 'No walks need feedback' 
-                    : `No ${activeTab} walks found`}
+                    : `No ${tab} walks found`}
                 </p>
               </div>
             ) : (
               <div className="space-y-6">
-                {sortedWalks.map(walk => {
-                  const dog = getDogById(walk.dogId);
-                  
-                  if (!dog) return null;
-                  
-                  return (
-                    <div key={walk.id} className={`flex flex-col sm:flex-row sm:items-center p-4 rounded-lg border ${
-                      activeTab === 'needs-feedback' ? 'border-amber-200 bg-amber-50' : 'border-gray-100 hover:bg-gray-50'
-                    }`}>
-                      <div className="flex items-center">
-                        <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 relative flex-shrink-0">
-                          <Image
-                            src={dog.imageUrl || 'https://via.placeholder.com/56'}
-                            alt={dog.name}
-                            width={56}
-                            height={56}
-                            className="object-cover"
-                          />
+                {tab === 'needs-feedback' ? (
+                  pastWalks.map(walk => {
+                    const dog = getDogById(walk.dogId);
+                    
+                    if (!dog) return null;
+                    
+                    return (
+                      <div key={walk.id} className={`flex flex-col sm:flex-row sm:items-center p-4 rounded-lg border ${
+                        tab === 'needs-feedback' ? 'border-amber-200 bg-amber-50' : 'border-gray-100 hover:bg-gray-50'
+                      }`}>
+                        <div className="flex items-center">
+                          <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 relative flex-shrink-0">
+                            <Image
+                              src={dog.imageUrl || 'https://via.placeholder.com/56'}
+                              alt={dog.name}
+                              width={56}
+                              height={56}
+                              className="object-cover"
+                            />
+                          </div>
+                          
+                          <div className="ml-4">
+                            <p className="font-medium text-gray-900">{dog.name}</p>
+                            <p className="text-sm text-gray-500">{dog.breed} • {dog.size}</p>
+                            <p className="text-sm text-gray-500">
+                              {formatDate(walk.date)} at {formatTime(walk.startTime)}
+                            </p>
+                          </div>
                         </div>
                         
-                        <div className="ml-4">
-                          <p className="font-medium text-gray-900">{dog.name}</p>
-                          <p className="text-sm text-gray-500">{dog.breed} • {dog.size}</p>
-                          <p className="text-sm text-gray-500">
-                            {formatDate(walk.date)} at {formatTime(walk.startTime)}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-4 sm:mt-0 sm:ml-auto flex flex-wrap gap-2">
-                        <Link 
-                          href={`/walker-dashboard/walks/${walk.id}`}
-                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500"
-                        >
-                          View Details
-                        </Link>
-                        
-                        {walk.status === 'completed' && !walk.feedback && (
+                        <div className="mt-4 sm:mt-0 sm:ml-auto flex flex-wrap gap-2">
                           <Link 
-                            href={`/walker-dashboard/walks/${walk.id}/feedback`}
-                            className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700"
+                            href={`/walker-dashboard/walks/${walk.id}`}
+                            className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500"
                           >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                            Add Feedback
+                            View Details
                           </Link>
-                        )}
-                        
-                        {walk.status === 'completed' && walk.feedback && (
-                          <span className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-5 font-medium rounded-md text-green-700 bg-green-100">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            Feedback Provided
-                          </span>
-                        )}
+                          
+                          {walk.status === 'completed' && !walk.feedback && (
+                            <Link 
+                              href={`/walker-dashboard/walks/${walk.id}/feedback`}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Add Feedback
+                            </Link>
+                          )}
+                          
+                          {walk.status === 'completed' && walk.feedback && (
+                            <span className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-5 font-medium rounded-md text-green-700 bg-green-100">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Feedback Provided
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                ) : (
+                  upcomingWalks.map(walk => {
+                    const dog = getDogById(walk.dogId);
+                    
+                    if (!dog) return null;
+                    
+                    return (
+                      <div key={walk.id} className={`flex flex-col sm:flex-row sm:items-center p-4 rounded-lg border ${
+                        tab === 'needs-feedback' ? 'border-amber-200 bg-amber-50' : 'border-gray-100 hover:bg-gray-50'
+                      }`}>
+                        <div className="flex items-center">
+                          <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 relative flex-shrink-0">
+                            <Image
+                              src={dog.imageUrl || 'https://via.placeholder.com/56'}
+                              alt={dog.name}
+                              width={56}
+                              height={56}
+                              className="object-cover"
+                            />
+                          </div>
+                          
+                          <div className="ml-4">
+                            <p className="font-medium text-gray-900">{dog.name}</p>
+                            <p className="text-sm text-gray-500">{dog.breed} • {dog.size}</p>
+                            <p className="text-sm text-gray-500">
+                              {formatDate(walk.date)} at {formatTime(walk.startTime)}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="mt-4 sm:mt-0 sm:ml-auto flex flex-wrap gap-2">
+                          <Link 
+                            href={`/walker-dashboard/walks/${walk.id}`}
+                            className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-5 font-medium rounded-md text-gray-700 bg-white hover:text-gray-500"
+                          >
+                            View Details
+                          </Link>
+                          
+                          {walk.status === 'completed' && !walk.feedback && (
+                            <Link 
+                              href={`/walker-dashboard/walks/${walk.id}/feedback`}
+                              className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                              Add Feedback
+                            </Link>
+                          )}
+                          
+                          {walk.status === 'completed' && walk.feedback && (
+                            <span className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-5 font-medium rounded-md text-green-700 bg-green-100">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              Feedback Provided
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             )
           )}

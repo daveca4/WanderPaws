@@ -1,62 +1,190 @@
-import { User, Permission, Role } from './types';
-import { mockUsers } from './mockUsers';
-import { permissions } from './mockUsers';
+'use client';
 
-// Type guard functions
-function isAdmin(role: Role): role is 'admin' {
-  return role === 'admin';
-}
-
-function isOwner(role: Role): role is 'owner' {
-  return role === 'owner';
-}
-
-function isWalker(role: Role): role is 'walker' {
-  return role === 'walker';
-}
+import { User, Role } from './types';
 
 // Constants for local storage
 const USER_STORAGE_KEY = 'wanderpaws_user';
 
-// Simulate user authentication
-export async function login(email: string, password: string): Promise<User | null> {
-  // In a real app, we would verify the password against a hash
-  const user = mockUsers.find(user => user.email === email);
+// Type for permissions
+export type Permission = string;
+
+// Define available permissions
+export const permissions = {
+  // Owner permissions
+  MANAGE_OWN_PROFILE: 'manage_own_profile' as Permission,
+  MANAGE_OWN_DOGS: 'manage_own_dogs' as Permission,
+  BOOK_WALKS: 'book_walks' as Permission,
+  VIEW_OWN_WALKS: 'view_own_walks' as Permission,
+  CANCEL_OWN_WALKS: 'cancel_own_walks' as Permission,
   
-  if (!user) {
-    return null;
+  // Walker permissions
+  MANAGE_WALKER_PROFILE: 'manage_walker_profile' as Permission,
+  MANAGE_AVAILABILITY: 'manage_availability' as Permission,
+  MANAGE_WALKS: 'manage_walks' as Permission,
+  UPLOAD_WALK_MEDIA: 'upload_walk_media' as Permission,
+  CREATE_ASSESSMENTS: 'create_assessments' as Permission,
+  
+  // Admin permissions
+  MANAGE_ALL_USERS: 'manage_all_users' as Permission,
+  VIEW_REPORTS: 'view_reports' as Permission,
+  MANAGE_SUBSCRIPTIONS: 'manage_subscriptions' as Permission,
+  MANAGE_ASSESSMENTS: 'manage_assessments' as Permission,
+  MANAGE_CONTENT: 'manage_content' as Permission,
+  MANAGE_MARKETING: 'manage_marketing' as Permission,
+  MANAGE_HOLIDAY_REQUESTS: 'manage_holiday_requests' as Permission,
+};
+
+// Map roles to permissions
+export const rolePermissions: Record<Role, Permission[]> = {
+  owner: [
+    permissions.MANAGE_OWN_PROFILE,
+    permissions.MANAGE_OWN_DOGS,
+    permissions.BOOK_WALKS,
+    permissions.VIEW_OWN_WALKS,
+    permissions.CANCEL_OWN_WALKS,
+  ],
+  walker: [
+    permissions.MANAGE_WALKER_PROFILE,
+    permissions.MANAGE_AVAILABILITY,
+    permissions.MANAGE_WALKS,
+    permissions.UPLOAD_WALK_MEDIA,
+    permissions.CREATE_ASSESSMENTS,
+  ],
+  admin: [
+    // Admin has all permissions
+    ...Object.values(permissions),
+  ],
+};
+
+// Function to check if a user has a specific permission
+export function hasPermission(user: User | null, action: string, resource: string, resourceOwnerId?: string): boolean {
+  if (!user) return false;
+  
+  // Admin role always has access to everything
+  if (user.role === 'admin') {
+    return true;
   }
   
-  // In a real app, we would check the password here
-  // For demo purposes, we'll just return the user
-  
-  // Update last login time
-  user.lastLogin = new Date().toISOString();
-  
-  // Store user in local storage
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-  }
-  
-  return user;
+  const permission = `${action}_${resource}` as Permission;
+  const userPermissions = rolePermissions[user.role] || [];
+  return userPermissions.includes(permission);
 }
 
-export async function logout(): Promise<void> {
-  // Clear user from local storage
-  if (typeof window !== 'undefined') {
-    localStorage.removeItem(USER_STORAGE_KEY);
-  }
-  return;
+// Function to get all permissions for a user
+export function getUserPermissions(user: User | null): Permission[] {
+  if (!user) return [];
+  return rolePermissions[user.role] || [];
 }
 
-// Get the current user from storage
-export function getCurrentUser(): User | null {
-  // Check for browser environment
+// User registration - client-side function that calls the API
+export async function registerUser(name: string, email: string, password: string, role: Role): Promise<User | null> {
   if (typeof window === 'undefined') {
+    console.error('registerUser should not be called from the server side');
     return null;
   }
   
-  // Get user from local storage
+  try {
+    // Use the registration API route
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name,
+        email,
+        password,
+        role,
+      }),
+    });
+    
+    // Get response data even if it's an error
+    const data = await response.json();
+    
+    // Check if the request was successful
+    if (!response.ok) {
+      // Use the error message from the API if available
+      throw new Error(data.error || 'Registration failed');
+    }
+    
+    console.log('User registration successful:', data.message);
+    
+    return data.user as User;
+  } catch (error) {
+    console.error('Error registering user:', error);
+    throw error; // Re-throw to let the UI handle it
+  }
+}
+
+// Login function - client-side function that calls the API
+export async function login(email: string, password: string): Promise<User | null> {
+  if (typeof window === 'undefined') {
+    console.error('login should not be called from the server side');
+    return null;
+  }
+  
+  try {
+    // Use the login API route
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        password,
+      }),
+    });
+    
+    // Get response data even if it's an error
+    const data = await response.json();
+    
+    // Check if the request was successful
+    if (!response.ok) {
+      // Use the error message from the API if available
+      throw new Error(data.error || 'Login failed');
+    }
+    
+    console.log('Login successful:', data.message);
+    const user = data.user;
+    
+    // Store user in local storage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    }
+    
+    return user as User;
+  } catch (error) {
+    console.error('Error during login:', error);
+    throw error;
+  }
+}
+
+// Logout function - client-side function
+export async function logout(): Promise<void> {
+  try {
+    // Call the logout API if needed
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+    });
+    
+    // Clear user from local storage
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(USER_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.error('Logout error:', error);
+    throw error;
+  }
+}
+
+// Get current user from local storage
+export function getCurrentUser(): User | null {
+  if (typeof window === 'undefined') {
+    // We're on the server, user is not available
+    return null;
+  }
+  
   const userJson = localStorage.getItem(USER_STORAGE_KEY);
   if (!userJson) {
     return null;
@@ -65,62 +193,8 @@ export function getCurrentUser(): User | null {
   try {
     return JSON.parse(userJson) as User;
   } catch (error) {
-    console.error('Error parsing user from storage:', error);
+    console.error('Error parsing user from local storage:', error);
     return null;
   }
 }
 
-// Check if a user has a specific permission
-export function hasPermission(
-  user: User | null, 
-  action: string, 
-  resource: string,
-  resourceOwnerId?: string
-): boolean {
-  if (!user) return false;
-  
-  // Admins have all permissions
-  if (isAdmin(user.role)) return true;
-  
-  // Get permissions for the user's role
-  const rolePermissions = permissions[user.role];
-  if (!rolePermissions) return false;
-  
-  // Check if the permission exists for this role
-  const hasBasePermission = rolePermissions.some(
-    permission => permission.action === action && permission.resource === resource
-  );
-  
-  if (!hasBasePermission) return false;
-  
-  // If this is a resource ownership check (e.g., for owners and walkers who should
-  // only access their own resources), verify the ownership
-  if (resourceOwnerId && !isAdmin(user.role)) {
-    // For owners, check if they own the resource
-    if (isOwner(user.role) && user.profileId !== resourceOwnerId) {
-      return false;
-    }
-    
-    // For walkers, check if they are assigned to the resource
-    if (isWalker(user.role) && user.profileId !== resourceOwnerId) {
-      // Note: In a real app, we would need more complex logic here to check 
-      // walk assignments, walker schedules, etc.
-      return false;
-    }
-  }
-  
-  return true;
-}
-
-// Get all permissions for a user
-export function getUserPermissions(user: User | null): Permission[] {
-  if (!user) return [];
-  
-  // Admins have all permissions
-  if (isAdmin(user.role)) {
-    return Object.values(permissions).flat();
-  }
-  
-  // Return permissions for the user's role
-  return permissions[user.role] || [];
-} 

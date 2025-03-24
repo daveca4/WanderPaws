@@ -1,20 +1,51 @@
 import { PrismaClient } from '@prisma/client';
 
-// Initialize Prisma client
+declare global {
+  var prisma: PrismaClient | undefined;
+}
+
+// PrismaClient is attached to the `global` object in development to prevent
+// exhausting your database connection limit.
+// Learn more: https://pris.ly/d/help/next-js-best-practices
+
 let prisma: PrismaClient;
 
-try {
-  prisma = new PrismaClient();
-  console.log('Prisma client initialized successfully');
-} catch (error) {
-  console.error('Failed to initialize Prisma client:', error);
-  throw new Error('Database connection failed');
+if (typeof window === 'undefined') {
+  // We're on the server
+  if (process.env.NODE_ENV === 'production') {
+    prisma = new PrismaClient();
+  } else {
+    // In development, use a global variable so that the value
+    // is preserved across module reloads caused by HMR (Hot Module Replacement).
+    if (!global.prisma) {
+      global.prisma = new PrismaClient();
+    }
+    prisma = global.prisma;
+  }
+} else {
+  // We're in the browser
+  // Create a dummy object that throws helpful errors when accessed
+  prisma = new Proxy({} as PrismaClient, {
+    get() {
+      throw new Error(
+        'PrismaClient cannot be accessed on the client side. Please use data context or server components for database access.'
+      );
+    },
+  });
 }
+
+// Export the prisma instance
+export default prisma;
+
+// IMPORTANT: All exports below should ONLY be used in server components or API routes
 
 // Stripe Customer Functions
 export async function getStripeCustomer(userId: string) {
   try {
-    console.log('Getting Stripe customer for user:', userId);
+    if (typeof window !== 'undefined') {
+      throw new Error('This function can only be called from the server side');
+    }
+    
     return await prisma.stripeCustomer.findUnique({
       where: {
         userId,
@@ -28,7 +59,10 @@ export async function getStripeCustomer(userId: string) {
 
 export async function createStripeCustomerRecord(stripeCustomerId: string, userId: string, email: string) {
   try {
-    console.log('Creating Stripe customer record:', stripeCustomerId, 'for user:', userId);
+    if (typeof window !== 'undefined') {
+      throw new Error('This function can only be called from the server side');
+    }
+    
     return await prisma.stripeCustomer.create({
       data: {
         id: stripeCustomerId,
@@ -134,4 +168,4 @@ export async function updateStripePaymentWithSubscription(
   }
 }
 
-export default prisma; 
+// Only export the necessary functions that are actually used directly in API routes 

@@ -18,13 +18,13 @@ export default function RouteGuard({
   requiredPermission,
   redirectTo = '/login',
 }: RouteGuardProps) {
-  const { user, loading, checkPermission } = useAuth();
+  const { user, isLoading, checkPermission } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     // Check if the user is authenticated and has the required permission
-    if (!loading) {
+    if (!isLoading) {
       if (!user) {
         // User is not logged in, redirect to login
         router.push(`${redirectTo}?returnUrl=${encodeURIComponent(pathname)}`);
@@ -36,10 +36,10 @@ export default function RouteGuard({
         router.push('/unauthorized');
       }
     }
-  }, [user, loading, requiredPermission, router, redirectTo, pathname, checkPermission]);
+  }, [user, isLoading, requiredPermission, router, redirectTo, pathname, checkPermission]);
 
   // Show nothing while loading
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>

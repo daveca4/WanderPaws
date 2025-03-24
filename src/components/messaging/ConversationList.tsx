@@ -1,11 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Conversation, User } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
-import { mockUsers } from '@/lib/mockUsers';
-import { mockOwners, mockWalkers } from '@/lib/mockData';
+import { getUsersByIds } from '@/lib/userService';
 import { useAuth } from '@/lib/AuthContext';
 import NewConversation from './NewConversation';
 
@@ -22,11 +21,44 @@ export default function ConversationList({
 }: ConversationListProps) {
   const { user } = useAuth();
   const [showNewConversationModal, setShowNewConversationModal] = useState(false);
+  const [participantUsers, setParticipantUsers] = useState<User[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Fetch users data for all participants
+  useEffect(() => {
+    const fetchParticipantUsers = async () => {
+      if (conversations.length === 0) return;
+      
+      // Get unique participant IDs from all conversations
+      const participantIds = Array.from(new Set(
+        conversations.flatMap(conv => conv.participants)
+      ));
+      
+      if (participantIds.length === 0) return;
+      
+      try {
+        setLoadingUsers(true);
+        const users = await getUsersByIds(participantIds);
+        setParticipantUsers(users);
+      } catch (error) {
+        console.error('Error fetching participant users:', error);
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    
+    fetchParticipantUsers();
+  }, [conversations]);
 
   // Helper function to get participants excluding current user
   const getOtherParticipants = (conversation: Conversation) => {
     if (!user) return [];
     return conversation.participants.filter(id => id !== user.id);
+  };
+
+  // Helper function to get user by ID
+  const getUserById = (userId: string): User | undefined => {
+    return participantUsers.find(u => u.id === userId);
   };
 
   // Helper function to get conversation title
@@ -37,21 +69,11 @@ export default function ConversationList({
     if (otherParticipants.length === 0) return 'Conversation';
     
     const names = otherParticipants.map(id => {
-      const participant = mockUsers.find(u => u.id === id);
+      const participant = getUserById(id);
       if (!participant) return 'Unknown User';
       
-      // Get the participant's name based on their role
-      if (participant.role === 'admin') {
-        return 'Admin';
-      } else if (participant.role === 'owner') {
-        const owner = mockOwners.find(o => o.id === participant.profileId);
-        return owner ? owner.name : participant.email.split('@')[0];
-      } else if (participant.role === 'walker') {
-        const walker = mockWalkers.find(w => w.id === participant.profileId);
-        return walker ? walker.name : participant.email.split('@')[0];
-      }
-      
-      return participant.email.split('@')[0];
+      // Get the participant's display name
+      return participant.name || participant.email.split('@')[0];
     });
     
     return names.join(', ');
@@ -70,7 +92,7 @@ export default function ConversationList({
     return conversation.unreadCount[user.id] || 0;
   };
 
-  if (isLoading) {
+  if (isLoading || loadingUsers) {
     return (
       <div className="p-4">
         <div className="animate-pulse space-y-4">

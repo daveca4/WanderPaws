@@ -1,158 +1,139 @@
-import { format, parseISO, isToday, isTomorrow, addDays } from 'date-fns';
-import { Dog, Walker, Walk, Owner } from '@/lib/types';
-import { mockDogs, mockOwners, mockWalkers, mockWalks } from '@/lib/mockData';
+import { format, isToday, isTomorrow, addDays, parseISO } from 'date-fns';
+import { Dog, Owner, Walker, Walk } from '@/lib/types';
 
-// Date formatting functions
-export function formatDate(dateString: string): string {
-  const options: Intl.DateTimeFormatOptions = { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  };
-  return new Date(dateString).toLocaleDateString(undefined, options);
-}
+// Format a date string to a readable format
+export const formatDate = (dateString: string): string => {
+  const date = parseISO(dateString);
+  return format(date, 'MMMM d, yyyy');
+};
 
-export function formatTime(timeString: string): string {
-  const [hour, minute] = timeString.split(':').map(Number);
-  const date = new Date();
-  date.setHours(hour, minute);
-  return date.toLocaleTimeString('en-US', { 
-    hour: 'numeric', 
-    minute: '2-digit',
-    hour12: true 
+// Format a time string to a readable format with AM/PM
+export const formatTime = (timeString: string): string => {
+  // Assuming timeString is in format "HH:MM:SS" or "HH:MM"
+  const [hours, minutes] = timeString.split(':');
+  const hour = parseInt(hours, 10);
+  const suffix = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12; // Convert 0 to 12 for 12 AM
+  return `${displayHour}:${minutes} ${suffix}`;
+};
+
+// Generate a unique ID with an optional prefix
+export const generateId = (prefix: string = ''): string => {
+  return `${prefix}${Math.random().toString(36).substring(2, 9)}`;
+};
+
+// These functions now expect to be given data rather than using mockData
+export const getDogById = (dogs: Dog[], id: string): Dog | undefined => {
+  return dogs.find(dog => dog.id === id);
+};
+
+export const getOwnerById = (owners: Owner[], id: string): Owner | undefined => {
+  return owners.find(owner => owner.id === id);
+};
+
+export const getWalkerById = (walkers: Walker[], id: string): Walker | undefined => {
+  return walkers.find(walker => walker.id === id);
+};
+
+export const getWalkById = (walks: Walk[], walkId: string): Walk | undefined => {
+  return walks.find(walk => walk.id === walkId);
+};
+
+// Check if a date is in the past
+export const isPastDate = (dateString: string): boolean => {
+  const date = parseISO(dateString);
+  return date < new Date();
+};
+
+export const getDogsByOwnerId = (dogs: Dog[], ownerId: string): Dog[] => {
+  return dogs.filter(dog => dog.ownerId === ownerId);
+};
+
+export const getWalksByDateRange = (walks: Walk[], startDate: Date, endDate: Date): Walk[] => {
+  // This function will filter walks by a date range
+  return walks.filter(walk => {
+    const walkDate = parseISO(walk.date);
+    return walkDate >= startDate && walkDate <= endDate;
   });
-}
+};
 
-// Data retrieval functions
-export function getDogById(id: string): Dog | undefined {
-  return mockDogs.find(dog => dog.id === id);
-}
-
-export function getOwnerById(id: string): Owner | undefined {
-  return mockOwners.find(owner => owner.id === id);
-}
-
-export function getWalkerById(id: string): Walker | undefined {
-  return mockWalkers.find(walker => walker.id === id);
-}
-
-export function getWalkById(walkId: string): Walk | undefined {
-  return mockWalks.find(walk => walk.id === walkId);
-}
-
-export function getOwnersByDogId(dogId: string): Owner | undefined {
-  const dog = getDogById(dogId);
-  if (!dog) return undefined;
-  return getOwnerById(dog.ownerId);
-}
-
-export function getDogsByOwnerId(ownerId: string): Dog[] {
-  return mockDogs.filter(dog => dog.ownerId === ownerId);
-}
-
-export function getUpcomingWalks(dogId?: string, limit?: number, walkerId?: string): Walk[] {
-  // Get walks that are scheduled in the future
+// Get upcoming walks sorted by date
+export const getUpcomingWalks = (walks: Walk[] = [], limit?: number, walkerId?: string): Walk[] => {
   const now = new Date();
-  
-  // Check if we're using mock data with future dates
-  const isMockData = mockWalks.some(walk => {
-    const walkDate = new Date(walk.date);
-    return walkDate.getFullYear() > now.getFullYear();
+  let filteredWalks = (walks || []).filter(walk => {
+    const walkDate = parseISO(walk.date);
+    return walkDate >= now && (!walkerId || walk.walkerId === walkerId);
+  })
+  .sort((a, b) => {
+    const dateA = parseISO(a.date);
+    const dateB = parseISO(b.date);
+    return dateA.getTime() - dateB.getTime();
   });
   
-  // If using mock data with future dates in 2025, don't filter by date
-  // This is a temporary fix for development only
-  let walks = mockWalks.filter(walk => {
-    if (isMockData) {
-      return (
-        walk.status === 'scheduled' && 
-        (dogId ? walk.dogId === dogId : true) &&
-        (walkerId ? walk.walkerId === walkerId : true)
-      );
-    } else {
-      // Normal date filtering for real data
+  if (limit) {
+    filteredWalks = filteredWalks.slice(0, limit);
+  }
+  
+  return filteredWalks;
+};
+
+// Get past walks sorted by date, newest first
+export const getPastWalks = (walks: Walk[] = [], limit?: number, walkerId?: string): Walk[] => {
+  const now = new Date();
+  let filteredWalks = (walks || [])
+    .filter(walk => {
       const walkDate = parseISO(walk.date);
-      return (
-        walk.status === 'scheduled' && 
-        walkDate >= now && 
-        (dogId ? walk.dogId === dogId : true) &&
-        (walkerId ? walk.walkerId === walkerId : true)
-      );
-    }
-  });
-  
-  // Sort by date and time
-  walks.sort((a, b) => {
-    const dateCompare = parseISO(a.date).getTime() - parseISO(b.date).getTime();
-    if (dateCompare !== 0) return dateCompare;
+      return walkDate < now && (!walkerId || walk.walkerId === walkerId);
+    })
+    .sort((a, b) => {
+      const dateA = parseISO(a.date);
+      const dateB = parseISO(b.date);
+      return dateB.getTime() - dateA.getTime(); // Newest first
+    });
     
-    // If dates are the same, compare times
-    const [aHours, aMinutes] = a.startTime.split(':').map(Number);
-    const [bHours, bMinutes] = b.startTime.split(':').map(Number);
-    
-    const aMinutesTotal = aHours * 60 + aMinutes;
-    const bMinutesTotal = bHours * 60 + bMinutes;
-    
-    return aMinutesTotal - bMinutesTotal;
-  });
-  
-  // Limit results if specified
-  if (limit && limit > 0) {
-    walks = walks.slice(0, limit);
+  if (limit) {
+    filteredWalks = filteredWalks.slice(0, limit);
   }
   
-  return walks;
-}
+  return filteredWalks;
+};
 
-export function getPastWalks(dogId?: string, limit?: number, walkerId?: string): Walk[] {
-  // Get completed walks
-  let walks = mockWalks.filter(walk => 
-    walk.status === 'completed' && 
-    (dogId ? walk.dogId === dogId : true) &&
-    (walkerId ? walk.walkerId === walkerId : true)
-  );
+// Get walks for a specific dog
+export const getWalksByDogId = (walks: Walk[], dogId: string): Walk[] => {
+  return walks.filter(walk => walk.dogId === dogId);
+};
+
+// Get walks for a specific walker
+export const getWalksByWalkerId = (walks: Walk[], walkerId: string): Walk[] => {
+  return walks.filter(walk => walk.walkerId === walkerId);
+};
+
+// Helper function to create a date with a specific time
+export const createDateWithTime = (dateString: string, timeString: string): Date => {
+  const date = parseISO(dateString);
+  const [hours, minutes] = timeString.split(':').map(Number);
   
-  // Sort by date and time, most recent first
-  walks.sort((a, b) => {
-    const dateCompare = parseISO(b.date).getTime() - parseISO(a.date).getTime();
-    if (dateCompare !== 0) return dateCompare;
-    
-    // If dates are the same, compare times
-    const [aHours, aMinutes] = a.startTime.split(':').map(Number);
-    const [bHours, bMinutes] = b.startTime.split(':').map(Number);
-    
-    const aMinutesTotal = aHours * 60 + aMinutes;
-    const bMinutesTotal = bHours * 60 + bMinutes;
-    
-    return bMinutesTotal - aMinutesTotal;
+  date.setHours(hours);
+  date.setMinutes(minutes);
+  
+  return date;
+};
+
+// Get walks occurring on a specific date
+export const getWalksByDate = (walks: Walk[], date: Date): Walk[] => {
+  const targetDate = new Date(date);
+  targetDate.setHours(0, 0, 0, 0); // Start of the day
+  
+  const nextDay = new Date(targetDate);
+  nextDay.setDate(nextDay.getDate() + 1); // Start of the next day
+  
+  return walks.filter(walk => {
+    const walkDate = parseISO(walk.date);
+    return walkDate >= targetDate && walkDate < nextDay;
   });
-  
-  // Limit results if specified
-  if (limit && limit > 0) {
-    walks = walks.slice(0, limit);
-  }
-  
-  return walks;
-}
+};
 
-// Generate a unique ID for new records
-export function generateId(prefix: string): string {
-  const timestamp = new Date().getTime();
-  const random = Math.floor(Math.random() * 10000);
-  return `${prefix}${timestamp}${random}`;
-}
-
-function getExistingIds(type: 'dog' | 'owner' | 'walker' | 'walk'): string[] {
-  switch (type) {
-    case 'dog':
-      return mockDogs.map(d => d.id);
-    case 'owner':
-      return mockOwners.map(o => o.id);
-    case 'walker':
-      return mockWalkers.map(w => w.id);
-    case 'walk':
-      return mockWalks.map(w => w.id);
-  }
-} 
+// Get all existing IDs of a certain type to avoid duplicates
+export const getExistingIds = (array: { id: string }[]): string[] => {
+  return array.map(item => item.id);
+}; 

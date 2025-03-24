@@ -3,10 +3,8 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { mockDogs } from '@/lib/mockData';
-import { getUserActiveSubscription } from '@/lib/mockSubscriptions';
-import { getAssessmentsByOwnerId } from '@/lib/mockAssessments';
-import { getBookingsByOwnerId } from '@/lib/mockBookings';
+import { useData } from '@/lib/DataContext';
+import { getDogsByOwnerId } from '@/utils/dataHelpers';
 
 // Define the workflow steps
 const WORKFLOW_STEPS = [
@@ -44,6 +42,7 @@ const WORKFLOW_STEPS = [
 
 export function WorkflowProgress() {
   const { user } = useAuth();
+  const { dogs, assessments, walks, userSubscriptions } = useData();
   const [workflowStatus, setWorkflowStatus] = useState<
     {step: string; completed: boolean; enabled: boolean}[]
   >([]);
@@ -52,27 +51,37 @@ export function WorkflowProgress() {
   useEffect(() => {
     if (!user) return;
 
-    // In a real app, fetch this data from an API
+    // Fetch this data from DataContext
     const checkWorkflowStatus = () => {
       // Step 1: Register Account - always completed if user exists
       const isRegistered = !!user;
 
       // Step 2: Add Dog - check if user has added any dogs
-      const hasAddedDogs = mockDogs.some(dog => dog.ownerId === user.profileId);
+      const userDogs = getDogsByOwnerId(dogs, user.profileId || '');
+      const hasAddedDogs = userDogs.length > 0;
 
       // Step 3: Dog Assessment - check if any dogs have completed assessments
-      const assessments = getAssessmentsByOwnerId(user.profileId || '');
-      const hasCompletedAssessment = assessments.some(assessment => 
+      const dogAssessments = assessments.filter(assessment => 
+        userDogs.some(dog => assessment.dogId === dog.id)
+      );
+      const hasCompletedAssessment = dogAssessments.some(assessment => 
         assessment.status === 'completed' && assessment.result === 'approved'
       );
 
       // Step 4: Buy Subscription - check if user has an active subscription
-      const activeSubscription = getUserActiveSubscription(user.id);
+      const now = new Date();
+      const activeSubscription = userSubscriptions.find(sub => 
+        sub.userId === user.id && 
+        sub.status === 'active' && 
+        new Date(sub.endDate) >= now
+      );
       const hasActiveSubscription = !!activeSubscription;
 
       // Step 5: Book Walks - check if user has any bookings
-      const bookings = getBookingsByOwnerId(user.profileId || '');
-      const hasBookings = bookings.length > 0;
+      const userWalks = walks.filter(walk => 
+        userDogs.some(dog => walk.dogId === dog.id)
+      );
+      const hasBookings = userWalks.length > 0;
 
       // Set up workflow status
       const status = [
@@ -87,9 +96,9 @@ export function WorkflowProgress() {
       setLoading(false);
     };
 
-    // Simulate API call
-    setTimeout(checkWorkflowStatus, 500);
-  }, [user]);
+    // Check status immediately when data is available
+    checkWorkflowStatus();
+  }, [user, dogs, assessments, walks, userSubscriptions]);
 
   if (loading) {
     return (

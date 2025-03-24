@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { handleWebhookEvent } from '@/lib/stripeService';
 import { headers } from 'next/headers';
 
+// Ensure this route is configured to skip body parsing
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text();
@@ -18,11 +22,4 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-}
-
-// Ensure this route is configured to skip CSRF protection
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-}; 
+} 
