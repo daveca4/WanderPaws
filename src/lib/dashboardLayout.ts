@@ -91,41 +91,45 @@ export const dashboardWidgets: DashboardWidget[] = [
 // Default layout for larger screens (desktop/laptop)
 export const defaultDesktopLayout: Layout[] = [
   { i: 'summaryWidget', x: 0, y: 0, w: 6, h: 2, static: false },
+  { i: 'weatherMonitoringWidget', x: 6, y: 0, w: 6, h: 4, static: false },
   { i: 'pendingAssessmentsWidget', x: 0, y: 2, w: 3, h: 4, static: false },
   { i: 'activeSubscriptionsWidget', x: 3, y: 2, w: 3, h: 4, static: false },
   { i: 'upcomingWalksWidget', x: 0, y: 6, w: 4, h: 4, static: false },
   { i: 'aiRecommendationsWidget', x: 4, y: 6, w: 2, h: 4, static: false },
   { i: 'recentActivitiesWidget', x: 0, y: 10, w: 6, h: 4, static: false },
-  { i: 'contentAIWidget', x: 0, y: 14, w: 3, h: 4, static: false },
-  { i: 'mediaGalleryWidget', x: 3, y: 14, w: 3, h: 4, static: false },
-  { i: 'weatherMonitoringWidget', x: 0, y: 18, w: 4, h: 4, static: false }
+  { i: 'contentAIWidget', x: 6, y: 4, w: 3, h: 4, static: false },
+  { i: 'mediaGalleryWidget', x: 9, y: 4, w: 3, h: 4, static: false }
 ];
 
 // Default layout for mobile screens
 export const defaultMobileLayout: Layout[] = [
   { i: 'summaryWidget', x: 0, y: 0, w: 1, h: 2, static: false },
-  { i: 'pendingAssessmentsWidget', x: 0, y: 2, w: 1, h: 4, static: false },
-  { i: 'activeSubscriptionsWidget', x: 0, y: 6, w: 1, h: 4, static: false },
-  { i: 'upcomingWalksWidget', x: 0, y: 10, w: 1, h: 4, static: false },
-  { i: 'aiRecommendationsWidget', x: 0, y: 14, w: 1, h: 4, static: false },
-  { i: 'recentActivitiesWidget', x: 0, y: 18, w: 1, h: 4, static: false },
-  { i: 'contentAIWidget', x: 0, y: 22, w: 1, h: 4, static: false },
-  { i: 'mediaGalleryWidget', x: 0, y: 26, w: 1, h: 4, static: false },
-  { i: 'weatherMonitoringWidget', x: 0, y: 30, w: 1, h: 4, static: false }
+  { i: 'weatherMonitoringWidget', x: 0, y: 2, w: 1, h: 4, static: false },
+  { i: 'pendingAssessmentsWidget', x: 0, y: 6, w: 1, h: 4, static: false },
+  { i: 'activeSubscriptionsWidget', x: 0, y: 10, w: 1, h: 4, static: false },
+  { i: 'upcomingWalksWidget', x: 0, y: 14, w: 1, h: 4, static: false },
+  { i: 'aiRecommendationsWidget', x: 0, y: 18, w: 1, h: 4, static: false },
+  { i: 'recentActivitiesWidget', x: 0, y: 22, w: 1, h: 4, static: false },
+  { i: 'contentAIWidget', x: 0, y: 26, w: 1, h: 4, static: false },
+  { i: 'mediaGalleryWidget', x: 0, y: 30, w: 1, h: 4, static: false }
 ];
 
 // Constants for localStorage keys
 export const DASHBOARD_LAYOUT_KEY = 'wanderpaws_admin_dashboard_layout';
 
+// Tab-based layout interfaces
+export type TabType = 'overview' | 'operations' | 'content' | 'analytics';
+export type TabLayouts = Record<TabType, Layout[]>;
+
 // Save layout to localStorage
-export const saveLayout = (layouts: { [key: string]: Layout[] }) => {
+export const saveLayout = (layouts: TabLayouts) => {
   if (typeof window !== 'undefined') {
     localStorage.setItem(DASHBOARD_LAYOUT_KEY, JSON.stringify(layouts));
   }
 };
 
 // Load layout from localStorage
-export const loadLayout = (): { [key: string]: Layout[] } | null => {
+export const loadLayout = (): TabLayouts | null => {
   if (typeof window !== 'undefined') {
     const savedLayout = localStorage.getItem(DASHBOARD_LAYOUT_KEY);
     if (savedLayout) {
