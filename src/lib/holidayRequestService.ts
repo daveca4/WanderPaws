@@ -28,7 +28,7 @@ const MOCK_HOLIDAY_REQUESTS: HolidayRequest[] = [
 ];
 
 // Flag to toggle between real API and mock data
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 
 // Fetch all holiday requests
 export async function getHolidayRequests(): Promise<HolidayRequest[]> {
