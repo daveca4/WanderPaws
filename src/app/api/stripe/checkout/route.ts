@@ -4,26 +4,17 @@ import {
   createStripeCustomer
 } from '@/lib/stripeService';
 import { getSubscriptionPlanById } from '@/lib/mockSubscriptions';
-import { getCurrentUser } from '@/lib/auth';
 import { getStripeCustomer, createStripeCustomerRecord } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
-    // Check authentication
-    const user = getCurrentUser();
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-    
     // Parse request body
-    const { planId } = await req.json();
+    const data = await req.json();
+    const { planId, userId, userEmail } = data;
     
-    if (!planId) {
+    if (!planId || !userId || !userEmail) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: planId, userId, userEmail' },
         { status: 400 }
       );
     }
@@ -39,23 +30,23 @@ export async function POST(req: NextRequest) {
     
     // Check if the user already has a Stripe customer ID
     let customerId;
-    const existingCustomer = await getStripeCustomer(user.id);
+    const existingCustomer = await getStripeCustomer(userId);
     
     if (existingCustomer) {
       customerId = existingCustomer.id;
     } else {
       // Create a new Stripe customer
-      customerId = await createStripeCustomer(user.email, user.id);
+      customerId = await createStripeCustomer(userEmail, userId);
       
       // Save the customer record in the database
-      await createStripeCustomerRecord(customerId, user.id, user.email);
+      await createStripeCustomerRecord(customerId, userId, userEmail);
     }
     
     // Create the checkout session
     const checkoutUrl = await createCheckoutSession(
       planId,
-      user.id,
-      user.email,
+      userId,
+      userEmail,
       customerId,
       plan
     );

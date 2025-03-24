@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { SubscriptionPlan } from '@/lib/types';
+import { useAuth } from '@/lib/AuthContext';
 
 interface StripeCheckoutButtonProps {
   plan: SubscriptionPlan;
@@ -13,9 +14,15 @@ export default function StripeCheckoutButton({
   className = '',
 }: StripeCheckoutButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const { user } = useAuth();
   
   const handleCheckout = async () => {
     try {
+      if (!user) {
+        alert('You must be logged in to subscribe');
+        return;
+      }
+      
       setIsLoading(true);
       
       // Make API call to create checkout session
@@ -26,11 +33,15 @@ export default function StripeCheckoutButton({
         },
         body: JSON.stringify({
           planId: plan.id,
+          userId: user.id,
+          userEmail: user.email
         }),
       });
       
       if (!response.ok) {
-        throw new Error('Failed to create checkout session');
+        const errorData = await response.json();
+        console.error('Checkout error response:', errorData);
+        throw new Error(errorData.error || 'Failed to create checkout session');
       }
       
       const { url } = await response.json();
@@ -38,6 +49,8 @@ export default function StripeCheckoutButton({
       // Redirect to Stripe checkout
       if (url) {
         window.location.href = url;
+      } else {
+        throw new Error('No checkout URL returned');
       }
     } catch (error) {
       console.error('Checkout error:', error);

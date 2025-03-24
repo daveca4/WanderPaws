@@ -2,9 +2,19 @@ import Stripe from 'stripe';
 import { SubscriptionPlan, UserSubscription } from './types';
 
 // Initialize Stripe with the secret key from environment variables
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
 });
+
+// Validate that required environment variables are set
+function validateEnvironmentVars() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('STRIPE_SECRET_KEY is not defined in environment variables');
+  }
+  if (!process.env.NEXT_PUBLIC_BASE_URL) {
+    console.warn('NEXT_PUBLIC_BASE_URL is not defined, using fallback');
+  }
+}
 
 export interface StripeCustomer {
   id: string;        // Stripe customer ID
@@ -16,6 +26,9 @@ export interface StripeCustomer {
 // Create a Stripe customer for a user
 export async function createStripeCustomer(email: string, userId: string): Promise<string> {
   try {
+    validateEnvironmentVars();
+    console.log('Creating Stripe customer for user:', userId, 'with email:', email);
+    
     const customer = await stripe.customers.create({
       email,
       metadata: {
@@ -23,10 +36,11 @@ export async function createStripeCustomer(email: string, userId: string): Promi
       },
     });
     
+    console.log('Stripe customer created with ID:', customer.id);
     return customer.id;
   } catch (error) {
     console.error('Error creating Stripe customer:', error);
-    throw new Error('Failed to create customer');
+    throw new Error(`Failed to create customer: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
@@ -39,8 +53,11 @@ export async function createCheckoutSession(
   plan: SubscriptionPlan
 ): Promise<string> {
   try {
+    validateEnvironmentVars();
+    console.log('Creating checkout session for plan:', planId, 'user:', userId);
+    
     // Create a product for the subscription plan if it doesn't exist
-    // In a production app, you'd likely create products through the Stripe dashboard or API
+    console.log('Creating Stripe product for plan:', plan.name);
     const product = await stripe.products.create({
       name: plan.name,
       description: plan.description,
@@ -50,13 +67,18 @@ export async function createCheckoutSession(
     });
     
     // Create a price for the product
+    console.log('Creating Stripe price for product:', product.id, 'amount:', plan.price);
     const price = await stripe.prices.create({
       product: product.id,
       unit_amount: plan.price,
       currency: 'gbp',
     });
     
+    // Determine the base URL for success/cancel URLs
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    
     // Create a checkout session
+    console.log('Creating Stripe checkout session');
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       customer: customerId,
@@ -67,21 +89,23 @@ export async function createCheckoutSession(
         },
       ],
       mode: 'payment',
-      success_url: `${process.env.NEXT_PUBLIC_BASE_URL}/owner-dashboard/subscriptions?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_BASE_URL}/owner-dashboard/subscriptions?canceled=true`,
+      success_url: `${baseUrl}/owner-dashboard/subscriptions?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/owner-dashboard/subscriptions?canceled=true`,
       metadata: {
         userId,
         planId,
+        planName: plan.name,
         walkCredits: plan.walkCredits.toString(),
         walkDuration: plan.walkDuration.toString(),
         validityPeriod: plan.validityPeriod.toString(),
       },
     });
     
+    console.log('Checkout session created with ID:', session.id, 'URL:', session.url);
     return session.url || '';
   } catch (error) {
     console.error('Error creating checkout session:', error);
-    throw new Error('Failed to create checkout session');
+    throw new Error(`Failed to create checkout session: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 

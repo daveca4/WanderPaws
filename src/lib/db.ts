@@ -1,11 +1,20 @@
 import { PrismaClient } from '@prisma/client';
 
 // Initialize Prisma client
-const prisma = new PrismaClient();
+let prisma: PrismaClient;
+
+try {
+  prisma = new PrismaClient();
+  console.log('Prisma client initialized successfully');
+} catch (error) {
+  console.error('Failed to initialize Prisma client:', error);
+  throw new Error('Database connection failed');
+}
 
 // Stripe Customer Functions
 export async function getStripeCustomer(userId: string) {
   try {
+    console.log('Getting Stripe customer for user:', userId);
     return await prisma.stripeCustomer.findUnique({
       where: {
         userId,
@@ -19,6 +28,7 @@ export async function getStripeCustomer(userId: string) {
 
 export async function createStripeCustomerRecord(stripeCustomerId: string, userId: string, email: string) {
   try {
+    console.log('Creating Stripe customer record:', stripeCustomerId, 'for user:', userId);
     return await prisma.stripeCustomer.create({
       data: {
         id: stripeCustomerId,
@@ -28,7 +38,7 @@ export async function createStripeCustomerRecord(stripeCustomerId: string, userI
     });
   } catch (error) {
     console.error('Error creating Stripe customer record:', error);
-    throw error;
+    throw new Error(`Failed to create Stripe customer record: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
