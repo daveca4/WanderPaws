@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
-import { mockWalks, mockDogs } from '@/lib/mockData';
+// Removed mock data import
 import { Walk, Dog } from '@/lib/types';
 
 export default function StartWalkPage({ params }: { params: { id: string } }) {

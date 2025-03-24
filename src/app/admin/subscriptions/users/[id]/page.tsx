@@ -3,13 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { 
-  mockUserSubscriptions,
-  mockSubscriptionPlans,
-  formatPrice
-} from '@/lib/mockSubscriptions';
-import { mockUsers } from '@/lib/mockUsers';
-import { mockOwners } from '@/lib/mockData';
+// Removed mock data import
+// Removed mock data import
+// Removed mock data import
 import { UserSubscription } from '@/lib/types';
 import RouteGuard from '@/components/RouteGuard';
 

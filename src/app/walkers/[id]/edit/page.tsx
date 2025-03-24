@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
-import { mockWalkers } from '@/lib/mockData';
+// Removed mock data import
 import { Walker, TimeSlot } from '@/lib/types';
 
 export default function EditWalker() {

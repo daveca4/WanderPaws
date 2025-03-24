@@ -6,7 +6,7 @@ import Link from 'next/link';
 import MediaUploader from '@/components/walks/MediaUploader';
 import { useAuth } from '@/lib/AuthContext';
 import { getBookingById } from '@/lib/mockBookings';
-import { mockDogs } from '@/lib/mockData';
+// Removed mock data import
 
 export default function WalkMediaPage({ params }: { params: { id: string } }) {
   const { user, loading } = useAuth();

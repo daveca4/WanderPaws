@@ -3,8 +3,8 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
-import { mockSubscriptionPlans } from '@/lib/mockSubscriptions';
-import { formatPrice, calculateDiscount, formatPricePerWalk } from '@/lib/mockSubscriptions';
+// Removed mock data import
+// Removed mock data import
 import { SubscriptionPlan } from '@/lib/types';
 
 export default function AdminSubscriptionsPage() {

@@ -20,16 +20,16 @@ function getWalkerPendingFeedbackCount(walkerId: string, walks: any[]): number {
   ).length;
 }
 
-// Mock function to get the number of pending owner requests
-function getOwnerPendingRequestsCount(ownerId?: string) {
-  // In a real app, this would be an API call
-  return 1;
+// Get count of real pending owner requests
+async function getOwnerPendingRequestsCount(ownerId?: string) {
+  // Return 0 until real API is implemented
+  return 0;
 }
 
-// Mock function to get the number of new dog profiles pending approval
-function getNewDogProfilesCount() {
-  // In a real app, this would be an API call
-  return 4;
+// Get count of new dog profiles pending approval
+async function getNewDogProfilesCount() {
+  // Return 0 until real API is implemented
+  return 0;
 }
 
 export function Sidebar() {

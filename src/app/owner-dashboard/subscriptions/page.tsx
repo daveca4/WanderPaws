@@ -5,11 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
-import { 
-  mockSubscriptionPlans, 
-  mockUserSubscriptions, 
-  getUserSubscriptions
-} from '@/lib/mockSubscriptions';
+// Removed mock data import
 import { SubscriptionPlan, UserSubscription } from '@/lib/types';
 import StripeCheckoutButton from '@/components/StripeCheckoutButton';
 

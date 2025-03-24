@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { mockOwners } from '@/lib/mockData';
+// Removed mock data import
 import NewDogForm from '@/components/NewDogForm';
 
 export default function AddDogPage() {

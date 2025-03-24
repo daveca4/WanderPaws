@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
-import { mockWalks, mockDogs } from '@/lib/mockData';
+// Removed mock data import
 import { Walk, Dog } from '@/lib/types';
 
 // Format date for display

@@ -7,15 +7,15 @@ import Image from 'next/image';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
 import { getDogsByOwnerId, getWalkerById } from '@/utils/helpers';
-import { getUserActiveSubscription } from '@/lib/mockSubscriptions';
+// Removed mock data import
 import { 
   getAvailableTimeSlots, 
   getTimeFromTimeSlot,
   isWalkerAvailable
 } from '@/lib/mockBookings';
 import { Dog, Walker } from '@/lib/types';
-import { mockWalkers, mockDogs } from '@/lib/mockData';
-import { mockSubscriptionPlans, mockUserSubscriptions } from '@/lib/mockSubscriptions';
+// Removed mock data import
+// Removed mock data import
 import { generateId } from '@/utils/helpers';
 import { v4 as uuidv4 } from 'uuid';
 

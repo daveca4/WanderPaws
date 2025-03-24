@@ -7,7 +7,7 @@ import Image from 'next/image';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
 import { getDogById } from '@/utils/helpers';
-import { createAssessment } from '@/lib/mockAssessments';
+// Removed mock data import
 import { Dog } from '@/lib/types';
 
 export default function AssessmentRequestPage({ params }: { params: { id: string } }) {

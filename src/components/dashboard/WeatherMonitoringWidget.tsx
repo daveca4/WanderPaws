@@ -72,14 +72,14 @@ export function WeatherMonitoringWidget() {
       setLocations(updatedLocations);
       locationsStorage = updatedLocations;
       
-      // Generate warnings based on weather conditions
-      const mockWarnings: WeatherWarning[] = [];
+      // Generate warnings based on weather conditions - real API implementation would be here
+      const warnings: WeatherWarning[] = [];
       updatedLocations.forEach(location => {
         if (!location.weather) return;
         
         // Create a warning if conditions meet criteria
         if (location.weather.condition === 'Rainy' && location.weather.precipitation > 70) {
-          mockWarnings.push({
+          warnings.push({
             id: `${location.id}-rain-${Date.now()}`,
             location: location.name,
             severity: 'yellow',
@@ -91,7 +91,7 @@ export function WeatherMonitoringWidget() {
         }
         
         if (location.weather.condition === 'Windy' && location.weather.wind > 25) {
-          mockWarnings.push({
+          warnings.push({
             id: `${location.id}-wind-${Date.now()}`,
             location: location.name,
             severity: 'amber',
@@ -103,7 +103,7 @@ export function WeatherMonitoringWidget() {
         }
         
         if (location.weather.condition === 'Snowy') {
-          mockWarnings.push({
+          warnings.push({
             id: `${location.id}-snow-${Date.now()}`,
             location: location.name,
             severity: 'red',
@@ -115,7 +115,7 @@ export function WeatherMonitoringWidget() {
         }
       });
       
-      setWarnings(mockWarnings);
+      setWarnings(warnings);
     } catch (error) {
       console.error('Error fetching weather data:', error);
     }

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
-import { mockDogs } from '@/lib/mockData';
+// Removed mock data import
 import { useAuth } from '@/lib/AuthContext';
 import { Dog } from '@/lib/types';
 

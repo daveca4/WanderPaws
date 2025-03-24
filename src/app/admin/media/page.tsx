@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import { S3Asset, getS3Assets, uploadFileToS3, getThumbnailUrl } from '@/lib/s3Service';
-import { mockWalks, mockDogs } from '@/lib/mockData';
+// Removed mock data import
 import RouteGuard from '@/components/RouteGuard';
 import MediaViewer from '@/components/MediaViewer';
 

@@ -1,4 +1,4 @@
-import { mockWalkers } from '@/lib/mockData';
+// Removed mock data import
 import Image from 'next/image';
 import Link from 'next/link';
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { mockOwners } from '@/lib/mockData';
+// Removed mock data import
 import { getDogsByOwnerId } from '@/lib/mockDogs';
 import { Dog } from '@/lib/types';
 import Image from 'next/image';

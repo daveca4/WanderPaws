@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
-import { mockDogs, mockWalks } from '@/lib/mockData';
+// Removed mock data import
 import { Dog } from '@/lib/types';
 
 export default function WalkerDogsPage() {

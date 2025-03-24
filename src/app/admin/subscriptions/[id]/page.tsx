@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import RouteGuard from '@/components/RouteGuard';
-import { mockSubscriptionPlans, formatPrice, calculateDiscount, formatPricePerWalk } from '@/lib/mockSubscriptions';
+// Removed mock data import
 import { SubscriptionPlan } from '@/lib/types';
 
 export default function SubscriptionDetailPage({ params }: { params: { id: string } }) {

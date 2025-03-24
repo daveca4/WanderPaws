@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import RouteGuard from '@/components/RouteGuard';
-import { getAssessmentById, updateAssessment } from '@/lib/mockAssessments';
+// Removed mock data import
 import { getDogById, getWalkerById, getOwnerById } from '@/utils/helpers';
 import { Assessment } from '@/lib/types';
 import { formatDate } from '@/utils/helpers';

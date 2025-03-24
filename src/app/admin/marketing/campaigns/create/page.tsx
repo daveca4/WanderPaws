@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
-import { mockSubscriptionPlans } from '@/lib/mockSubscriptions';
+// Removed mock data import
 
 // Mock audience segments for targeting options
 const audienceSegments = [

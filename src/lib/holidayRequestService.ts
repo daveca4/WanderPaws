@@ -5,37 +5,8 @@ const API_ENDPOINTS = {
   HOLIDAY_REQUESTS: '/api/holiday-requests',
 };
 
-// Mock data to use when the API is not available
-const MOCK_HOLIDAY_REQUESTS: HolidayRequest[] = [
-  {
-    id: 'mock-hr-1',
-    walkerId: 'walker-1',
-    date: '2023-09-01',
-    reason: 'Personal leave',
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  },
-  {
-    id: 'mock-hr-2',
-    walkerId: 'walker-2',
-    date: '2023-09-15',
-    reason: 'Doctor appointment',
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-];
-
-// Flag to toggle between real API and mock data
-const USE_MOCK_DATA = false;
-
 // Fetch all holiday requests
 export async function getHolidayRequests(): Promise<HolidayRequest[]> {
-  if (USE_MOCK_DATA) {
-    return MOCK_HOLIDAY_REQUESTS;
-  }
-  
   try {
     const response = await fetch(API_ENDPOINTS.HOLIDAY_REQUESTS);
     if (!response.ok) throw new Error('Failed to fetch holiday requests');
@@ -50,10 +21,6 @@ export async function getHolidayRequests(): Promise<HolidayRequest[]> {
 
 // Fetch pending holiday requests
 export async function getPendingHolidayRequests(): Promise<HolidayRequest[]> {
-  if (USE_MOCK_DATA) {
-    return MOCK_HOLIDAY_REQUESTS.filter(req => req.status === 'pending');
-  }
-  
   try {
     // Add timeout to prevent hanging requests
     const controller = new AbortController();
@@ -111,10 +78,6 @@ export async function getPendingHolidayRequests(): Promise<HolidayRequest[]> {
 
 // Get the count of pending holiday requests
 export async function getPendingHolidayRequestsCount(): Promise<number> {
-  if (USE_MOCK_DATA) {
-    return MOCK_HOLIDAY_REQUESTS.filter(req => req.status === 'pending').length;
-  }
-  
   try {
     const pendingRequests = await getPendingHolidayRequests();
     return pendingRequests.length;
@@ -127,10 +90,6 @@ export async function getPendingHolidayRequestsCount(): Promise<number> {
 
 // Fetch holiday requests for a specific walker
 export async function getWalkerHolidayRequests(walkerId: string): Promise<HolidayRequest[]> {
-  if (USE_MOCK_DATA) {
-    return MOCK_HOLIDAY_REQUESTS.filter(req => req.walkerId === walkerId);
-  }
-  
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
@@ -177,17 +136,6 @@ export async function getWalkerHolidayRequests(walkerId: string): Promise<Holida
 
 // Create a new holiday request
 export async function createHolidayRequest(requestData: Omit<HolidayRequest, 'id'>): Promise<HolidayRequest | undefined> {
-  if (USE_MOCK_DATA) {
-    const newRequest = {
-      ...requestData,
-      id: `mock-hr-${MOCK_HOLIDAY_REQUESTS.length + 1}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    MOCK_HOLIDAY_REQUESTS.push(newRequest);
-    return newRequest;
-  }
-  
   try {
     const response = await fetch(API_ENDPOINTS.HOLIDAY_REQUESTS, {
       method: 'POST',
@@ -211,19 +159,6 @@ export async function updateHolidayRequest(
   requestId: string,
   updateData: Partial<HolidayRequest>
 ): Promise<HolidayRequest | undefined> {
-  if (USE_MOCK_DATA) {
-    const index = MOCK_HOLIDAY_REQUESTS.findIndex(r => r.id === requestId);
-    if (index >= 0) {
-      MOCK_HOLIDAY_REQUESTS[index] = {
-        ...MOCK_HOLIDAY_REQUESTS[index],
-        ...updateData,
-        updatedAt: new Date().toISOString()
-      };
-      return MOCK_HOLIDAY_REQUESTS[index];
-    }
-    return undefined;
-  }
-  
   try {
     const response = await fetch(`${API_ENDPOINTS.HOLIDAY_REQUESTS}/${requestId}`, {
       method: 'PUT',

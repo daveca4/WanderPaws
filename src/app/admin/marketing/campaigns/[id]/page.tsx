@@ -10,7 +10,7 @@ import {
   Tooltip, Legend, ResponsiveContainer 
 } from 'recharts';
 import RouteGuard from '@/components/RouteGuard';
-import { formatPrice } from '@/lib/mockSubscriptions';
+// Removed mock data import
 
 // Define types for campaign data
 type DailyStat = {

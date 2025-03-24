@@ -10,7 +10,7 @@ import { RecentActivities } from '@/components/RecentActivities';
 import { AIRecommendations } from '@/components/AIRecommendations';
 import { AssessmentList } from '@/components/AssessmentList';
 import { getPastWalks } from '@/utils/helpers';
-import { mockWalks, mockDogs } from '@/lib/mockData';
+// Removed mock data import
 import Link from 'next/link';
 import Image from 'next/image';
 

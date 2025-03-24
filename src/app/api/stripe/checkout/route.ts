@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { getSubscriptionPlanById } from '@/lib/mockSubscriptions';
+// Removed mock data import
 import { getStripeCustomer, createStripeCustomerRecord } from '@/lib/db';
 
 // Initialize Stripe directly in the API route

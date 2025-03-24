@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
-import { getAssessmentById } from '@/lib/mockAssessments';
+// Removed mock data import
 import { getDogById, getOwnerById, formatDate } from '@/utils/helpers';
 import { Assessment, AssessmentFeedback } from '@/lib/types';
 

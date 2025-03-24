@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
-import { getAssessmentById, submitAssessmentFeedback, updateAssessment } from '@/lib/mockAssessments';
+// Removed mock data import
 import { getDogById, getOwnerById } from '@/utils/helpers';
 import { Assessment, AssessmentFeedback } from '@/lib/types';
 import { formatDate } from '@/utils/helpers';

@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react';
 import { Conversation, Message as MessageType, MessageAttachment } from '@/lib/types';
 import { useMessages } from '@/lib/MessageContext';
 import { useAuth } from '@/lib/AuthContext';
-import { mockUsers } from '@/lib/mockUsers';
 import { format } from 'date-fns';
 import Message from './Message';
 
@@ -15,27 +14,25 @@ interface MessagePanelProps {
 export default function MessagePanel({ conversation }: MessagePanelProps) {
   const { messages, sendMessage } = useMessages();
   const { user } = useAuth();
-  const [messageText, setMessageText] = useState('');
-  const [isSending, setIsSending] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const conversationMessages = messages.filter(msg => msg.conversationId === conversation.id);
 
-  // Get conversation title (group name or participant names)
+  // Get conversation title - replace mockUser with user ID when real user service is implemented
   const getConversationTitle = () => {
     if (conversation.title) return conversation.title;
     
-    if (user) {
-      const otherParticipantIds = conversation.participants.filter(id => id !== user.id);
-      const otherParticipants = otherParticipantIds.map(id => {
-        const participant = mockUsers.find(u => u.id === id);
-        return participant ? participant.email.split('@')[0] : 'Unknown User';
-      });
+    // For direct messages, show the other participant's name
+    if (conversation.type === 'direct') {
+      const otherParticipantId = conversation.participants.find(id => id !== user?.id);
       
-      return otherParticipants.join(', ');
+      // Use the participant ID as a fallback until real user service is implemented
+      return otherParticipantId || 'Conversation';
     }
     
-    return 'Conversation';
+    return 'Group Conversation';
   };
 
   // Scroll to bottom when messages change
@@ -50,18 +47,14 @@ export default function MessagePanel({ conversation }: MessagePanelProps) {
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!messageText.trim() && attachments.length === 0) return;
-    
-    setIsSending(true);
+    if (!newMessage.trim() && attachments.length === 0) return;
     
     try {
-      await sendMessage(messageText, attachments.length > 0 ? attachments : undefined);
-      setMessageText('');
+      await sendMessage(newMessage, attachments.length > 0 ? attachments : undefined);
+      setNewMessage('');
       setAttachments([]);
     } catch (error) {
       console.error('Error sending message:', error);
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -143,13 +136,13 @@ export default function MessagePanel({ conversation }: MessagePanelProps) {
       
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-        {messages.length === 0 ? (
+        {conversationMessages.length === 0 ? (
           <div className="text-center py-8">
             <p className="text-gray-500">No messages yet</p>
             <p className="text-sm text-gray-400">Be the first to send a message!</p>
           </div>
         ) : (
-          messages.map(message => (
+          conversationMessages.map(message => (
             <Message 
               key={message.id} 
               message={message} 
@@ -170,8 +163,8 @@ export default function MessagePanel({ conversation }: MessagePanelProps) {
                 className="block w-full rounded-lg border border-gray-300 shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm p-2"
                 placeholder="Type your message..."
                 rows={1}
-                value={messageText}
-                onChange={(e) => setMessageText(e.target.value)}
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -198,7 +191,6 @@ export default function MessagePanel({ conversation }: MessagePanelProps) {
             />
             <button
               type="submit"
-              disabled={isSending || (!messageText.trim() && attachments.length === 0)}
               className="inline-flex items-center p-2 rounded-full text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50"
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

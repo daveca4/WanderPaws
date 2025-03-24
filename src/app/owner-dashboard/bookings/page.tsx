@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import RouteGuard from '@/components/RouteGuard';
-import { mockWalks, mockDogs } from '@/lib/mockData';
+// Removed mock data import
 import { useAuth } from '@/lib/AuthContext';
 import { formatDate, formatTime, getDogById, getWalkerById } from '@/utils/helpers';
 import { Walk } from '@/lib/types';

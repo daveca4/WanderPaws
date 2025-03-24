@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
-import { mockWalks, mockDogs } from '@/lib/mockData';
+// Removed mock data import
 import { Walk, Dog } from '@/lib/types';
 
 // Format date for display

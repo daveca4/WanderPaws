@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { Message as MessageType } from '@/lib/types';
-import { mockUsers } from '@/lib/mockUsers';
 import { format } from 'date-fns';
 
 interface MessageProps {
@@ -15,8 +14,8 @@ export default function Message({ message, isOwnMessage }: MessageProps) {
   
   // Get sender name
   const getSenderName = () => {
-    const sender = mockUsers.find(u => u.id === message.senderId);
-    return sender ? sender.email.split('@')[0] : 'Unknown User';
+    // Return a placeholder until real user service is implemented
+    return message.senderId || 'Unknown User';
   };
   
   // Determine if the message has any attachments

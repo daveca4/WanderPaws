@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { mockWalkers } from '@/lib/mockData';
+// Removed mock data import
 import { useAuth } from '@/lib/AuthContext';
 import { TimeSlot } from '@/lib/types';
 
