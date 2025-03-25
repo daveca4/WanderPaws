@@ -42,7 +42,7 @@ const WORKFLOW_STEPS = [
 
 export function WorkflowProgress() {
   const { user } = useAuth();
-  const { dogs, assessments, walks, userSubscriptions } = useData();
+  const { dogs = [], assessments = [], walks = [], userSubscriptions = [] } = useData();
   const [workflowStatus, setWorkflowStatus] = useState<
     {step: string; completed: boolean; enabled: boolean}[]
   >([]);
@@ -70,7 +70,7 @@ export function WorkflowProgress() {
 
       // Step 4: Buy Subscription - check if user has an active subscription
       const now = new Date();
-      const activeSubscription = userSubscriptions.find(sub => 
+      const activeSubscription = userSubscriptions?.find(sub => 
         sub.userId === user.id && 
         sub.status === 'active' && 
         new Date(sub.endDate) >= now
@@ -134,7 +134,7 @@ export function WorkflowProgress() {
                 key={step.title}
                 href={status?.enabled ? step.href : "#"}
                 className={`relative flex flex-col items-center p-4 rounded-lg border-2 ${borderColor} ${bgColor} ${!status?.enabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-md transition-shadow'}`}
-                onClick={(e) => !status?.enabled && e.preventDefault()}
+                onClick={(e: React.MouseEvent<HTMLAnchorElement>) => !status?.enabled && e.preventDefault()}
               >
                 <div className={`rounded-full p-2 mb-2 ${status?.completed ? 'bg-green-100' : (status?.enabled ? 'bg-blue-100' : 'bg-gray-200')}`}>
                   <svg 

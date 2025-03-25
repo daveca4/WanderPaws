@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, ReactNode } from 'react';
-import { Dog, Owner, Walker, Walk, Assessment, Message, Conversation, User } from './types';
+import { Dog, Owner, Walker, Walk, Assessment, Message, Conversation, User, UserSubscription, SubscriptionPlan } from './types';
 
 // Create a context with initial empty values
 interface DataContextType {
@@ -13,6 +13,8 @@ interface DataContextType {
   users: User[];
   messages: Message[];
   conversations: Conversation[];
+  userSubscriptions: UserSubscription[];
+  subscriptionPlans: SubscriptionPlan[];
   // These functions return empty data for backward compatibility
   getDogById: (id: string) => Dog | undefined;
   getOwnerById: (id: string) => Owner | undefined;
@@ -46,6 +48,8 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     users: [],
     messages: [],
     conversations: [],
+    userSubscriptions: [],
+    subscriptionPlans: [],
     // Return undefined for all getById functions
     getDogById: () => undefined,
     getOwnerById: () => undefined,
