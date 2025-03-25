@@ -8,7 +8,10 @@ export async function POST(req: NextRequest) {
     const data = await req.json();
     const { email, password } = data;
     
+    console.log('Login attempt for email:', email);
+    
     if (!email || !password) {
+      console.log('Missing email or password');
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
@@ -16,11 +19,25 @@ export async function POST(req: NextRequest) {
     }
     
     // Find the user
+    console.log('Finding user in database...');
     const user = await prisma.user.findUnique({
       where: { email },
+      include: {
+        owner: true,
+        walker: true
+      }
     });
     
-    if (!user || !user.passwordHash) {
+    if (!user) {
+      console.log('User not found');
+      return NextResponse.json(
+        { error: 'Invalid email or password' },
+        { status: 401 }
+      );
+    }
+
+    if (!user.passwordHash) {
+      console.log('User has no password hash');
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
@@ -28,17 +45,18 @@ export async function POST(req: NextRequest) {
     }
     
     // Verify password
+    console.log('Verifying password...');
     const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     
     if (!isPasswordValid) {
+      console.log('Invalid password');
       return NextResponse.json(
         { error: 'Invalid email or password' },
         { status: 401 }
       );
     }
     
-    // The lastLogin field doesn't exist in the schema, so we don't need to update it
-    // Just use the current time for the response
+    console.log('Login successful');
     const currentLoginTime = new Date().toISOString();
     
     // Remove sensitive data
@@ -50,7 +68,7 @@ export async function POST(req: NextRequest) {
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
       lastLogin: currentLoginTime,
-      profileId: ""
+      profileId: user.role === 'owner' ? user.owner?.id : user.walker?.id || ""
     };
     
     return NextResponse.json({
@@ -58,7 +76,7 @@ export async function POST(req: NextRequest) {
       user: userResponse,
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Login error:', error instanceof Error ? error.stack : error);
     return NextResponse.json(
       { error: 'An error occurred during login' },
       { status: 500 }

@@ -1,11 +1,17 @@
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
-import { getPastWalks, getDogById, getWalkerById, formatDate, formatTime } from '@/utils/helpers';
+import { useData } from '@/lib/DataContext';
+import { getPastWalks, formatDate, formatTime } from '@/utils/helpers';
 
 export function RecentActivities() {
   const { user } = useAuth();
+  const { walks, dogs, walkers } = useData();
   const walkerId = user?.profileId || undefined;
-  const recentWalks = getPastWalks(undefined, 5, walkerId);
+  const recentWalks = getPastWalks(walks, 5, walkerId);
+  
+  // Helper functions
+  const getDogById = (id: string) => dogs.find(dog => dog.id === id);
+  const getWalkerById = (id: string) => walkers.find(walker => walker.id === id);
   
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
@@ -39,7 +45,7 @@ export function RecentActivities() {
                 <div className="flex-1 pb-6">
                   <div className="flex items-center mb-1">
                     <h3 className="text-sm font-medium text-gray-900">
-                      {dog.name} completed a {walk.metrics?.distanceCovered.toFixed(1)} km walk
+                      {dog.name} completed a {walk.metrics?.distanceCovered ? walk.metrics.distanceCovered.toFixed(1) : '0'} km walk
                     </h3>
                     <span className="ml-auto text-xs text-gray-500">
                       {formatDate(walk.date)} at {formatTime(walk.startTime)}
@@ -49,7 +55,7 @@ export function RecentActivities() {
                   <div className="flex items-center mt-2 bg-gray-50 p-3 rounded-lg">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 relative flex-shrink-0">
                       <Image
-                        src={dog.imageUrl || 'https://via.placeholder.com/40'}
+                        src={dog.imageUrl || '/images/default-dog.png'}
                         alt={dog.name}
                         width={40}
                         height={40}

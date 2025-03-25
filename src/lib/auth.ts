@@ -16,6 +16,12 @@ export const permissions = {
   BOOK_WALKS: 'book_walks' as Permission,
   VIEW_OWN_WALKS: 'view_own_walks' as Permission,
   CANCEL_OWN_WALKS: 'cancel_own_walks' as Permission,
+  ACCESS_OWNER_DASHBOARD: 'access_owner-dashboard' as Permission,
+  CREATE_DOGS: 'create_dogs' as Permission,
+  READ_DOGS: 'read_dogs' as Permission,
+  READ_SUBSCRIPTION_PLANS: 'read_subscription_plans' as Permission,
+  READ_WALKS: 'read_walks' as Permission,
+  CREATE_WALKS: 'create_walks' as Permission,
   
   // Walker permissions
   MANAGE_WALKER_PROFILE: 'manage_walker_profile' as Permission,
@@ -42,6 +48,12 @@ export const rolePermissions: Record<Role, Permission[]> = {
     permissions.BOOK_WALKS,
     permissions.VIEW_OWN_WALKS,
     permissions.CANCEL_OWN_WALKS,
+    permissions.ACCESS_OWNER_DASHBOARD,
+    permissions.CREATE_DOGS,
+    permissions.READ_DOGS,
+    permissions.READ_SUBSCRIPTION_PLANS,
+    permissions.READ_WALKS,
+    permissions.CREATE_WALKS,
   ],
   walker: [
     permissions.MANAGE_WALKER_PROFILE,
@@ -62,6 +74,36 @@ export function hasPermission(user: User | null, action: string, resource: strin
   
   // Admin role always has access to everything
   if (user.role === 'admin') {
+    return true;
+  }
+  
+  // Special case for walkers accessing media
+  if (user.role === 'walker' && action === 'upload_walk_media' && resource === 'media') {
+    return true;
+  }
+  
+  // Special case for owners accessing owner-dashboard
+  if (user.role === 'owner' && action === 'access' && resource === 'owner-dashboard') {
+    return true;
+  }
+  
+  // Special case for owners creating dogs
+  if (user.role === 'owner' && action === 'create' && resource === 'dogs') {
+    return true;
+  }
+  
+  // Special case for owners reading dogs
+  if (user.role === 'owner' && action === 'read' && resource === 'dogs') {
+    return true;
+  }
+  
+  // Special case for owners reading subscription plans
+  if (user.role === 'owner' && action === 'read' && resource === 'subscription_plans') {
+    return true;
+  }
+  
+  // Special case for owners reading and creating walks
+  if (user.role === 'owner' && (action === 'read' || action === 'create') && resource === 'walks') {
     return true;
   }
   

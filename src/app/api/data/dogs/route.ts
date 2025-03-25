@@ -19,6 +19,18 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
+    
+    // Validate required fields
+    if (!data.name) {
+      return NextResponse.json({ error: 'Dog name is required' }, { status: 400 });
+    }
+    
+    if (!data.ownerId) {
+      return NextResponse.json({ error: 'Owner ID is required' }, { status: 400 });
+    }
+    
+    console.log('Creating dog with owner ID:', data.ownerId);
+    
     const newDog = await dbOps.createDog(data);
     
     // Parse any JSON fields in the response
@@ -27,6 +39,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(parsedDog, { status: 201 });
   } catch (error) {
     console.error('Error creating dog:', error);
-    return NextResponse.json({ error: 'Failed to create dog' }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    // Send a more descriptive error message to the client
+    return NextResponse.json({ 
+      error: `Failed to create dog: ${errorMessage}`,
+      details: error instanceof Error ? error.toString() : undefined
+    }, { status: 500 });
   }
 } 

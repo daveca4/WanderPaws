@@ -369,7 +369,7 @@ export default function WalkerMediaPage() {
   }
 
   return (
-    <RouteGuard requiredPermission={{ action: 'access', resource: 'walker-dashboard' }}>
+    <RouteGuard requiredPermission={{ action: 'upload_walk_media', resource: 'media' }}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

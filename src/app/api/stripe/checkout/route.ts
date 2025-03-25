@@ -1,12 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-// Removed mock data import
+import prisma from '@/lib/db';
 import { getStripeCustomer, createStripeCustomerRecord } from '@/lib/db';
 
 // Initialize Stripe directly in the API route
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16' as Stripe.LatestApiVersion,
 });
+
+// Function to get a subscription plan by ID from the database
+async function getSubscriptionPlanById(planId: string) {
+  try {
+    const plan = await prisma.subscriptionPlan.findUnique({
+      where: { id: planId }
+    });
+    return plan;
+  } catch (error) {
+    console.error('Error getting subscription plan:', error);
+    return null;
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Get the subscription plan
-    const plan = getSubscriptionPlanById(planId);
+    const plan = await getSubscriptionPlanById(planId);
     if (!plan) {
       return NextResponse.json(
         { error: 'Subscription plan not found' },
@@ -96,7 +109,7 @@ export async function POST(req: NextRequest) {
         planName: plan.name,
         walkCredits: plan.walkCredits.toString(),
         walkDuration: plan.walkDuration.toString(),
-        validityPeriod: plan.validityPeriod.toString(),
+        validityDays: '30', // Fixed value for validity period
       },
     });
     

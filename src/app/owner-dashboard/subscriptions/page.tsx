@@ -5,34 +5,23 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
-// Removed mock data import
+import { useData } from '@/lib/DataContext';
 import { SubscriptionPlan, UserSubscription } from '@/lib/types';
 import StripeCheckoutButton from '@/components/StripeCheckoutButton';
 
 export default function SubscriptionsPage() {
   const { user } = useAuth();
+  const { subscriptionPlans, userSubscriptions } = useData();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
-  const [userSubscriptions, setUserSubscriptions] = useState<UserSubscription[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   useEffect(() => {
     if (!user) return;
     
-    const loadData = () => {
-      // Get all active subscription plans
-      setPlans(mockSubscriptionPlans.filter(plan => plan.isActive));
-      
-      // Get user's subscriptions
-      const subscriptions = getUserSubscriptions(user.id);
-      setUserSubscriptions(subscriptions);
-      
-      setLoading(false);
-    };
-    
-    setTimeout(loadData, 500);
+    // Data should be loaded from the DataContext
+    setLoading(false);
     
     // Check for success parameter in URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -41,9 +30,8 @@ export default function SubscriptionsPage() {
     
     if (success === 'true' && sessionId) {
       setSuccessMessage('Payment successful! Your subscription has been activated.');
-      loadData(); // Reload data to get the new subscription
     }
-  }, [user]);
+  }, [user, subscriptionPlans, userSubscriptions]);
   
   const handleSelectPlan = (planId: string) => {
     setSelectedPlanId(planId);
@@ -62,6 +50,9 @@ export default function SubscriptionsPage() {
       </div>
     );
   }
+  
+  // Get active plans
+  const activePlans = subscriptionPlans.filter(plan => plan.isActive);
   
   // Format prices (in pence) to pounds
   const formatPrice = (price: number) => {
@@ -136,7 +127,7 @@ export default function SubscriptionsPage() {
                 </h3>
                 <div className="mt-2 text-sm text-green-700">
                   <p>
-                    You have an active {plans.find(p => p.id === activeSubscription.planId)?.name} plan with {activeSubscription.creditsRemaining} walk credits remaining.
+                    You have an active {subscriptionPlans.find(p => p.id === activeSubscription.planId)?.name} plan with {activeSubscription.creditsRemaining} walk credits remaining.
                     Valid until {new Date(activeSubscription.endDate).toLocaleDateString()}.
                   </p>
                 </div>
@@ -157,7 +148,7 @@ export default function SubscriptionsPage() {
 
         {/* Subscription Plans */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((plan) => {
+          {activePlans.map((plan) => {
             const isPopular = plan.id === 'plan2'; // Mark the middle plan as popular
             
             return (
@@ -270,10 +261,10 @@ export default function SubscriptionsPage() {
         {selectedPlanId && (
           <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-between items-center shadow-lg transform transition-transform duration-300 z-10">
             <div className="text-gray-800 font-semibold">
-              Selected: {plans.find(p => p.id === selectedPlanId)?.name}
+              Selected: {subscriptionPlans.find(p => p.id === selectedPlanId)?.name}
             </div>
             <StripeCheckoutButton 
-              plan={plans.find(p => p.id === selectedPlanId)!} 
+              plan={subscriptionPlans.find(p => p.id === selectedPlanId)!} 
               buttonText="Subscribe Now"
             />
           </div>

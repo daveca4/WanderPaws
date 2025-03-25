@@ -3,24 +3,24 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
+import { useData } from '@/lib/DataContext';
 import { DashboardSummary } from '@/components/DashboardSummary';
 import { UpcomingWalks } from '@/components/UpcomingWalks';
 import { DogList } from '@/components/DogList';
 import { RecentActivities } from '@/components/RecentActivities';
-import { AIRecommendations } from '@/components/AIRecommendations';
 import { AssessmentList } from '@/components/AssessmentList';
 import { getPastWalks } from '@/utils/helpers';
-// Removed mock data import
 import Link from 'next/link';
 import Image from 'next/image';
 
 function PendingFeedback() {
   const { user } = useAuth();
+  const { walks } = useData();
   
   if (!user?.profileId) return null;
   
   // Get completed walks without feedback
-  const completedWalks = getPastWalks(undefined, undefined, user.profileId);
+  const completedWalks = getPastWalks(walks, undefined, user.profileId);
   const pendingFeedback = completedWalks.filter(walk => !walk.feedback);
   
   if (pendingFeedback.length === 0) return null;
@@ -80,12 +80,14 @@ function PendingFeedback() {
 // New component to display upcoming group walks
 function UpcomingGroupWalks() {
   const { user } = useAuth();
+  const { walks } = useData();
   
   if (!user?.profileId) return null;
   
   // Find upcoming walks that are part of group walks (multiple dogs in same time slot)
-  const upcomingWalks = mockWalks.filter(
-    walk => walk.walkerId === user.profileId && walk.status === 'scheduled'
+  const upcomingWalks = walks.filter(walk => 
+    walk.walkerId === user.profileId && 
+    walk.status === 'scheduled'
   );
   
   // Group by date and time slot
@@ -159,6 +161,7 @@ function UpcomingGroupWalks() {
 
 export default function WalkerDashboard() {
   const { user, loading } = useAuth();
+  const { walks } = useData();
   const router = useRouter();
 
   // Redirect if not a walker or admin
@@ -178,7 +181,7 @@ export default function WalkerDashboard() {
   }
   
   // Get completed walks without feedback
-  const completedWalks = getPastWalks(undefined, undefined, user.profileId);
+  const completedWalks = getPastWalks(walks, undefined, user.profileId);
   const needsFeedbackCount = completedWalks.filter(walk => !walk.feedback).length;
 
   return (
@@ -244,7 +247,6 @@ export default function WalkerDashboard() {
         <div className="space-y-6">
           <AssessmentList />
           <DogList />
-          <AIRecommendations />
         </div>
       </div>
     </div>

@@ -1,17 +1,37 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
-import { getDogById } from '@/utils/helpers';
-// Removed mock data import
-import { Dog } from '@/lib/types';
+import { useData } from '@/lib/DataContext';
+import { getDogById, generateId } from '@/utils/helpers';
+import { Dog, Assessment } from '@/lib/types';
+import { use } from 'react';
 
-export default function AssessmentRequestPage({ params }: { params: { id: string } }) {
+// Helper function to create a new assessment
+function createAssessment(dogId: string, ownerId: string): Assessment {
+  const today = new Date();
+  const scheduledDate = new Date(today);
+  scheduledDate.setDate(today.getDate() + 3); // Schedule 3 days from now
+  
+  return {
+    id: generateId('assessment'),
+    dogId,
+    ownerId,
+    createdDate: today.toISOString(),
+    scheduledDate: scheduledDate.toISOString(),
+    status: 'pending',
+  };
+}
+
+export default function AssessmentRequestPage() {
+  const params = useParams();
+  const dogId = params.id as string;
   const { user } = useAuth();
+  const { dogs } = useData();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -19,41 +39,56 @@ export default function AssessmentRequestPage({ params }: { params: { id: string
   
   // Load the dog
   useEffect(() => {
-    if (!user) return;
+    if (!user || !dogs.length) return;
     
     const loadDog = () => {
-      const foundDog = getDogById(params.id);
+      console.log("Loading dog with ID:", dogId);
+      const foundDog = getDogById(dogs, dogId);
+      console.log("Found dog:", foundDog);
+      
       if (foundDog && foundDog.ownerId === user.profileId) {
         setDog(foundDog);
       }
       setLoading(false);
     };
     
-    setTimeout(loadDog, 500);
-  }, [params.id, user]);
+    loadDog(); // Remove setTimeout to load immediately
+  }, [dogId, user, dogs]);
   
-  const handleRequestAssessment = () => {
+  const handleRequestAssessment = async () => {
     if (!dog || !user) return;
     
     setSubmitting(true);
     
-    // In a real app, this would be an API call
-    // For demo, simulate creating an assessment
-    setTimeout(() => {
-      const today = new Date();
-      const scheduledDate = new Date(today);
-      scheduledDate.setDate(today.getDate() + 3); // Schedule 3 days from now
+    try {
+      // Create an actual assessment in the database
+      const response = await fetch('/api/data/assessments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          dogId: dog.id,
+          ownerId: user.profileId || '',
+          status: 'pending',
+          scheduledDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString() // 3 days from now
+        })
+      });
       
-      const newAssessment = createAssessment(
-        dog.id,
-        user.profileId || ''
-      );
-      
-      console.log('Assessment requested:', newAssessment);
-      
-      // Redirect to subscription page to continue the flow
-      router.push('/owner-dashboard/subscriptions');
-    }, 1000);
+      if (response.ok) {
+        console.log('Assessment created successfully');
+        // Redirect to subscription page to continue the flow
+        router.push('/owner-dashboard/subscriptions');
+      } else {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to create assessment');
+      }
+    } catch (error) {
+      console.error('Error creating assessment:', error);
+      alert('Failed to create assessment. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
   
   if (loading) {

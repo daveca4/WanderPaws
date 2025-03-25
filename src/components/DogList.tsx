@@ -2,68 +2,12 @@ import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
-import { fetchDogs, fetchOwners, fetchWalks, getDogsByOwnerId } from '@/utils/dataHelpers';
+import { useData } from '@/lib/DataContext';
 import { Dog, Owner, Walk } from '@/lib/types';
 
-export default function DogList() {
+export function DogList() {
   const { user } = useAuth();
-  
-  const [dogs, setDogs] = useState<Dog[]>([]);
-  const [owners, setOwners] = useState<Owner[]>([]);
-  const [walks, setWalks] = useState<Walk[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  useEffect(() => {
-    async function loadData() {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Fetch all necessary data in parallel
-        const [dogsData, ownersData, walksData] = await Promise.all([
-          fetchDogs(),
-          fetchOwners(),
-          fetchWalks()
-        ]);
-        
-        setDogs(dogsData);
-        setOwners(ownersData);
-        setWalks(walksData);
-      } catch (err) {
-        console.error('Error fetching dog data:', err);
-        setError('Failed to load dog data');
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    loadData();
-  }, []);
-  
-  // Handle loading state
-  if (loading) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Dogs</h2>
-        <div className="text-center py-6">
-          <p className="text-gray-500">Loading dogs...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  // Handle error state
-  if (error) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Dogs</h2>
-        <div className="text-center py-6">
-          <p className="text-red-500">{error}</p>
-        </div>
-      </div>
-    );
-  }
+  const { dogs, owners, walks } = useData();
   
   // If user is an owner, show only their dogs
   // If user is a walker, show dogs they've walked

@@ -9,11 +9,11 @@ export interface Dog {
   ownerId: string;
   imageUrl?: string;
   profileImage?: string; // Added for DogList component
-  walkingPreferences: {
-    frequency: number; // walks per week
-    duration: number; // minutes per walk
-    preferredTimes: string[]; // e.g., "morning", "afternoon", "evening"
-    preferredRoutes?: string[];
+  address: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
   };
   assessmentStatus?: 'pending' | 'approved' | 'denied' | 'not_required'; // Dog assessment status
   weight?: number; // Dog's weight in kg for health assessment

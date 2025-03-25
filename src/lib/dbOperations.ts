@@ -42,6 +42,15 @@ export async function getDogsByOwnerId(ownerId: string) {
 
 export async function createDog(dogData: any) {
   try {
+    // First verify that the owner exists
+    const ownerExists = await prisma.owner.findUnique({
+      where: { id: dogData.ownerId }
+    });
+    
+    if (!ownerExists) {
+      throw new Error(`Owner with ID ${dogData.ownerId} not found. Cannot create dog without valid owner.`);
+    }
+    
     return await prisma.dog.create({
       data: dogData,
     });

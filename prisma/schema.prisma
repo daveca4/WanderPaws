@@ -99,7 +99,7 @@ model Dog {
   ownerId           String
   owner             Owner    @relation(fields: [ownerId], references: [id])
   imageUrl          String?
-  walkingPreferences Json    // Stored as JSON object
+  address           Json    // Stored as JSON object with street, city, state, zip
   assessmentStatus  String?  // 'pending', 'approved', 'denied', 'not_required'
   walks             Walk[]
   createdAt         DateTime @default(now())
@@ -153,6 +153,12 @@ model Walk {
   route        Json?    // Stored as JSON object
   feedback     Json?    // Stored as JSON object
   metrics      Json?    // Stored as JSON object
+  pickupLocation Json?   // Stored as JSON: { lat: number, lng: number, timestamp: string }
+  dropoffLocation Json?  // Stored as JSON: { lat: number, lng: number, timestamp: string }
+  walkStartLocation Json? // Stored as JSON: { lat: number, lng: number, timestamp: string }
+  walkEndLocation Json?   // Stored as JSON: { lat: number, lng: number, timestamp: string }
+  routeCoordinates Json?  // Stored as JSON array of coordinates: [{ lat, lng, timestamp }]
+  isTrackingActive Boolean @default(false)
   subscriptionId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

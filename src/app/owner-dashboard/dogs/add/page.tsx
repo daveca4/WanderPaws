@@ -19,10 +19,11 @@ export default function AddDogPage() {
     temperament: [] as string[],
     specialNeeds: [] as string[],
     imageUrl: '',
-    walkingPreferences: {
-      frequency: 3,
-      duration: 60,
-      preferredTimes: [] as string[],
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      zip: ''
     },
     newTemperament: '',
     newSpecialNeed: ''
@@ -33,34 +34,19 @@ export default function AddDogPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
-    // Handle nested properties for walking preferences
-    if (name.includes('walkingPreferences.')) {
-      const preference = name.split('.')[1];
+    // Handle nested properties for address
+    if (name.includes('address.')) {
+      const addressField = name.split('.')[1];
       setFormData(prev => ({
         ...prev,
-        walkingPreferences: {
-          ...prev.walkingPreferences,
-          [preference]: value
+        address: {
+          ...prev.address,
+          [addressField]: value
         }
       }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
-  };
-
-  const handlePreferredTimeChange = (time: string) => {
-    const currentTimes = formData.walkingPreferences.preferredTimes;
-    const updatedTimes = currentTimes.includes(time)
-      ? currentTimes.filter(t => t !== time)
-      : [...currentTimes, time];
-    
-    setFormData(prev => ({
-      ...prev,
-      walkingPreferences: {
-        ...prev.walkingPreferences,
-        preferredTimes: updatedTimes
-      }
-    }));
   };
 
   const handleAddTemperament = () => {
@@ -97,6 +83,37 @@ export default function AddDogPage() {
     }));
   };
 
+  const ensureOwnerProfile = async () => {
+    if (!user) return null;
+    
+    try {
+      // Call the API to ensure owner profile exists
+      const response = await fetch('/api/data/owners/ensure', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          name: user.name || 'Dog Owner',
+          email: user.email,
+          phone: ''
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to ensure owner profile');
+      }
+      
+      const ownerData = await response.json();
+      return ownerData.id; // Return the owner ID
+    } catch (error) {
+      console.error('Error ensuring owner profile:', error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
@@ -104,34 +121,53 @@ export default function AddDogPage() {
     
     setLoading(true);
     
-    // In a real app, this would be an API call
-    // For demo, simulate creating a dog
-    setTimeout(() => {
-      // Create a new dog ID
-      const newDog = {
-        id: generateId('dog'),
+    try {
+      // First ensure the owner profile exists
+      const ownerId = user.profileId || await ensureOwnerProfile();
+      
+      if (!ownerId) {
+        throw new Error("Could not find or create owner profile");
+      }
+      
+      const dogData = {
         name: formData.name,
         breed: formData.breed,
         age: Number(formData.age),
         size: formData.size,
         temperament: formData.temperament,
         specialNeeds: formData.specialNeeds,
-        ownerId: user.profileId || '',
-        walkingPreferences: {
-          frequency: Number(formData.walkingPreferences.frequency),
-          duration: Number(formData.walkingPreferences.duration),
-          preferredTimes: formData.walkingPreferences.preferredTimes
-        },
-        // Set assessment status to pending to trigger assessment process
+        ownerId: ownerId,
+        address: formData.address,
         assessmentStatus: 'pending'
       };
       
-      // In a real app, save this to the database
+      console.log('Submitting new dog:', dogData);
+      
+      // Call the API to save the dog
+      const response = await fetch('/api/data/dogs', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(dogData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create dog');
+      }
+      
+      const newDog = await response.json();
       console.log('New dog created:', newDog);
       
-      // Redirect to request assessment page
+      // Redirect to assessment request page
       router.push(`/owner-dashboard/dogs/assessment-request/${newDog.id}`);
-    }, 1000);
+    } catch (error) {
+      console.error('Error saving dog:', error);
+      alert(`Failed to save dog: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -304,101 +340,68 @@ export default function AddDogPage() {
               </div>
             </div>
 
-            {/* Walking Preferences */}
+            {/* Address Section */}
             <div>
-              <h2 className="text-lg font-medium text-gray-900">Walking Preferences</h2>
+              <h2 className="text-lg font-medium text-gray-900">Address Information</h2>
               <div className="mt-4 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-4">
-                <div>
-                  <label htmlFor="walkingPreferences.frequency" className="block text-sm font-medium text-gray-700">
-                    How many walks per week?
+                <div className="sm:col-span-2">
+                  <label htmlFor="address.street" className="block text-sm font-medium text-gray-700">
+                    Street Address
                   </label>
                   <input
-                    type="number"
-                    id="walkingPreferences.frequency"
-                    name="walkingPreferences.frequency"
-                    min="1"
-                    max="7"
+                    type="text"
+                    id="address.street"
+                    name="address.street"
                     required
-                    value={formData.walkingPreferences.frequency}
+                    value={formData.address.street}
                     onChange={handleChange}
                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <label htmlFor="walkingPreferences.duration" className="block text-sm font-medium text-gray-700">
-                    Walk Duration
+                <div>
+                  <label htmlFor="address.city" className="block text-sm font-medium text-gray-700">
+                    City
                   </label>
                   <input
                     type="text"
-                    id="walkingPreferences.duration"
-                    name="walkingPreferences.duration"
-                    value="60"
-                    disabled
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100 text-gray-700 sm:text-sm"
+                    id="address.city"
+                    name="address.city"
+                    required
+                    value={formData.address.city}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                   />
-                  <p className="mt-2 text-sm text-gray-500">
-                    All walks are 60 minutes in duration
-                  </p>
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Preferred walking times
+                <div>
+                  <label htmlFor="address.state" className="block text-sm font-medium text-gray-700">
+                    State / Province
                   </label>
-                  <div className="mt-2 space-y-2">
-                    <div className="relative flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="morning"
-                          name="morning"
-                          type="checkbox"
-                          checked={formData.walkingPreferences.preferredTimes.includes('morning')}
-                          onChange={() => handlePreferredTimeChange('morning')}
-                          className="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="morning" className="font-medium text-gray-700">
-                          Morning (6am - 12pm)
-                        </label>
-                      </div>
-                    </div>
-                    <div className="relative flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="afternoon"
-                          name="afternoon"
-                          type="checkbox"
-                          checked={formData.walkingPreferences.preferredTimes.includes('afternoon')}
-                          onChange={() => handlePreferredTimeChange('afternoon')}
-                          className="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="afternoon" className="font-medium text-gray-700">
-                          Afternoon (12pm - 5pm)
-                        </label>
-                      </div>
-                    </div>
-                    <div className="relative flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id="evening"
-                          name="evening"
-                          type="checkbox"
-                          checked={formData.walkingPreferences.preferredTimes.includes('evening')}
-                          onChange={() => handlePreferredTimeChange('evening')}
-                          className="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300 rounded"
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor="evening" className="font-medium text-gray-700">
-                          Evening (5pm - 10pm)
-                        </label>
-                      </div>
-                    </div>
-                  </div>
+                  <input
+                    type="text"
+                    id="address.state"
+                    name="address.state"
+                    required
+                    value={formData.address.state}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="address.zip" className="block text-sm font-medium text-gray-700">
+                    Postal Code
+                  </label>
+                  <input
+                    type="text"
+                    id="address.zip"
+                    name="address.zip"
+                    required
+                    value={formData.address.zip}
+                    onChange={handleChange}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
+                  />
                 </div>
               </div>
             </div>

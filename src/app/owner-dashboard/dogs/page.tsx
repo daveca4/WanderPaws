@@ -4,30 +4,31 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
-// Removed mock data import
 import { useAuth } from '@/lib/AuthContext';
+import { useData } from '@/lib/DataContext';
 import { Dog } from '@/lib/types';
 
 export default function OwnerDogsPage() {
   const { user } = useAuth();
+  const { dogs } = useData();
   const [loading, setLoading] = useState(true);
   const [myDogs, setMyDogs] = useState<Dog[]>([]);
 
   // Load owner's dogs
   useEffect(() => {
-    if (!user) return;
+    if (!user || !user.profileId) return;
 
     const loadDogs = () => {
-      // In a real app, this would fetch from an API
-      // For demo, filter the mock dogs where the ownerId matches the user's profileId
-      const ownerDogs = mockDogs.filter(dog => dog.ownerId === user.profileId);
+      console.log("Looking for dogs belonging to owner:", user.profileId);
+      // Filter dogs by owner ID
+      const ownerDogs = dogs.filter(dog => dog.ownerId === user.profileId);
+      console.log("Found dogs:", ownerDogs);
       setMyDogs(ownerDogs);
       setLoading(false);
     };
 
-    // Simulate API call
-    setTimeout(loadDogs, 500);
-  }, [user]);
+    loadDogs();
+  }, [user, dogs]);
 
   return (
     <RouteGuard requiredPermission={{ action: 'read', resource: 'dogs' }}>
@@ -65,12 +66,20 @@ export default function OwnerDogsPage() {
               <Link key={dog.id} href={`/owner-dashboard/dogs/${dog.id}`} className="block">
                 <div className="bg-white shadow rounded-lg overflow-hidden hover:shadow-md transition-shadow border border-gray-200">
                   <div className="h-48 relative">
-                    <Image
-                      src={dog.imageUrl || 'https://via.placeholder.com/300x200'}
-                      alt={dog.name}
-                      fill
-                      className="object-cover"
-                    />
+                    {dog.imageUrl ? (
+                      <Image
+                        src={dog.imageUrl}
+                        alt={dog.name}
+                        fill
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="h-full bg-gray-200 flex items-center justify-center">
+                        <svg className="h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3zm9-7h-1V7c0-1.1-.9-2-2-2h-4c0-1.1-.9-2-2-2s-2 .9-2 2H5C3.9 5 3 5.9 3 7v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zM5 19V7h14v12H5z"/>
+                        </svg>
+                      </div>
+                    )}
                   </div>
                   <div className="p-4">
                     <div className="flex justify-between items-start">

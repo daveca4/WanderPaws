@@ -24,11 +24,11 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
     specialNeeds: initialData?.specialNeeds || [],
     ownerId: initialData?.ownerId || (owners.length > 0 ? owners[0].id : ''),
     imageUrl: initialData?.imageUrl || '',
-    walkingPreferences: {
-      frequency: initialData?.walkingPreferences?.frequency || 3,
-      duration: 60,
-      preferredTimes: initialData?.walkingPreferences?.preferredTimes || ['morning'],
-      preferredRoutes: initialData?.walkingPreferences?.preferredRoutes || [],
+    address: initialData?.address || {
+      street: '',
+      city: '',
+      state: '',
+      zip: ''
     },
   });
   
@@ -76,21 +76,18 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
+    // Handle nested properties (e.g., address.street)
     if (name.includes('.')) {
-      // Handle nested properties (e.g., walkingPreferences.frequency)
       const [parent, child] = name.split('.');
-      setFormData({
-        ...formData,
+      setFormData(prev => ({
+        ...prev,
         [parent]: {
-          ...(formData[parent as keyof typeof formData] as any),
-          [child]: value,
-        },
-      });
+          ...(prev?.[parent as keyof typeof prev] as object),
+          [child]: value
+        }
+      }));
     } else {
-      setFormData({
-        ...formData,
-        [name]: value,
-      });
+      setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
   
@@ -118,28 +115,10 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, checked } = e.target;
     
-    // This handles the preferredTimes checkbox array
-    if (name === 'preferredTimes') {
-      const currentTimes = [...(formData.walkingPreferences?.preferredTimes || [])];
-      
-      if (checked) {
-        // Add to array if checked
-        currentTimes.push(value);
-      } else {
-        // Remove from array if unchecked
-        const index = currentTimes.indexOf(value);
-        if (index > -1) {
-          currentTimes.splice(index, 1);
-        }
-      }
-      
-      setFormData({
-        ...formData,
-        walkingPreferences: {
-          ...formData.walkingPreferences!,
-          preferredTimes: currentTimes,
-        },
-      });
+    // This method is no longer needed since we removed the walkingPreferences checkboxes
+    // Keeping it for other checkbox uses in the future
+    if (name === 'otherCheckboxes') {
+      // Handle other checkboxes if needed
     }
   };
   
@@ -373,91 +352,79 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
             )}
           </div>
           
-          <div>
-            <h3 className="text-sm font-medium text-gray-700 mb-3">Walking Preferences</h3>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="walkingPreferences.frequency" className="block text-sm font-medium text-gray-700">
-                  Frequency (walks per week)
-                </label>
-                <input
-                  type="number"
-                  name="walkingPreferences.frequency"
-                  id="walkingPreferences.frequency"
-                  min="1"
-                  max="14"
-                  value={formData.walkingPreferences?.frequency}
-                  onChange={handleNumberChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-                />
-              </div>
-              
-              <div>
-                <label htmlFor="walkingPreferences.duration" className="block text-sm font-medium text-gray-700">
-                  Walk Duration
+          <div className="mt-8">
+            <h3 className="text-lg font-medium text-gray-900">Address Information</h3>
+            <div className="mt-4 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-4">
+              <div className="sm:col-span-2">
+                <label htmlFor="address.street" className="block text-sm font-medium text-gray-700">
+                  Street Address
                 </label>
                 <input
                   type="text"
-                  name="walkingPreferences.duration"
-                  id="walkingPreferences.duration"
-                  value="60"
-                  disabled
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-gray-100 text-gray-700 sm:text-sm"
+                  name="address.street"
+                  id="address.street"
+                  required
+                  value={(formData.address as any)?.street || ''}
+                  onChange={handleChange}
+                  className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
                 />
-                <p className="mt-2 text-sm text-gray-500">
-                  All walks are 60 minutes in duration
-                </p>
+                {formErrors['address.street'] && (
+                  <p className="mt-2 text-sm text-red-600">{formErrors['address.street']}</p>
+                )}
               </div>
-            </div>
-            
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">Preferred Times</label>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input
-                    id="morning"
-                    name="preferredTimes"
-                    type="checkbox"
-                    value="morning"
-                    checked={formData.walkingPreferences?.preferredTimes?.includes('morning')}
-                    onChange={handleCheckboxChange}
-                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <label htmlFor="morning" className="ml-2 block text-sm text-gray-700">
-                    Morning
-                  </label>
-                </div>
-                
-                <div className="flex items-center">
-                  <input
-                    id="afternoon"
-                    name="preferredTimes"
-                    type="checkbox"
-                    value="afternoon"
-                    checked={formData.walkingPreferences?.preferredTimes?.includes('afternoon')}
-                    onChange={handleCheckboxChange}
-                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <label htmlFor="afternoon" className="ml-2 block text-sm text-gray-700">
-                    Afternoon
-                  </label>
-                </div>
-                
-                <div className="flex items-center">
-                  <input
-                    id="evening"
-                    name="preferredTimes"
-                    type="checkbox"
-                    value="evening"
-                    checked={formData.walkingPreferences?.preferredTimes?.includes('evening')}
-                    onChange={handleCheckboxChange}
-                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  <label htmlFor="evening" className="ml-2 block text-sm text-gray-700">
-                    Evening
-                  </label>
-                </div>
+
+              <div>
+                <label htmlFor="address.city" className="block text-sm font-medium text-gray-700">
+                  City
+                </label>
+                <input
+                  type="text"
+                  name="address.city"
+                  id="address.city"
+                  required
+                  value={(formData.address as any)?.city || ''}
+                  onChange={handleChange}
+                  className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                />
+                {formErrors['address.city'] && (
+                  <p className="mt-2 text-sm text-red-600">{formErrors['address.city']}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="address.state" className="block text-sm font-medium text-gray-700">
+                  State / Province
+                </label>
+                <input
+                  type="text"
+                  name="address.state"
+                  id="address.state"
+                  required
+                  value={(formData.address as any)?.state || ''}
+                  onChange={handleChange}
+                  className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                />
+                {formErrors['address.state'] && (
+                  <p className="mt-2 text-sm text-red-600">{formErrors['address.state']}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="address.zip" className="block text-sm font-medium text-gray-700">
+                  Postal Code
+                </label>
+                <input
+                  type="text"
+                  name="address.zip"
+                  id="address.zip"
+                  required
+                  value={(formData.address as any)?.zip || ''}
+                  onChange={handleChange}
+                  className="mt-1 focus:ring-primary-500 focus:border-primary-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
+                />
+                {formErrors['address.zip'] && (
+                  <p className="mt-2 text-sm text-red-600">{formErrors['address.zip']}</p>
+                )}
               </div>
             </div>
           </div>

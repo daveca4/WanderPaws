@@ -1,13 +1,55 @@
-import { getDogById, getOwnerById, getUpcomingWalks, getPastWalks } from '@/utils/helpers';
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
+import { useData } from '@/lib/DataContext';
 import Image from 'next/image';
 import Link from 'next/link';
-import { formatDate, formatTime } from '@/utils/helpers';
+import { formatDate, formatTime, getDogById, getOwnerById, getUpcomingWalks, getPastWalks } from '@/utils/helpers';
 import { getWalkerRecommendation, getDogHealthInsights } from '@/lib/aiService';
 
-export default async function DogDetailsPage({ params }: { params: { id: string } }) {
-  const dogId = params.id;
-  const dog = getDogById(dogId);
-  const owner = dog ? getOwnerById(dog.ownerId) : null;
+export default function DogDetailsPage() {
+  const params = useParams();
+  const dogId = params.id as string;
+  const { dogs, owners, walks } = useData();
+  
+  const [healthInsights, setHealthInsights] = useState<any>(null);
+  const [walkerRecommendation, setWalkerRecommendation] = useState<any>(null);
+  
+  const dog = getDogById(dogs, dogId);
+  const owner = dog ? getOwnerById(owners, dog.ownerId) : null;
+  
+  // Get walks data
+  const upcomingWalks = getUpcomingWalks(walks, undefined, undefined);
+  const pastWalks = getPastWalks(walks, undefined, undefined);
+  
+  // Simulate AI insights
+  useEffect(() => {
+    // Mock health insights
+    setHealthInsights({
+      hasInsights: true,
+      averageDistance: '2.3',
+      averageWalkTime: '45',
+      averageMoodRating: '4.2',
+      walkCount: 12,
+      recommendations: [
+        'Increase walk frequency in warmer weather',
+        'Consider morning walks for better energy levels'
+      ]
+    });
+    
+    // Mock walker recommendation
+    setWalkerRecommendation({
+      type: 'walker',
+      reason: 'Experience with this breed',
+      confidence: 0.85,
+      data: {
+        id: 'walker1',
+        name: 'Emily Davis',
+        imageUrl: 'https://randomuser.me/api/portraits/women/32.jpg'
+      }
+    });
+  }, []);
   
   if (!dog) {
     return (
@@ -20,16 +62,6 @@ export default async function DogDetailsPage({ params }: { params: { id: string 
       </div>
     );
   }
-  
-  // Get upcoming walks for this dog
-  const upcomingWalks = getUpcomingWalks(dogId, 3);
-  
-  // Get past walks for this dog
-  const pastWalks = getPastWalks(dogId, 3);
-  
-  // Get AI-powered insights
-  const healthInsights = await getDogHealthInsights(dogId);
-  const walkerRecommendation = await getWalkerRecommendation(dogId);
   
   return (
     <div>
@@ -115,20 +147,14 @@ export default async function DogDetailsPage({ params }: { params: { id: string 
                 </div>
                 
                 <div className="sm:col-span-2">
-                  <dt className="text-sm font-medium text-gray-500">Walking Preferences</dt>
+                  <dt className="text-sm font-medium text-gray-500">Address</dt>
                   <dd className="mt-1 bg-gray-50 p-3 rounded-md">
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-2">
                       <div>
-                        <span className="block text-xs text-gray-500">Frequency</span>
-                        <span className="text-gray-900">{dog.walkingPreferences.frequency} walks/week</span>
+                        <span className="text-gray-900">{dog.address.street}</span>
                       </div>
                       <div>
-                        <span className="block text-xs text-gray-500">Duration</span>
-                        <span className="text-gray-900">{dog.walkingPreferences.duration} minutes</span>
-                      </div>
-                      <div>
-                        <span className="block text-xs text-gray-500">Preferred Times</span>
-                        <span className="text-gray-900 capitalize">{dog.walkingPreferences.preferredTimes.join(', ')}</span>
+                        <span className="text-gray-900">{dog.address.city}, {dog.address.state} {dog.address.zip}</span>
                       </div>
                     </div>
                   </dd>
@@ -175,7 +201,7 @@ export default async function DogDetailsPage({ params }: { params: { id: string 
               </div>
               
               {/* Health Insights */}
-              {healthInsights.hasInsights && (
+              {healthInsights && healthInsights.hasInsights && (
                 <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
                   <h3 className="font-medium text-blue-800 mb-2">Health Insights</h3>
                   <div className="grid grid-cols-2 gap-3 mb-3">
