@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     // Get user data from request
     const data = await req.json();
-    const { email, password, name, role = 'owner' } = data;
+    const { email, password, name, role = 'owner', phone, address } = data;
     
     if (!email || !password) {
       return NextResponse.json(
@@ -35,27 +35,51 @@ export async function POST(req: NextRequest) {
     // Generate a unique ID
     const userId = `user_${uuidv4()}`;
     
-    // Create user
-    const user = await prisma.user.create({
-      data: {
-        id: userId,
-        email,
-        passwordHash,
-        name,
-        role,
-        emailVerified: false,
-      },
+    // Create user and owner in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create user
+      const user = await tx.user.create({
+        data: {
+          id: userId,
+          email,
+          passwordHash,
+          name,
+          role,
+          emailVerified: false,
+        },
+      });
+      
+      // If role is owner, create owner record
+      if (role === 'owner') {
+        if (!phone || !address) {
+          throw new Error('Phone and address are required for owner registration');
+        }
+        
+        const owner = await tx.owner.create({
+          data: {
+            name: name || '',
+            email,
+            phone,
+            address: address,
+            userId: user.id,
+          },
+        });
+        
+        return { user, owner };
+      }
+      
+      return { user };
     });
     
     // Remove sensitive data before sending response
-    const { passwordHash: _, ...userWithoutPassword } = user;
+    const { passwordHash: _, ...userWithoutPassword } = result.user;
     
     // Return response with properly shaped user object
     const userResponse = {
       ...userWithoutPassword,
-      profileId: "", // Include empty string instead of null/undefined
-      createdAt: user.createdAt.toISOString(),
-      updatedAt: user.updatedAt.toISOString()
+      profileId: role === 'owner' ? result.owner?.id : "",
+      createdAt: result.user.createdAt.toISOString(),
+      updatedAt: result.user.updatedAt.toISOString()
     };
     
     return NextResponse.json({
@@ -65,7 +89,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(
-      { error: 'Failed to register user' },
+      { error: error instanceof Error ? error.message : 'Failed to register user' },
       { status: 500 }
     );
   }

@@ -1,17 +1,24 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, FormEvent } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
-import { generateId } from '@/utils/helpers';
+import { useData } from '@/lib/DataContext';
 import DogImageUploader from '@/components/DogImageUploader';
+import { Dog } from '@/lib/types';
 
-export default function AddDogPage() {
-  const { user } = useAuth();
+export default function EditDogPage() {
+  const params = useParams();
+  const dogId = params.id as string;
   const router = useRouter();
+  const { user } = useAuth();
+  const { getDogById, updateDog } = useData();
   
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [formData, setFormData] = useState({
     name: '',
     breed: '',
@@ -30,8 +37,63 @@ export default function AddDogPage() {
     newSpecialNeed: ''
   });
   
-  const [loading, setLoading] = useState(false);
-
+  // Load dog data
+  useEffect(() => {
+    if (!user || !user.profileId) return;
+    
+    const loadDog = async () => {
+      try {
+        console.log("Loading dog with ID:", dogId);
+        
+        // First try to get dog from context
+        let dogData = getDogById(dogId);
+        
+        // If not found in context, fetch directly from API
+        if (!dogData) {
+          console.log("Dog not found in context, fetching from API");
+          const response = await fetch(`/api/data/dogs/${dogId}`);
+          
+          if (!response.ok) {
+            throw new Error("Failed to fetch dog details");
+          }
+          
+          dogData = await response.json();
+        }
+        
+        // Verify dog belongs to current user
+        if (dogData && dogData.ownerId === user.profileId) {
+          console.log("Dog found:", dogData);
+          setFormData({
+            name: dogData.name,
+            breed: dogData.breed,
+            age: dogData.age.toString(),
+            size: dogData.size,
+            temperament: dogData.temperament || [],
+            specialNeeds: dogData.specialNeeds || [],
+            imageUrl: dogData.imageUrl || '',
+            address: dogData.address || {
+              street: '',
+              city: '',
+              state: '',
+              zip: ''
+            },
+            newTemperament: '',
+            newSpecialNeed: ''
+          });
+        } else {
+          setError("This dog doesn't belong to your account or doesn't exist");
+        }
+      } catch (err) {
+        console.error("Error loading dog:", err);
+        setError("Failed to load dog details");
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadDog();
+  }, [dogId, user, getDogById]);
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     
@@ -49,7 +111,7 @@ export default function AddDogPage() {
       setFormData(prev => ({ ...prev, [name]: value }));
     }
   };
-
+  
   const handleAddTemperament = () => {
     if (formData.newTemperament.trim() !== '') {
       setFormData(prev => ({
@@ -83,53 +145,16 @@ export default function AddDogPage() {
       specialNeeds: prev.specialNeeds.filter((_, i) => i !== index)
     }));
   };
-
-  const ensureOwnerProfile = async () => {
-    if (!user) return null;
-    
-    try {
-      // Call the API to ensure owner profile exists
-      const response = await fetch('/api/data/owners/ensure', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          name: user.name || 'Dog Owner',
-          email: user.email,
-          phone: ''
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to ensure owner profile');
-      }
-      
-      const ownerData = await response.json();
-      return ownerData.id; // Return the owner ID
-    } catch (error) {
-      console.error('Error ensuring owner profile:', error);
-      return null;
-    }
-  };
-
+  
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    if (!user) return;
+    if (!user || !user.profileId) return;
     
-    setLoading(true);
+    setSaving(true);
+    setError('');
     
     try {
-      // First ensure the owner profile exists
-      const ownerId = user.profileId || await ensureOwnerProfile();
-      
-      if (!ownerId) {
-        throw new Error("Could not find or create owner profile");
-      }
-      
       const dogData = {
         name: formData.name,
         breed: formData.breed,
@@ -137,60 +162,68 @@ export default function AddDogPage() {
         size: formData.size,
         temperament: formData.temperament,
         specialNeeds: formData.specialNeeds,
-        ownerId: ownerId,
         address: formData.address,
-        imageUrl: formData.imageUrl,
-        assessmentStatus: 'pending'
+        imageUrl: formData.imageUrl
       };
       
-      console.log('Submitting new dog:', dogData);
+      console.log('Updating dog:', dogData);
       
-      // Call the API to save the dog
-      const response = await fetch('/api/data/dogs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(dogData)
-      });
+      const updatedDog = await updateDog(dogId, dogData);
+      console.log('Dog updated successfully:', updatedDog);
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create dog');
-      }
-      
-      const newDog = await response.json();
-      console.log('New dog created:', newDog);
-      
-      // Redirect to assessment request page with error handling
-      try {
-        router.push(`/owner-dashboard/dogs/assessment-request/${newDog.id}`);
-        
-        // Set a fallback redirect timeout to prevent UI from being stuck
-        setTimeout(() => {
-          if (document.visibilityState === 'visible') {
-            console.log('Fallback redirect triggered');
-            window.location.href = `/owner-dashboard/dogs/assessment-request/${newDog.id}`;
-          }
-        }, 3000);
-      } catch (redirectError) {
-        console.error('Error during redirect:', redirectError);
-        // Force a hard redirect if Next.js router fails
-        window.location.href = `/owner-dashboard/dogs/assessment-request/${newDog.id}`;
-      }
+      // Redirect back to the dog details page
+      router.push(`/owner-dashboard/dogs/${dogId}`);
     } catch (error) {
-      console.error('Error saving dog:', error);
-      alert(`Failed to save dog: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setLoading(false);
+      console.error('Error updating dog:', error);
+      setError(`Failed to update dog: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setSaving(false);
     }
   };
-
+  
+  if (loading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+  
+  if (error && !formData.name) {
+    return (
+      <div className="bg-white shadow rounded-lg p-6 text-center">
+        <h2 className="text-lg font-medium text-gray-900 mb-2">Error</h2>
+        <p className="text-gray-500 mb-4">{error}</p>
+        <Link
+          href="/owner-dashboard/dogs"
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+        >
+          Back to My Dogs
+        </Link>
+      </div>
+    );
+  }
+  
   return (
-    <RouteGuard requiredPermission={{ action: 'create', resource: 'dogs' }}>
+    <RouteGuard requiredPermission={{ action: 'update', resource: 'dogs' }}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">Add a New Dog</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Edit Dog: {formData.name}</h1>
         </div>
+
+        {error && (
+          <div className="bg-red-50 border-l-4 border-red-400 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white shadow rounded-lg p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -430,17 +463,17 @@ export default function AddDogPage() {
 
             <div className="flex justify-end mt-6 space-x-3">
               <Link
-                href="/owner-dashboard/dogs"
+                href={`/owner-dashboard/dogs/${dogId}`}
                 className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
               >
                 Cancel
               </Link>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={saving}
                 className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
               >
-                {loading ? 'Adding...' : 'Add Dog'}
+                {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </form>

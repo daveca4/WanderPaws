@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Message, Conversation } from './types';
-import { useData } from './DataContext';
 import { useAuth } from './AuthContext';
 
 // Define the shape of our context
@@ -21,17 +20,44 @@ const MessageContext = createContext<MessageContextType | undefined>(undefined);
 
 export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const { messages: dbMessages, conversations: dbConversations } = useData();
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
   
-  // Update messages and conversations from DataContext when they change
+  // Load messages and conversations directly from API instead of via DataContext
   useEffect(() => {
-    setMessages(dbMessages);
-    setConversations(dbConversations);
-  }, [dbMessages, dbConversations]);
+    if (!user) return;
+    
+    // Fetch conversations
+    const fetchConversations = async () => {
+      try {
+        const response = await fetch('/api/data/conversations');
+        if (response.ok) {
+          const data = await response.json();
+          setConversations(data);
+        }
+      } catch (error) {
+        console.error('Error fetching conversations:', error);
+      }
+    };
+    
+    // Fetch messages
+    const fetchMessages = async () => {
+      try {
+        const response = await fetch('/api/data/messages');
+        if (response.ok) {
+          const data = await response.json();
+          setMessages(data);
+        }
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      }
+    };
+    
+    fetchConversations();
+    fetchMessages();
+  }, [user]);
   
   // Calculate unread messages count
   const unreadCount = user 

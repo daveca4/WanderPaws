@@ -7,7 +7,10 @@ import { Dog, Owner, Walk } from '@/lib/types';
 
 export function DogList() {
   const { user } = useAuth();
-  const { dogs, owners, walks } = useData();
+  const { dogs, owners, walks, refreshData, deleteDog } = useData();
+  const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   
   // If user is an owner, show only their dogs
   // If user is a walker, show dogs they've walked
@@ -27,6 +30,54 @@ export function DogList() {
     }
   }
 
+  const handleImageError = (dogId: string) => {
+    setImageErrors(prev => ({
+      ...prev,
+      [dogId]: true
+    }));
+  };
+
+  const handleDeleteDog = async (dogId: string, e: React.MouseEvent) => {
+    e.preventDefault(); // Stop event propagation to prevent navigation
+    e.stopPropagation(); // Ensure the event doesn't bubble up
+    
+    if (!confirm('Are you sure you want to delete this dog? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      setIsDeleting(dogId);
+      setDeleteError(null);
+      
+      // Get the dog's name for the success message
+      const dogToDelete = dogs.find(dog => dog.id === dogId);
+      
+      // Attempt to delete the dog
+      const success = await deleteDog(dogId);
+      
+      if (!success) {
+        throw new Error(`Failed to delete ${dogToDelete?.name || 'dog'}. Please try again.`);
+      }
+      
+      // Success notification could be handled here if you want to show a success message
+      
+    } catch (error) {
+      console.error('Error deleting dog:', error);
+      
+      // More user-friendly error message
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : 'An unknown error occurred while trying to delete the dog. Please try again.';
+      
+      setDeleteError(errorMessage);
+      
+      // If deletion failed, refresh to get accurate data
+      await refreshData();
+    } finally {
+      setIsDeleting(null);
+    }
+  };
+
   if (filteredDogs.length === 0) {
     return (
       <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
@@ -36,6 +87,23 @@ export function DogList() {
             ? "You don't have any dogs yet. Add your first dog to get started."
             : "No dogs found."}
         </div>
+        
+        {deleteError && (
+          <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-md">
+            {deleteError}
+          </div>
+        )}
+        
+        {user?.role === 'owner' && (
+          <div className="mt-4 text-center">
+            <Link 
+              href="/owner-dashboard/dogs/add" 
+              className="inline-block px-4 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-600 transition"
+            >
+              Add Your First Dog
+            </Link>
+          </div>
+        )}
       </div>
     );
   }
@@ -53,14 +121,22 @@ export function DogList() {
           </Link>
         )}
       </div>
+      
+      {deleteError && (
+        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+          {deleteError}
+        </div>
+      )}
+      
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {filteredDogs.map(dog => {
           const dogOwner = owners.find(owner => owner.id === dog.ownerId);
-          const dogImage = dog.profileImage || dog.imageUrl;
+          const dogImage = !imageErrors[dog.id] ? (dog.profileImage || dog.imageUrl) : null;
+          const isOwner = user?.role === 'owner' && user?.profileId === dog.ownerId;
           
           return (
-            <Link href={`/dogs/${dog.id}`} key={dog.id} className="group">
-              <div className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition">
+            <div key={dog.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition">
+              <Link href={`/dogs/${dog.id}`} className="group">
                 {dogImage ? (
                   <div className="aspect-square relative">
                     <Image 
@@ -68,6 +144,8 @@ export function DogList() {
                       alt={dog.name}
                       fill
                       className="object-cover"
+                      onError={() => handleImageError(dog.id)}
+                      priority={true}
                     />
                   </div>
                 ) : (
@@ -86,8 +164,21 @@ export function DogList() {
                     </p>
                   )}
                 </div>
-              </div>
-            </Link>
+              </Link>
+              
+              {isOwner && (
+                <div className="px-3 pb-3 mt-1 flex justify-end">
+                  <button
+                    onClick={(e) => handleDeleteDog(dog.id, e)}
+                    disabled={isDeleting === dog.id}
+                    className="text-xs px-2 py-1 text-red-600 hover:bg-red-50 rounded transition"
+                    aria-label={`Delete ${dog.name}`}
+                  >
+                    {isDeleting === dog.id ? 'Deleting...' : 'Remove Dog'}
+                  </button>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

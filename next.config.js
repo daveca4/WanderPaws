@@ -2,14 +2,13 @@
 const nextConfig = {
   reactStrictMode: true,
   images: {
-    domains: [
-      'images.unsplash.com',
-      'placehold.co',
-      'randomuser.me',
-      'i.pravatar.cc',
-      'cloudflare-ipfs.com'
-    ],
+    domains: ['localhost', 'wanderpaws-images.s3.amazonaws.com'],
   },
-};
+  swcMinify: true,
+  experimental: {
+    optimizeCss: true,
+    optimizePackageImports: ['react-query']
+  }
+}
 
 module.exports = nextConfig; 

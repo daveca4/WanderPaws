@@ -5,6 +5,8 @@ import { Owner, Dog } from '@/lib/types';
 import { generateId } from '@/utils/helpers';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import DogImageUploader from './DogImageUploader';
+import { useData } from '@/lib/DataContext';
 
 interface NewDogFormProps {
   owners: Owner[];
@@ -14,6 +16,7 @@ interface NewDogFormProps {
 
 export default function NewDogForm({ owners, initialData, isEditing = false }: NewDogFormProps) {
   const router = useRouter();
+  const { createDog, updateDog } = useData();
   
   const [formData, setFormData] = useState<Partial<Dog>>({
     name: initialData?.name || '',
@@ -35,12 +38,12 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
   const [temperamentInput, setTemperamentInput] = useState('');
   const [specialNeedsInput, setSpecialNeedsInput] = useState('');
   
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<{
     [key: string]: string;
   }>({});
   
-  // This is a mock implementation. In a real app, we would save to a database.
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Basic validation
@@ -57,20 +60,26 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
     
     // Clear any previous errors
     setFormErrors({});
+    setIsSubmitting(true);
     
-    // In a real app, this would send data to an API
-    // For now, we'll just simulate success and navigate back
-    
-    console.log('Submitting dog data:', {
-      ...formData,
-      id: isEditing ? initialData?.id : generateId('dog'),
-    });
-    
-    // Fake a small delay to simulate API call
-    setTimeout(() => {
+    try {
+      // Actually save the data using our API
+      if (isEditing && initialData?.id) {
+        await updateDog(initialData.id, formData);
+      } else {
+        await createDog(formData as Omit<Dog, 'id'>);
+      }
+      
       // Navigate back to dogs list
       router.push('/dogs');
-    }, 500);
+    } catch (error) {
+      console.error('Error saving dog:', error);
+      setFormErrors({
+        submit: error instanceof Error ? error.message : 'Failed to save dog'
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
   
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -160,11 +169,24 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
     });
   };
   
+  // Handle image upload
+  const handleImageUploaded = (imageUrl: string) => {
+    setFormData(prev => ({
+      ...prev,
+      imageUrl
+    }));
+  };
+  
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Basic Information */}
         <div className="space-y-6">
+          <DogImageUploader 
+            initialImageUrl={formData.imageUrl} 
+            onImageUploaded={handleImageUploaded} 
+          />
+          
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700">
               Name *
@@ -251,22 +273,6 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
               ))}
             </select>
             {formErrors.ownerId && <p className="mt-1 text-sm text-red-600">{formErrors.ownerId}</p>}
-          </div>
-          
-          <div>
-            <label htmlFor="imageUrl" className="block text-sm font-medium text-gray-700">
-              Image URL
-            </label>
-            <input
-              type="text"
-              name="imageUrl"
-              id="imageUrl"
-              value={formData.imageUrl}
-              onChange={handleChange}
-              placeholder="https://example.com/dog-image.jpg"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
-            />
-            <p className="mt-1 text-xs text-gray-500">Optional: Link to a photo of the dog</p>
           </div>
         </div>
         
@@ -431,20 +437,27 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
         </div>
       </div>
       
-      <div className="flex justify-end space-x-3 pt-5 border-t border-gray-200">
+      <div className="flex justify-end space-x-3">
         <Link
           href="/dogs"
-          className="inline-flex justify-center rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+          className="px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
         >
           Cancel
         </Link>
         <button
           type="submit"
-          className="inline-flex justify-center rounded-md border border-transparent bg-primary-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-primary-700"
+          disabled={isSubmitting}
+          className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 ${
+            isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
+          }`}
         >
-          {isEditing ? 'Update Dog' : 'Add Dog'}
+          {isSubmitting ? 'Saving...' : isEditing ? 'Update Dog' : 'Add Dog'}
         </button>
       </div>
+      
+      {formErrors.submit && (
+        <p className="mt-2 text-sm text-red-600">{formErrors.submit}</p>
+      )}
     </form>
   );
 } 

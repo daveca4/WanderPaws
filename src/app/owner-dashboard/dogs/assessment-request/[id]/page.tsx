@@ -39,20 +39,38 @@ export default function AssessmentRequestPage() {
   
   // Load the dog
   useEffect(() => {
-    if (!user || !dogs.length) return;
+    if (!user) return;
     
     const loadDog = () => {
       console.log("Loading dog with ID:", dogId);
+      // First attempt to get dog directly from context
       const foundDog = getDogById(dogs, dogId);
       console.log("Found dog:", foundDog);
       
       if (foundDog && foundDog.ownerId === user.profileId) {
         setDog(foundDog);
+        setLoading(false);
+      } else {
+        // Fallback: try to fetch the dog directly from API
+        fetch(`/api/data/dogs/${dogId}`)
+          .then(res => {
+            if (!res.ok) throw new Error('Dog not found');
+            return res.json();
+          })
+          .then(dogData => {
+            if (dogData && dogData.ownerId === user.profileId) {
+              setDog(dogData);
+            }
+            setLoading(false);
+          })
+          .catch(err => {
+            console.error('Error fetching dog:', err);
+            setLoading(false);
+          });
       }
-      setLoading(false);
     };
     
-    loadDog(); // Remove setTimeout to load immediately
+    loadDog();
   }, [dogId, user, dogs]);
   
   const handleRequestAssessment = async () => {
@@ -139,7 +157,14 @@ export default function AssessmentRequestPage() {
                     src={dog.imageUrl}
                     alt={dog.name}
                     fill
+                    unoptimized={true}
                     className="object-cover"
+                    onError={(e) => {
+                      console.error('Error loading dog image:', e);
+                      // Fallback to initial
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
                   />
                 ) : (
                   <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center">

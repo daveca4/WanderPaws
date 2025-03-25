@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useData } from '@/lib/DataContext';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -9,56 +9,113 @@ import { formatDate, formatTime, getDogById, getOwnerById, getUpcomingWalks, get
 import { getWalkerRecommendation, getDogHealthInsights } from '@/lib/aiService';
 
 export default function DogDetailsPage() {
+  const router = useRouter();
   const params = useParams();
   const dogId = params.id as string;
-  const { dogs, owners, walks } = useData();
+  const { dogs, owners, walks, isLoading, error: dataError, getDogById, getOwnerById } = useData();
   
   const [healthInsights, setHealthInsights] = useState<any>(null);
   const [walkerRecommendation, setWalkerRecommendation] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   
-  const dog = getDogById(dogs, dogId);
-  const owner = dog ? getOwnerById(owners, dog.ownerId) : null;
+  useEffect(() => {
+    console.log('Dog ID from params:', dogId);
+    console.log('All dogs:', dogs);
+    
+    if (!isLoading && dogs.length > 0) {
+      // Check if the dog exists
+      const dogExists = dogs.some(d => d.id === dogId);
+      console.log('Dog exists in data?', dogExists);
+      
+      if (!dogExists) {
+        setError(`Dog with ID ${dogId} not found in database`);
+      }
+    }
+  }, [dogId, dogs, isLoading]);
+  
+  // Get dog data
+  const dog = getDogById(dogId);
+  const owner = dog ? getOwnerById(dog.ownerId) : null;
   
   // Get walks data
-  const upcomingWalks = getUpcomingWalks(walks, undefined, undefined);
-  const pastWalks = getPastWalks(walks, undefined, undefined);
+  const upcomingWalks = walks.filter(walk => {
+    const walkDate = new Date(walk.date);
+    return walkDate > new Date() && walk.dogId === dogId;
+  }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  const pastWalks = walks.filter(walk => {
+    const walkDate = new Date(walk.date);
+    return walkDate <= new Date() && walk.dogId === dogId;
+  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   
   // Simulate AI insights
   useEffect(() => {
-    // Mock health insights
-    setHealthInsights({
-      hasInsights: true,
-      averageDistance: '2.3',
-      averageWalkTime: '45',
-      averageMoodRating: '4.2',
-      walkCount: 12,
-      recommendations: [
-        'Increase walk frequency in warmer weather',
-        'Consider morning walks for better energy levels'
-      ]
-    });
-    
-    // Mock walker recommendation
-    setWalkerRecommendation({
-      type: 'walker',
-      reason: 'Experience with this breed',
-      confidence: 0.85,
-      data: {
-        id: 'walker1',
-        name: 'Emily Davis',
-        imageUrl: 'https://randomuser.me/api/portraits/women/32.jpg'
-      }
-    });
-  }, []);
+    if (dog) {
+      // Mock health insights
+      setHealthInsights({
+        hasInsights: true,
+        averageDistance: '2.3',
+        averageWalkTime: '45',
+        averageMoodRating: '4.2',
+        walkCount: 12,
+        recommendations: [
+          'Increase walk frequency in warmer weather',
+          'Consider morning walks for better energy levels'
+        ]
+      });
+      
+      // Mock walker recommendation
+      setWalkerRecommendation({
+        type: 'walker',
+        reason: 'Experience with this breed',
+        confidence: 0.85,
+        data: {
+          id: 'walker1',
+          name: 'Emily Davis',
+          imageUrl: 'https://randomuser.me/api/portraits/women/32.jpg'
+        }
+      });
+    }
+  }, [dog]);
   
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="text-center py-12">
+        <h1 className="text-2xl font-bold text-gray-600">Loading...</h1>
+        <p className="mt-2 text-gray-600">Fetching dog information</p>
+      </div>
+    );
+  }
+  
+  // Show error state
+  if (dataError || error) {
+    return (
+      <div className="text-center py-12">
+        <h1 className="text-2xl font-bold text-red-600">Error</h1>
+        <p className="mt-2 text-gray-600">{dataError || error || "Something went wrong"}</p>
+        <button 
+          onClick={() => router.back()} 
+          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
+  
+  // Show not found state
   if (!dog) {
     return (
       <div className="text-center py-12">
         <h1 className="text-2xl font-bold text-red-600">Dog not found</h1>
         <p className="mt-2 text-gray-600">The dog you're looking for does not exist.</p>
-        <Link href="/dogs" className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700">
-          Back to Dogs
-        </Link>
+        <button 
+          onClick={() => router.back()} 
+          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+        >
+          Go Back
+        </button>
       </div>
     );
   }
@@ -66,21 +123,29 @@ export default function DogDetailsPage() {
   return (
     <div>
       <div className="mb-6">
-        <Link href="/dogs" className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700">
+        <button 
+          onClick={() => router.back()} 
+          className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
           </svg>
-          Back to Dogs
-        </Link>
+          Back
+        </button>
       </div>
       
       <div className="bg-white shadow-sm rounded-lg overflow-hidden">
         <div className="h-64 relative">
           <Image 
-            src={dog.imageUrl || 'https://via.placeholder.com/1200x400'} 
+            src={dog.imageUrl || '/images/default-dog.png'} 
             alt={dog.name}
             fill
             className="object-cover"
+            onError={(e) => {
+              // Fallback to default image on error
+              const target = e.target as HTMLImageElement;
+              target.src = '/images/default-dog.png';
+            }}
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent"></div>
           <div className="absolute bottom-0 left-0 p-6 text-white">
