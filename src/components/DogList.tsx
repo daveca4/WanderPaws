@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import { Dog, Owner, Walk } from '@/lib/types';
+import S3Image from '@/components/S3Image';
 
 export function DogList() {
   const { user } = useAuth();
   const { dogs, owners, walks, refreshData, deleteDog } = useData();
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
   
   // If user is an owner, show only their dogs
   // If user is a walker, show dogs they've walked
@@ -29,13 +28,6 @@ export function DogList() {
       filteredDogs = dogs.filter(dog => dogIds.includes(dog.id));
     }
   }
-
-  const handleImageError = (dogId: string) => {
-    setImageErrors(prev => ({
-      ...prev,
-      [dogId]: true
-    }));
-  };
 
   const handleDeleteDog = async (dogId: string, e: React.MouseEvent) => {
     e.preventDefault(); // Stop event propagation to prevent navigation
@@ -131,30 +123,22 @@ export function DogList() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
         {filteredDogs.map(dog => {
           const dogOwner = owners.find(owner => owner.id === dog.ownerId);
-          const dogImage = !imageErrors[dog.id] ? (dog.profileImage || dog.imageUrl) : null;
+          const dogImage = dog.profileImage || dog.imageUrl;
           const isOwner = user?.role === 'owner' && user?.profileId === dog.ownerId;
           
           return (
             <div key={dog.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-md transition">
               <Link href={`/dogs/${dog.id}`} className="group">
-                {dogImage ? (
-                  <div className="aspect-square relative">
-                    <Image 
-                      src={dogImage} 
-                      alt={dog.name}
-                      fill
-                      className="object-cover"
-                      onError={() => handleImageError(dog.id)}
-                      priority={true}
-                    />
-                  </div>
-                ) : (
-                  <div className="aspect-square bg-gray-200 flex items-center justify-center">
-                    <svg className="h-16 w-16 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 8c-2.8 0-5 2.2-5 5s2.2 5 5 5 5-2.2 5-5-2.2-5-5-5zm0 8c-1.7 0-3-1.3-3-3s1.3-3 3-3 3 1.3 3 3-1.3 3-3 3zm9-7h-1V7c0-1.1-.9-2-2-2h-4c0-1.1-.9-2-2-2s-2 .9-2 2H5C3.9 5 3 5.9 3 7v12c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-8c0-1.1-.9-2-2-2zM5 19V7h14v12H5z"/>
-                    </svg>
-                  </div>
-                )}
+                <div className="aspect-square relative">
+                  <S3Image 
+                    src={dogImage} 
+                    alt={dog.name}
+                    fill
+                    className="object-cover"
+                    defaultImage="/images/default-dog.png"
+                    priority={true}
+                  />
+                </div>
                 <div className="p-3">
                   <h3 className="font-medium text-gray-900 group-hover:text-primary-600 transition">{dog.name}</h3>
                   <p className="text-sm text-gray-500">{dog.breed}, {dog.age} year{dog.age !== 1 && 's'} old</p>

@@ -197,6 +197,9 @@ export const uploadFileToS3 = async (
   const { walkId, tags = [], prefix = '' } = options;
   
   try {
+    console.log(`S3 Upload Started: ${file.name} (${file.size} bytes, type: ${file.type})`);
+    console.log(`Using bucket: ${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}`);
+    
     // Check file size - 50MB limit for images, 100MB for videos
     const maxSize = file.type.startsWith('video/') ? 100 * 1024 * 1024 : 50 * 1024 * 1024;
     if (file.size > maxSize) {
@@ -222,6 +225,7 @@ export const uploadFileToS3 = async (
     console.log(`Uploading ${fileName} with content type: ${contentType}`);
     
     // Get a presigned URL
+    console.log('Requesting presigned URL from API...');
     const response = await fetch('/api/s3/presigned-upload', {
       method: 'POST',
       headers: {
@@ -239,6 +243,7 @@ export const uploadFileToS3 = async (
       // Add timeout for the presigned URL request
       signal: AbortSignal.timeout(10000), // 10 seconds timeout
     }).catch(err => {
+      console.error('Presigned URL request failed:', err);
       if (err.name === 'AbortError') {
         throw new Error('Request for upload permission timed out');
       }
@@ -246,13 +251,17 @@ export const uploadFileToS3 = async (
     });
     
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Presigned URL error (${response.status}):`, errorText);
       throw new Error(`Failed to get presigned URL: ${response.status} ${response.statusText}`);
     }
     
     const { uploadUrl, key } = await response.json();
+    console.log(`Got presigned URL for key: ${key}`);
     
     // First try to upload with the original file and type
     try {
+      console.log(`Uploading file to S3 using presigned URL...`);
       const uploadResponse = await fetch(uploadUrl, {
         method: 'PUT',
         headers: {
@@ -261,6 +270,7 @@ export const uploadFileToS3 = async (
         body: file,
         signal: AbortSignal.timeout(120000), // 2 minutes timeout
       }).catch(err => {
+        console.error('File upload to S3 failed:', err);
         if (err.name === 'AbortError') {
           throw new Error(`Upload timed out. The file may be too large: ${file.name} (${(file.size/1024/1024).toFixed(2)} MB)`);
         }
@@ -275,9 +285,11 @@ export const uploadFileToS3 = async (
       
       if (uploadResponse.ok) {
         // Original upload succeeded
+        console.log(`Upload successful! ETag: ${uploadResponse.headers.get('ETag')}`);
+        const region = process.env.NEXT_PUBLIC_AWS_REGION || process.env.AWS_REGION || 'eu-central-1';
         const result: S3UploadResult = {
           key,
-          location: `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${key}`,
+          location: `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`,
           bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME || 'wanderpaws-media',
           etag: uploadResponse.headers.get('ETag') || '',
           contentType,
@@ -287,6 +299,8 @@ export const uploadFileToS3 = async (
       }
       
       // If we get here, the original upload failed but didn't throw an error
+      const errorText = await uploadResponse.text();
+      console.error(`Upload failed (${uploadResponse.status}):`, errorText);
       console.warn(`Upload failed with status: ${uploadResponse.status}. Trying fallback...`);
     } catch (uploadError) {
       console.warn('Initial upload attempt failed:', uploadError);
@@ -330,9 +344,10 @@ export const uploadFileToS3 = async (
             });
             
             if (jpegUploadResponse.ok) {
+              const region = process.env.NEXT_PUBLIC_AWS_REGION || process.env.AWS_REGION || 'eu-central-1';
               const result: S3UploadResult = {
                 key: jpegKey,
-                location: `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${jpegKey}`,
+                location: `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}.s3.${region}.amazonaws.com/${jpegKey}`,
                 bucket: process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME || 'wanderpaws-media',
                 etag: jpegUploadResponse.headers.get('ETag') || '',
                 contentType: 'image/jpeg',
@@ -396,7 +411,8 @@ export const getSignedViewUrl = async (
       console.error('Error getting signed URL:', error);
       // Fall back to the original URL as a last resort
       // This won't work if the bucket is private, but allows code to continue
-      const fallbackUrl = `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}.s3.amazonaws.com/${key}`;
+      const region = process.env.NEXT_PUBLIC_AWS_REGION || 'eu-central-1';
+      const fallbackUrl = `https://${process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME}.s3.${region}.amazonaws.com/${key}`;
       return fallbackUrl;
     }
   }
@@ -619,4 +635,71 @@ export const generateThumbnail = async (assetKey: string): Promise<string | null
   
   console.log('Thumbnail generation for', assetKey, 'would happen server-side');
   return null;
+};
+
+/**
+ * Central function to get a presigned URL for any S3 asset
+ * @param key - The S3 object key
+ * @param expiresIn - Time in seconds before the URL expires (default: 7 days)
+ * @returns A promise that resolves to a signed URL
+ */
+export const getPresignedUrl = async (key: string, expiresIn = 60 * 60 * 24 * 7): Promise<string> => {
+  if (!key) {
+    console.error('No key provided for presigned URL');
+    return '';
+  }
+
+  try {
+    // Try to get a signed URL from the API endpoint
+    const response = await fetch(`/api/s3/refresh-url`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ key, expiresIn })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to get presigned URL: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.location;
+  } catch (error) {
+    console.error('Error getting presigned URL:', error);
+    throw error;
+  }
+};
+
+/**
+ * Handle displaying an image with an S3 URL - ensures the URL is presigned
+ * @param url Original URL or key
+ * @param defaultImage Fallback image path
+ * @returns A presigned URL or the default image path if there's an error
+ */
+export const ensurePresignedUrl = async (
+  url: string | undefined | null, 
+  defaultImage = '/images/default-placeholder.png'
+): Promise<string> => {
+  if (!url) return defaultImage;
+  
+  try {
+    // Check if this is already a presigned URL
+    if (url.includes('X-Amz-Signature')) {
+      return url;
+    }
+    
+    // Extract the key if it's a plain S3 URL
+    let key = url;
+    if (url.includes('amazonaws.com')) {
+      const urlObj = new URL(url);
+      key = urlObj.pathname.startsWith('/') ? urlObj.pathname.substring(1) : urlObj.pathname;
+    }
+    
+    // Get a fresh presigned URL
+    return await getPresignedUrl(key);
+  } catch (error) {
+    console.error('Error ensuring presigned URL:', error);
+    return defaultImage;
+  }
 }; 

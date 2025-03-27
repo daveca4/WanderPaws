@@ -70,7 +70,7 @@ function setupAPITracking() {
   const originalFetch = window.fetch;
   window.fetch = async (input, init) => {
     const startTime = performance.now();
-    let url = typeof input === 'string' ? input : 
+    const url = typeof input === 'string' ? input : 
               input instanceof URL ? input.toString() : 
               input instanceof Request ? input.url : '';
     

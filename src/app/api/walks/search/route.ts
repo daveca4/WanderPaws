@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     const hasBounds = north && south && east && west;
     
     // Build the query
-    let query: any = {
+    const query: any = {
       where: {
         // Filter by date range if provided
         ...(startDate && endDate && {

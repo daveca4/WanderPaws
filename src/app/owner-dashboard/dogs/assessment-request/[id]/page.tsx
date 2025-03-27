@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import S3Image from '@/components/S3Image';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
@@ -154,18 +155,12 @@ export default function AssessmentRequestPage() {
             <div className="flex items-center mb-6">
               <div className="flex-shrink-0 h-16 w-16 relative rounded-full overflow-hidden">
                 {dog.imageUrl ? (
-                  <Image
+                  <S3Image
                     src={dog.imageUrl}
                     alt={dog.name}
                     fill
-                    unoptimized={true}
                     className="object-cover"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-                      console.error('Error loading dog image:', e);
-                      // Fallback to initial
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
+                    defaultImage="/images/default-dog.png"
                   />
                 ) : (
                   <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center">

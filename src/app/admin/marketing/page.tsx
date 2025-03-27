@@ -4,8 +4,21 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import RouteGuard from '@/components/RouteGuard';
 
+// Define a Campaign type
+interface Campaign {
+  id: string;
+  name: string;
+  type: string;
+  status: string;
+  audience: string;
+  sent: number;
+  conversions: number;
+  converted: number;
+  revenue: number;
+}
+
 // Use these empty objects/arrays as defaults until API provides real data
-const defaultCampaigns = [];
+const defaultCampaigns: Campaign[] = [];
 const defaultMetrics = {
   totalCampaigns: 0,
   activeCampaigns: 0,
@@ -17,7 +30,7 @@ const defaultMetrics = {
 };
 
 // Helper function to format price
-const formatPrice = (amount) => {
+const formatPrice = (amount: number): string => {
   return new Intl.NumberFormat('en-GB', {
     style: 'currency',
     currency: 'GBP',
@@ -26,10 +39,10 @@ const formatPrice = (amount) => {
 
 export default function MarketingDashboard() {
   const [selectedTab, setSelectedTab] = useState('overview');
-  const [campaigns, setCampaigns] = useState(defaultCampaigns);
+  const [campaigns, setCampaigns] = useState<Campaign[]>(defaultCampaigns);
   const [marketingMetrics, setMarketingMetrics] = useState(defaultMetrics);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch marketing data from API
   useEffect(() => {

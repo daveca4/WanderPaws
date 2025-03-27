@@ -12,7 +12,7 @@ export default function RevenueSection() {
       try {
         setLoading(true);
         setError(null);
-        const data = await fetchReports('revenue');
+        const data = await fetchReports('revenue') as RevenueReport[];
         
         if (Array.isArray(data)) {
           setRevenueData(data);

@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
     const walkerIds = url.searchParams.get('walkerIds');
     const ownerIds = url.searchParams.get('ownerIds');
     
-    let where: any = {};
+    const where: any = {};
     
     // If IDs are provided, filter by those IDs
     if (ids) {

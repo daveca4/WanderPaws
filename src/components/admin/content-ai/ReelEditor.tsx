@@ -9,9 +9,13 @@ import {
   CloudinaryAsset
 } from '@/lib/cloudinaryService';
 import MediaLibrary from './MediaLibrary';
-// @ts-ignore - Import react-dnd components despite TS errors
+// @ts-expect-error VideoJS types compatibility issue
+import videojs from 'video.js';
+// @ts-expect-error VideoJS types compatibility issue
+import 'video.js/dist/video-js.css';
+// @ts-expect-error React DnD types compatibility issue
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
-// @ts-ignore - Import HTML5Backend despite TS errors
+// @ts-expect-error HTML5 backend types compatibility issue
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
 interface ReelEditorProps {
@@ -271,7 +275,7 @@ export default function ReelEditor({ onComplete, initialMedia = [] }: ReelEditor
       const limitedAssets = selectedAssets.slice(0, 20); // Limit to 20 assets max
       
       // Optimize media if enabled
-      let optimizedAssets = limitedAssets;
+      const optimizedAssets = limitedAssets;
       if (optimizeMedia) {
         // In a real app, you would compress/resize images and videos here
         // For now, we'll just simulate this with a delay

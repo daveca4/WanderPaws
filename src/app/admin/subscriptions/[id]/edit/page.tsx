@@ -4,8 +4,15 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import RouteGuard from '@/components/RouteGuard';
-// Removed mock data import
 import { SubscriptionPlan } from '@/lib/types';
+
+// Temporary solution until actual subscription plans are implemented
+const tempSubscriptionPlans: SubscriptionPlan[] = [];
+
+// Helper function to format price from pence to pounds
+function formatPrice(pence: number): string {
+  return `£${(pence / 100).toFixed(2)}`;
+}
 
 export default function EditSubscriptionPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -29,7 +36,7 @@ export default function EditSubscriptionPage({ params }: { params: { id: string 
 
   useEffect(() => {
     // Find the plan with the matching ID
-    const foundPlan = mockSubscriptionPlans.find(p => p.id === params.id);
+    const foundPlan = tempSubscriptionPlans.find(p => p.id === params.id);
     
     if (foundPlan) {
       setFormData(foundPlan);
@@ -75,13 +82,13 @@ export default function EditSubscriptionPage({ params }: { params: { id: string 
       console.log('Updated plan:', formData);
       
       // Update the mock data (for demo purposes)
-      const planIndex = mockSubscriptionPlans.findIndex(p => p.id === params.id);
+      const planIndex = tempSubscriptionPlans.findIndex(p => p.id === params.id);
       if (planIndex !== -1) {
         const updatedPlan = {
           ...formData,
           updatedAt: new Date().toISOString()
         };
-        mockSubscriptionPlans[planIndex] = updatedPlan;
+        tempSubscriptionPlans[planIndex] = updatedPlan;
       }
       
       setSaving(false);

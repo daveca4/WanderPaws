@@ -427,7 +427,7 @@ export async function POST(request: NextRequest) {
       });
       
       // Apply advanced transformations if provided
-      let transformations = [];
+      const transformations = [];
       
       // Set aspect ratio
       if (aspectRatio === '9:16') {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 
 interface DogImageUploaderProps {
@@ -10,9 +10,11 @@ interface DogImageUploaderProps {
 
 export default function DogImageUploader({ initialImageUrl, onImageUploaded }: DogImageUploaderProps) {
   const [imageUrl, setImageUrl] = useState<string>(initialImageUrl || '');
+  const [originalKey, setOriginalKey] = useState<string>('');
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [useImgFallback, setUseImgFallback] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Memoize the file upload function to avoid recreating it on each render
@@ -37,55 +39,43 @@ export default function DogImageUploader({ initialImageUrl, onImageUploaded }: D
     setIsUploading(true);
     setUploadError(null);
     setUploadProgress(0);
+    setUseImgFallback(false);
     
     try {
-      // Step 1: Get a presigned URL for the upload - perform basic validation client-side
-      const presignedUrlResponse = await fetch('/api/s3/presigned-upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          fileName: file.name,
-          contentType: file.type,
-          prefix: 'dog-profiles',
-          metadata: {
-            fileType: 'dog-profile',
-            timestamp: Date.now().toString()
-          }
-        })
-      });
-      
-      if (!presignedUrlResponse.ok) {
-        throw new Error('Failed to get upload URL');
-      }
-      
-      const { uploadUrl, key, bucket } = await presignedUrlResponse.json();
+      // Create form data for upload
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('prefix', 'dog-profiles');
+      formData.append('metadata', JSON.stringify({
+        fileType: 'dog-profile',
+        timestamp: Date.now().toString()
+      }));
       
       // Simulated progress - this is just for UI feedback
       setUploadProgress(30);
       
-      // Step 2: Upload the file to S3 using the presigned URL
-      const uploadResponse = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type
-        },
-        body: file
+      // Upload directly to the server-side endpoint
+      const uploadResponse = await fetch('/api/s3/direct-upload', {
+        method: 'POST',
+        body: formData
       });
       
       if (!uploadResponse.ok) {
+        const errorText = await uploadResponse.text();
+        console.error('Upload failed:', errorText);
         throw new Error('Failed to upload image');
       }
       
       setUploadProgress(90);
       
-      // Step 3: Construct the full URL to the uploaded image
-      const fullImageUrl = `https://${bucket}.s3.amazonaws.com/${key}`;
+      // Get the response data
+      const result = await uploadResponse.json();
       
       // Update state and notify parent component
-      setImageUrl(fullImageUrl);
-      onImageUploaded(fullImageUrl);
+      console.log('Image upload successful, URL:', result.location);
+      setImageUrl(result.location);
+      setOriginalKey(result.originalKey || result.key); // Store the original key for refreshing URLs
+      onImageUploaded(result.location);
       setUploadProgress(100);
       
       // Clear the file input to allow re-uploading the same file
@@ -104,6 +94,51 @@ export default function DogImageUploader({ initialImageUrl, onImageUploaded }: D
       setIsUploading(false);
     }
   }, [onImageUploaded]);
+  
+  // Function to refresh the URL if it expires
+  const refreshImageUrl = useCallback(async () => {
+    if (!originalKey) return;
+    
+    try {
+      const refreshResponse = await fetch('/api/s3/refresh-url', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          key: originalKey,
+          expiresIn: 60 * 60 * 24 * 7 // 7 days
+        })
+      });
+      
+      if (!refreshResponse.ok) {
+        throw new Error('Failed to refresh image URL');
+      }
+      
+      const result = await refreshResponse.json();
+      console.log('URL refreshed successfully:', result.location);
+      
+      // Update the URL
+      setImageUrl(result.location);
+      onImageUploaded(result.location);
+      setUseImgFallback(false); // Reset fallback if it was being used
+    } catch (error) {
+      console.error('Error refreshing image URL:', error);
+    }
+  }, [originalKey, onImageUploaded]);
+
+  // Handle image loading errors by refreshing the URL
+  const handleImageError = useCallback(() => {
+    console.error('Image failed to load with Next/Image:', imageUrl);
+    
+    // First try the fallback
+    setUseImgFallback(true);
+    
+    // If we have the original key, try to refresh the URL
+    if (originalKey) {
+      refreshImageUrl();
+    }
+  }, [imageUrl, originalKey, refreshImageUrl]);
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
@@ -122,18 +157,37 @@ export default function DogImageUploader({ initialImageUrl, onImageUploaded }: D
         >
           {imageUrl ? (
             <div className="relative w-full h-full overflow-hidden rounded-lg">
-              <Image 
-                src={imageUrl} 
-                alt="Dog preview" 
-                fill 
-                loading="lazy"
-                unoptimized={true}
-                className="object-cover"
-                key={imageUrl}
-                onError={() => setImageUrl('')}
-                sizes="128px"
-                priority={false}
-              />
+              {useImgFallback ? (
+                // Fallback to a standard img tag if Next/Image fails
+                <img 
+                  src={imageUrl} 
+                  alt="Dog preview" 
+                  className="w-full h-full object-cover"
+                  onError={() => {
+                    console.error('Image also failed to load with standard img tag:', imageUrl);
+                    // If we have the original key, try to refresh instead of clearing
+                    if (originalKey) {
+                      refreshImageUrl();
+                    } else {
+                      setImageUrl('');
+                      setUploadError('Image cannot be displayed. It was uploaded but may have restricted access.');
+                    }
+                  }}
+                />
+              ) : (
+                <Image 
+                  src={imageUrl} 
+                  alt="Dog preview" 
+                  fill 
+                  loading="lazy"
+                  unoptimized={true}
+                  className="object-cover"
+                  key={imageUrl}
+                  onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => handleImageError()}
+                  sizes="128px"
+                  priority={false}
+                />
+              )}
               <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-opacity flex items-center justify-center">
                 <span className="text-white text-sm font-medium opacity-0 hover:opacity-100">Change</span>
               </div>
@@ -173,6 +227,15 @@ export default function DogImageUploader({ initialImageUrl, onImageUploaded }: D
           )}
           {uploadError && (
             <p className="text-sm text-red-600 mt-2">{uploadError}</p>
+          )}
+          {originalKey && (
+            <button 
+              type="button"
+              onClick={refreshImageUrl}
+              className="mt-2 text-xs text-primary-600 hover:text-primary-800 underline"
+            >
+              Refresh image
+            </button>
           )}
         </div>
       </div>

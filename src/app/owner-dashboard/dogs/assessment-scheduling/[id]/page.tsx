@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
+import S3Image from '@/components/S3Image';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
 import { format, addDays, isBefore, isAfter, parseISO } from 'date-fns';
@@ -45,36 +45,43 @@ export default function AssessmentSchedulingPage() {
     
     const loadAssessment = async () => {
       try {
+        console.log('Loading assessment with ID:', assessmentId);
         // Fetch the assessment
         const response = await fetch(`/api/data/assessments/${assessmentId}`);
         
         if (!response.ok) {
+          console.error('Assessment fetch error:', await response.text());
           throw new Error('Assessment not found');
         }
         
         const assessmentData = await response.json();
+        console.log('Assessment data:', assessmentData);
         setAssessment(assessmentData);
         
         // Fetch the dog details
         const dogResponse = await fetch(`/api/data/dogs/${assessmentData.dogId}`);
         
         if (!dogResponse.ok) {
+          console.error('Dog fetch error:', await dogResponse.text());
           throw new Error('Dog not found');
         }
         
         const dogData = await dogResponse.json();
+        console.log('Dog data:', dogData);
         setDog(dogData);
         
         // Set default selected date to the scheduled date if it's in the future
-        const scheduledDate = parseISO(assessmentData.scheduledDate);
-        if (isAfter(scheduledDate, new Date())) {
-          setSelectedDate(scheduledDate);
+        if (assessmentData.scheduledDate) {
+          const scheduledDate = new Date(assessmentData.scheduledDate);
+          if (isAfter(scheduledDate, new Date())) {
+            setSelectedDate(scheduledDate);
+          }
         }
         
         setLoading(false);
       } catch (err) {
         console.error('Error loading assessment:', err);
-        setError('Failed to load assessment details');
+        setError('Failed to load assessment details. Please try again later.');
         setLoading(false);
       }
     };
@@ -90,8 +97,11 @@ export default function AssessmentSchedulingPage() {
     if (!selectedDate || !assessment) return;
     
     setSubmitting(true);
+    setError(null);
     
     try {
+      console.log('Submitting assessment with date:', selectedDate.toISOString());
+      
       // Update the assessment with the selected date
       const response = await fetch(`/api/data/assessments/${assessmentId}`, {
         method: 'PATCH',
@@ -105,9 +115,13 @@ export default function AssessmentSchedulingPage() {
       });
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to schedule assessment');
+        const errorData = await response.json();
+        console.error('Assessment update error:', errorData);
+        throw new Error(errorData.error || 'Failed to schedule assessment');
       }
+      
+      const updatedAssessment = await response.json();
+      console.log('Assessment scheduled:', updatedAssessment);
       
       // Redirect to subscription page
       router.push('/owner-dashboard/subscriptions');
@@ -178,18 +192,12 @@ export default function AssessmentSchedulingPage() {
             <div className="flex items-center mb-6">
               <div className="flex-shrink-0 h-16 w-16 relative rounded-full overflow-hidden">
                 {dog.imageUrl ? (
-                  <Image
+                  <S3Image
                     src={dog.imageUrl}
                     alt={dog.name}
                     fill
-                    unoptimized={true}
                     className="object-cover"
-                    onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                      console.error('Error loading dog image:', e);
-                      // Fallback to initial
-                      const target = e.target as HTMLImageElement;
-                      target.style.display = 'none';
-                    }}
+                    defaultImage="/images/default-dog.png"
                   />
                 ) : (
                   <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center">
@@ -250,11 +258,11 @@ export default function AssessmentSchedulingPage() {
               </div>
             </div>
             
-            <div className="pt-6 border-t border-gray-200">
-              <div className="flex justify-end space-x-3">
+            <div className="pt-5 border-t border-gray-200">
+              <div className="flex justify-end">
                 <Link
                   href="/owner-dashboard/dogs"
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Cancel
                 </Link>
@@ -262,9 +270,21 @@ export default function AssessmentSchedulingPage() {
                   type="button"
                   onClick={handleSubmit}
                   disabled={!selectedDate || submitting}
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+                  className={`ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${
+                    !selectedDate
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500'
+                  }`}
                 >
-                  {submitting ? 'Scheduling...' : 'Confirm Assessment Date'}
+                  {submitting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Processing...
+                    </>
+                  ) : 'Schedule Assessment'}
                 </button>
               </div>
             </div>

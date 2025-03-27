@@ -39,7 +39,7 @@ export default function AdminReportsPage() {
   const [selectedReport, setSelectedReport] = useState('walk-activity');
   const [timeRange, setTimeRange] = useState('7d');
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
   
   // Filter states for interactive reports
   const [breedFilter, setBreedFilter] = useState('all');
@@ -73,7 +73,7 @@ export default function AdminReportsPage() {
   }, [timeRange]);
 
   // Format currency values
-  const formatCurrency = (amount) => {
+  const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-GB', {
       style: 'currency',
       currency: 'GBP',

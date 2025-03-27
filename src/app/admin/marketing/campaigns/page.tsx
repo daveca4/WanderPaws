@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import RouteGuard from '@/components/RouteGuard';
+import { formatPrice } from '@/utils/format';
 // Removed mock data import
 
 // Campaign status options with colors for visual indicators

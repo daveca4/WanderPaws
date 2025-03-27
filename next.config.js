@@ -9,31 +9,27 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'wanderpaws-images.s3.amazonaws.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'wanderpaws.s3.amazonaws.com',
+        hostname: 'wanderpaws-images.s3.eu-central-1.amazonaws.com',
+        port: '',
+        pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: 'wanderpaws.s3.eu-central-1.amazonaws.com',
-      },
-      {
-        protocol: 'https',
-        hostname: '*.s3.amazonaws.com',
+        port: '',
+        pathname: '/**',
       },
       {
         protocol: 'https',
         hostname: '*.s3.*.amazonaws.com',
+        port: '',
+        pathname: '/**',
       },
       {
-        protocol: 'http',
-        hostname: '*.s3.amazonaws.com',
-      },
-      {
-        protocol: 'http',
-        hostname: '*.s3.*.amazonaws.com',
+        protocol: 'https',
+        hostname: '*.amazonaws.com',
+        port: '',
+        pathname: '/**',
       },
       {
         protocol: 'https',

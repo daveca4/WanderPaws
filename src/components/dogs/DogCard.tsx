@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import S3Image from '@/components/S3Image';
 import type { Dog } from '@/lib/types';
 
 type DogCardProps = {
@@ -12,30 +12,6 @@ type DogCardProps = {
 
 export const DogCard: React.FC<DogCardProps> = ({ dog }) => {
   const router = useRouter();
-  const [signedImageUrl, setSignedImageUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    const getSignedUrl = async () => {
-      if (dog.imageUrl) {
-        try {
-          // Extract the key from the S3 URL
-          const key = dog.imageUrl.split('.com/').pop();
-          if (!key) return;
-
-          const response = await fetch(`/api/s3/signed-url?key=${encodeURIComponent(key)}`);
-          if (!response.ok) throw new Error('Failed to get signed URL');
-          
-          const data = await response.json();
-          setSignedImageUrl(data.signedUrl);
-        } catch (error) {
-          console.error('Error getting signed URL:', error);
-          setSignedImageUrl(null);
-        }
-      }
-    };
-
-    getSignedUrl();
-  }, [dog.imageUrl]);
 
   return (
     <div 
@@ -44,24 +20,13 @@ export const DogCard: React.FC<DogCardProps> = ({ dog }) => {
       onClick={() => router.push(`/owner-dashboard/dogs/${dog.id}`)}
     >
       <div className="h-48 bg-gray-200 relative">
-        {signedImageUrl ? (
-          <Image 
-            src={signedImageUrl} 
-            alt={dog.name} 
-            fill
-            className="object-cover"
-            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-              e.currentTarget.src = '/dog-placeholder.png';
-            }}
-          />
-        ) : (
-          <Image 
-            src="/dog-placeholder.png" 
-            alt="Dog placeholder" 
-            fill 
-            className="object-cover"
-          />
-        )}
+        <S3Image 
+          src={dog.imageUrl} 
+          alt={dog.name} 
+          fill
+          className="object-cover"
+          defaultImage="/dog-placeholder.png"
+        />
       </div>
       <div className="p-4">
         <h2 className="text-lg font-semibold text-gray-900">{dog.name}</h2>

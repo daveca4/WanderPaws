@@ -18,7 +18,7 @@ async function getCachedDog(id: string, userId: string, userRole: Role) {
   }
   
   // Otherwise, fetch from database with authorization check
-  let dog = await prisma.dog.findUnique({
+  const dog = await prisma.dog.findUnique({
     where: { id },
     include: { 
       owner: {

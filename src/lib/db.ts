@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 
 declare global {
+  // eslint-disable-next-line no-var
   var prisma: PrismaClient | undefined;
 }
 
@@ -50,7 +51,7 @@ if (typeof window === 'undefined') {
 
 // Add query performance monitoring in development
 if (process.env.NODE_ENV === 'development' && typeof window === 'undefined') {
-  prisma.$use(async (params, next) => {
+  prisma.$use(async (params: any, next: any) => {
     const start = performance.now();
     const result = await next(params);
     const end = performance.now();

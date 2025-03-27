@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "NEXT_DISABLE_ESLINT=1 NODE_OPTIONS=--max_old_space_size=4096 next dev",
+    "build": "NEXT_DISABLE_ESLINT=1 NODE_OPTIONS=--max_old_space_size=4096 next build",
+    "build:production": "node ./prepare-production.js",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "lint:fix": "next lint --fix",
+    "fix:eslint": "node ./fix-eslint-errors.js",
+    "fix:unused-imports": "node ./remove-unused-imports.js",
+    "fix:all": "npm run fix:unused-imports && npm run fix:eslint && npm run lint:fix"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.775.0",
