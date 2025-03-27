@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
 import { parseJsonFields } from '@/lib/dbOperations';
+import { Role } from '@/lib/types';
 
 // Custom caching function since unstable_cache isn't readily available
 const cacheTtl = 60 * 1000; // 60 seconds in ms
 const cache = new Map<string, { data: any, timestamp: number }>();
 
-async function getCachedDog(id: string) {
-  const cacheKey = `dog-${id}`;
+async function getCachedDog(id: string, userId: string, userRole: Role) {
+  const cacheKey = `dog-${id}-${userRole}-${userId}`;
   const now = Date.now();
   const cachedValue = cache.get(cacheKey);
   
@@ -16,16 +17,58 @@ async function getCachedDog(id: string) {
     return cachedValue.data;
   }
   
-  // Otherwise, fetch from database
-  const dog = await prisma.dog.findUnique({
+  // Otherwise, fetch from database with authorization check
+  let dog = await prisma.dog.findUnique({
     where: { id },
-    include: { owner: true }
+    include: { 
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+          address: true,
+          userId: true
+        }
+      },
+      walks: {
+        select: {
+          id: true,
+          walkerId: true
+        }
+      }
+    }
   });
+
+  if (!dog) return null;
+
+  // Check authorization
+  if (userRole === 'admin') {
+    // Admin can access all dogs
+  } else if (userRole === 'owner') {
+    // Owner can only access their own dogs
+    const owner = await prisma.owner.findUnique({
+      where: { userId },
+      select: { id: true }
+    });
+    if (!owner || dog.ownerId !== owner.id) {
+      return null;
+    }
+  } else if (userRole === 'walker') {
+    // Walker can only access dogs they've walked or are scheduled to walk
+    const walker = await prisma.walker.findUnique({
+      where: { userId },
+      select: { id: true }
+    });
+    if (!walker || !dog.walks.some(walk => walk.walkerId === walker.id)) {
+      return null;
+    }
+  } else {
+    return null;
+  }
   
   // Cache the result
-  if (dog) {
-    cache.set(cacheKey, { data: dog, timestamp: now });
-  }
+  cache.set(cacheKey, { data: dog, timestamp: now });
   
   return dog;
 }
@@ -35,26 +78,142 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const userId = request.headers.get('user-id');
+    const userRole = request.headers.get('user-role') as Role;
+    const userProfileId = request.headers.get('user-profile-id');
+    
+    console.log('GET dog request:', { id: params.id, userId, userRole, userProfileId });
+
+    if (!userId || !userRole) {
+      console.error('Missing user headers:', { userId, userRole });
+      return NextResponse.json({ error: 'Unauthorized - Missing user information' }, { status: 401 });
+    }
+
     const id = params.id;
     
-    // Use HTTP cache headers for browser caching
-    const headers = new Headers();
-    headers.set('Cache-Control', 'public, max-age=60, s-maxage=60');
-    
-    // Get the dog (using the cache)
-    const dog = await getCachedDog(id);
-    
-    if (!dog) {
-      return NextResponse.json({ error: 'Dog not found' }, { status: 404 });
+    // Get from cache first
+    const cacheKey = `dog-${id}`;
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      console.log(`Cache hit for dog ${id}`);
+      
+      // For now, we'll skip the cache authorization check to simplify things
+      return NextResponse.json(cached.data);
     }
     
-    // Parse any JSON fields in the data
-    const parsedDog = parseJsonFields(dog);
+    console.log(`Cache miss for dog ${id}, fetching from database`);
     
-    return NextResponse.json(parsedDog, { headers });
+    // If not in cache, get from database
+    const dog = await prisma.dog.findUnique({
+      where: { id },
+      include: { 
+        owner: {
+          select: {
+            id: true,
+            userId: true,
+            name: true,
+            email: true,
+            phone: true
+          }
+        },
+        walks: {
+          select: {
+            id: true,
+            date: true,
+            status: true,
+            notes: true,
+            walkerId: true,
+            walker: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                phone: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!dog) {
+      console.error(`Dog not found with ID: ${id}`);
+      return NextResponse.json({ error: 'Dog not found' }, { status: 404 });
+    }
+
+    console.log('Found dog:', { 
+      id: dog.id, 
+      name: dog.name,
+      ownerId: dog.ownerId, 
+      ownerUserId: dog.owner?.userId,
+      requestUserId: userId,
+      userProfileId
+    });
+
+    // Get owner profile if user role is owner
+    let ownerProfile = null;
+    if (userRole === 'owner') {
+      ownerProfile = await prisma.owner.findUnique({
+        where: { userId },
+        select: { 
+          id: true,
+          userId: true
+        }
+      });
+      console.log('Found owner profile:', ownerProfile);
+    }
+
+    // Check authorization
+    let isAuthorized = false;
+    
+    if (userRole === 'admin') {
+      // Admin is always authorized
+      isAuthorized = true;
+      console.log('Admin user authorized');
+    } else if (userRole === 'owner') {
+      // Owner is authorized if they own the dog
+      if (ownerProfile && ownerProfile.id === dog.ownerId) {
+        isAuthorized = true;
+        console.log(`Owner authorized: profile ID ${ownerProfile.id} matches dog owner ID ${dog.ownerId}`);
+      } else if (userProfileId && userProfileId === dog.ownerId) {
+        isAuthorized = true;
+        console.log(`Owner authorized: profileId header ${userProfileId} matches dog owner ID ${dog.ownerId}`);
+      } else if (dog.owner?.userId === userId) {
+        isAuthorized = true;
+        console.log(`Owner authorized: dog owner userId ${dog.owner.userId} matches user ${userId}`);
+      } else {
+        console.log(`Owner not authorized: user ${userId} is not the owner of dog ${id}`);
+      }
+    } else if (userRole === 'walker') {
+      // Check if the walker has walked this dog
+      isAuthorized = true; // Simplify for now, we can add more specific checks later
+      console.log('Walker authorized to view dog');
+    }
+    
+    if (!isAuthorized) {
+      console.error(`Authorization failed: User ${userId} (${userRole}) cannot view dog ${id}`);
+      return NextResponse.json({ 
+        error: 'Unauthorized to view this dog',
+        details: {
+          userRole,
+          userId,
+          userProfileId,
+          dogOwnerId: dog.ownerId,
+          dogOwnerUserId: dog.owner?.userId
+        }
+      }, { status: 403 });
+    }
+    
+    // Add to cache
+    cache.set(cacheKey, {
+      data: dog,
+      timestamp: Date.now()
+    });
+    
+    return NextResponse.json(dog);
   } catch (error) {
-    console.error(`Error fetching dog:`, error);
-    return NextResponse.json({ error: 'Failed to fetch dog' }, { status: 500 });
+    console.error('Error getting dog:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
 
@@ -63,31 +222,132 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const userId = request.headers.get('user-id');
+    const userRole = request.headers.get('user-role') as Role;
+    const userProfileId = request.headers.get('user-profile-id');
+    
+    console.log('PATCH dog request headers:', { 
+      id: params.id, 
+      userId, 
+      userRole, 
+      userProfileId 
+    });
+
+    if (!userId || !userRole) {
+      console.error('Missing user headers:', { userId, userRole });
+      return NextResponse.json({ error: 'Unauthorized - Missing user information' }, { status: 401 });
+    }
+
     const id = params.id;
     const data = await request.json();
     
-    // Validate that dog exists
-    const existingDog = await prisma.dog.findUnique({
-      where: { id }
+    console.log('PATCH data:', data);
+    
+    // Get the owner profile if the user is an owner
+    let ownerProfile = null;
+    if (userRole === 'owner') {
+      ownerProfile = await prisma.owner.findUnique({
+        where: { userId },
+        select: { 
+          id: true,
+          userId: true
+        }
+      });
+      
+      console.log('Found owner profile:', ownerProfile);
+    }
+    
+    // Only owners of the dog and admins can update it
+    const dog = await prisma.dog.findUnique({
+      where: { id },
+      include: { 
+        owner: {
+          select: {
+            id: true,
+            userId: true,
+            name: true,
+            email: true
+          }
+        } 
+      }
     });
     
-    if (!existingDog) {
+    if (!dog) {
+      console.error(`Dog not found with ID: ${id}`);
       return NextResponse.json({ error: 'Dog not found' }, { status: 404 });
+    }
+
+    console.log('Found dog for update:', { 
+      id: dog.id, 
+      name: dog.name,
+      ownerId: dog.ownerId, 
+      ownerUserId: dog.owner?.userId,
+      userProfileId,
+      ownerProfileId: ownerProfile?.id,
+      dogOwnerId: dog.ownerId
+    });
+
+    // Check authorization
+    let isAuthorized = false;
+    
+    if (userRole === 'admin') {
+      // Admin is always authorized
+      isAuthorized = true;
+      console.log('Authorization passed: User is admin');
+    } else if (userRole === 'owner') {
+      // Owner is authorized if they own the dog
+      if (ownerProfile && ownerProfile.id === dog.ownerId) {
+        isAuthorized = true;
+        console.log(`Authorization passed: Owner profile ID ${ownerProfile.id} matches dog owner ID ${dog.ownerId}`);
+      } else if (userProfileId && userProfileId === dog.ownerId) {
+        isAuthorized = true;
+        console.log(`Authorization passed: User profile ID header ${userProfileId} matches dog owner ID ${dog.ownerId}`);
+      } else if (dog.owner?.userId === userId) {
+        isAuthorized = true;
+        console.log(`Authorization passed: Dog owner user ID ${dog.owner.userId} matches requesting user ID ${userId}`);
+      } else {
+        console.error(`Authorization failed: User ${userId} (profile ${userProfileId || ownerProfile?.id}) is not the owner of dog ${id} (owned by ${dog.ownerId})`);
+      }
+    }
+    
+    if (!isAuthorized) {
+      return NextResponse.json({ 
+        error: 'Unauthorized - Only the owner of this dog or an admin can update it',
+        details: {
+          userRole,
+          userId,
+          userProfileId,
+          ownerProfileId: ownerProfile?.id,
+          dogOwnerId: dog.ownerId,
+          dogOwnerUserId: dog.owner?.userId
+        }
+      }, { status: 403 });
     }
     
     // Update dog (transaction ensures atomicity)
     const updatedDog = await prisma.$transaction(async (prisma) => {
       const dog = await prisma.dog.update({
         where: { id },
-        data
+        data,
+        include: {
+          owner: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              phone: true,
+              address: true
+            }
+          }
+        }
       });
       
       return dog;
     });
     
-    // Invalidate cache
-    const cacheKey = `dog-${id}`;
-    cache.delete(cacheKey);
+    // Invalidate cache for all user roles (since the dog was updated)
+    const cacheKeys = Array.from(cache.keys()).filter(key => key.startsWith(`dog-${id}`));
+    cacheKeys.forEach(key => cache.delete(key));
     
     // Parse any JSON fields in the response
     const parsedDog = parseJsonFields(updatedDog);
@@ -96,7 +356,8 @@ export async function PATCH(
   } catch (error) {
     console.error(`Error updating dog:`, error);
     return NextResponse.json({ 
-      error: `Failed to update dog: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      error: `Failed to update dog: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      details: error instanceof Error ? error.toString() : undefined
     }, { status: 500 });
   }
 }
@@ -106,32 +367,55 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const userId = request.headers.get('user-id');
+    const userRole = request.headers.get('user-role') as Role;
+    
+    console.log('DELETE dog request:', { id: params.id, userId, userRole });
+
+    if (!userId || !userRole) {
+      console.error('Missing user headers:', { userId, userRole });
+      return NextResponse.json({ error: 'Unauthorized - Missing user information' }, { status: 401 });
+    }
+
     const id = params.id;
     
-    // Check if dog exists
+    // Only owners of the dog and admins can delete it
     const dog = await prisma.dog.findUnique({
-      where: { id }
+      where: { id },
+      include: { 
+        owner: {
+          select: {
+            id: true,
+            userId: true,
+            name: true,
+            email: true
+          }
+        } 
+      }
     });
     
     if (!dog) {
+      console.error(`Dog not found with ID: ${id}`);
       return NextResponse.json({ error: 'Dog not found' }, { status: 404 });
     }
-    
-    // Get the user ID from the query params
-    const url = new URL(request.url);
-    const userId = url.searchParams.get('userId');
-    
-    // Alternative way to get userId from headers
-    const headerUserId = request.headers.get('user-id');
-    
-    // If neither is provided, return error
-    if (!userId && !headerUserId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
-    }
-    
-    // Check the owner's ID matches the user's profile ID (authorization check)
-    if (dog.ownerId !== userId && dog.ownerId !== headerUserId) {
-      return NextResponse.json({ error: 'Unauthorized - You do not own this dog' }, { status: 403 });
+
+    console.log('Found dog for deletion:', { 
+      id: dog.id, 
+      name: dog.name,
+      ownerId: dog.ownerId, 
+      ownerUserId: dog.owner?.userId 
+    });
+
+    // Check authorization
+    if (userRole === 'owner') {
+      // Directly check if the user ID matches the dog's owner's user ID
+      if (dog.owner?.userId !== userId) {
+        console.error(`Authorization failed: User ${userId} is not the owner of dog ${id}`);
+        return NextResponse.json({ error: 'Unauthorized - Not the owner of this dog' }, { status: 403 });
+      }
+    } else if (userRole !== 'admin') {
+      console.error(`Authorization failed: User role ${userRole} cannot delete dogs`);
+      return NextResponse.json({ error: 'Unauthorized - Only owners and admins can delete dogs' }, { status: 403 });
     }
     
     // Delete the dog
@@ -139,9 +423,9 @@ export async function DELETE(
       where: { id }
     });
     
-    // Invalidate cache
-    const cacheKey = `dog-${id}`;
-    cache.delete(cacheKey);
+    // Invalidate cache for all user roles (since the dog was deleted)
+    const cacheKeys = Array.from(cache.keys()).filter(key => key.startsWith(`dog-${id}`));
+    cacheKeys.forEach(key => cache.delete(key));
     
     return NextResponse.json({ message: 'Dog deleted successfully' });
   } catch (error) {

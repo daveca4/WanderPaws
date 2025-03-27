@@ -1,33 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSignedViewUrl } from '@/lib/s3Service';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 
-export async function GET(req: NextRequest) {
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION || 'eu-central-1',
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+  },
+});
+
+const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME || 'wanderpaws';
+
+export async function GET(request: NextRequest) {
   try {
-    // Get query parameters
-    const searchParams = req.nextUrl.searchParams;
+    const { searchParams } = new URL(request.url);
     const key = searchParams.get('key');
-    const expiresIn = searchParams.get('expiresIn') 
-      ? parseInt(searchParams.get('expiresIn') as string, 10) 
-      : 3600; // Default to 1 hour
-    
-    // Validate required fields
+
     if (!key) {
-      return NextResponse.json(
-        { error: 'key parameter is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Missing key parameter' }, { status: 400 });
     }
-    
-    // Generate the signed URL for viewing
-    const signedUrl = await getSignedViewUrl(key, expiresIn);
-    
-    // Return the signed URL
+
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    });
+
+    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 }); // URL expires in 1 hour
+
     return NextResponse.json({ signedUrl });
   } catch (error) {
-    console.error('Error generating signed URL for viewing:', error);
-    return NextResponse.json(
-      { error: 'Failed to generate signed URL for viewing' },
-      { status: 500 }
-    );
+    console.error('Error generating signed URL:', error);
+    return NextResponse.json({ error: 'Failed to generate signed URL' }, { status: 500 });
   }
 } 

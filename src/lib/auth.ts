@@ -97,6 +97,16 @@ export function hasPermission(user: User | null, action: string, resource: strin
     return true;
   }
   
+  // Special case for owners viewing dogs 
+  if (user.role === 'owner' && action === 'view' && resource === 'dogs') {
+    return true;
+  }
+  
+  // Special case for owners updating dogs
+  if (user.role === 'owner' && action === 'update' && resource === 'dogs') {
+    return true;
+  }
+  
   // Special case for owners reading subscription plans
   if (user.role === 'owner' && action === 'read' && resource === 'subscription_plans') {
     return true;
@@ -233,9 +243,44 @@ export function getCurrentUser(): User | null {
   }
   
   try {
-    return JSON.parse(userJson) as User;
+    const user = JSON.parse(userJson);
+    
+    // Validate required fields
+    if (!user.id || !user.email || !user.role) {
+      console.error('Invalid user object in local storage:', user);
+      localStorage.removeItem(USER_STORAGE_KEY);
+      return null;
+    }
+    
+    // Validate role
+    if (!['owner', 'walker', 'admin'].includes(user.role)) {
+      console.error('Invalid user role in local storage:', user.role);
+      localStorage.removeItem(USER_STORAGE_KEY);
+      return null;
+    }
+    
+    // Ensure all required fields are present
+    const validatedUser: User = {
+      id: user.id,
+      email: user.email,
+      role: user.role as Role,
+      name: user.name || null,
+      emailVerified: user.emailVerified || false,
+      createdAt: user.createdAt || new Date().toISOString(),
+      updatedAt: user.updatedAt || new Date().toISOString(),
+      lastLogin: user.lastLogin || new Date().toISOString(),
+      profileId: user.profileId || null,
+      image: user.image || null,
+      passwordHash: user.passwordHash || ''
+    };
+    
+    // Update storage with validated user
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(validatedUser));
+    
+    return validatedUser;
   } catch (error) {
     console.error('Error parsing user from local storage:', error);
+    localStorage.removeItem(USER_STORAGE_KEY);
     return null;
   }
 }

@@ -2,14 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-// Configure S3 client
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
+// Configure S3 client - create once and reuse
+const region = process.env.AWS_REGION || 'eu-central-1';
+const credentials = {
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
+};
+const bucketName = process.env.AWS_S3_BUCKET_NAME || 'wanderpaws';
+
+// Use singleton pattern for S3 client to avoid recreation on each request
+let s3ClientInstance: S3Client | null = null;
+
+const getS3Client = () => {
+  if (!s3ClientInstance) {
+    s3ClientInstance = new S3Client({ region, credentials });
   }
-});
+  return s3ClientInstance;
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,7 +26,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { fileName, contentType, prefix = '', metadata = {} } = body;
     
-    // Validate required fields
+    // Validate required fields - fast fail
     if (!fileName || !contentType) {
       return NextResponse.json(
         { error: 'fileName and contentType are required' },
@@ -26,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
     
     // Generate a unique key for the file using a timestamp prefix
-    const timestamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+    const timestamp = Date.now().toString(); // Faster than ISO string manipulation
     const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
     
     // Create key based on whether a prefix is provided
@@ -34,7 +43,8 @@ export async function POST(req: NextRequest) {
       ? `${prefix}/${timestamp}-${sanitizedName}` 
       : `${timestamp}-${sanitizedName}`;
     
-    const bucketName = process.env.NEXT_PUBLIC_AWS_S3_BUCKET_NAME || process.env.AWS_S3_BUCKET_NAME || 'wanderpaws';
+    // Get S3 client instance
+    const s3Client = getS3Client();
     
     // Create the command for the operation
     const command = new PutObjectCommand({
@@ -44,9 +54,9 @@ export async function POST(req: NextRequest) {
       Metadata: metadata,
     });
 
-    // Generate the presigned URL
+    // Generate the presigned URL with shorter expiration for faster response
     const uploadUrl = await getSignedUrl(s3Client, command, {
-      expiresIn: 60 * 15, // 15 minutes
+      expiresIn: 60 * 5, // 5 minutes instead of 15
     });
     
     return NextResponse.json({

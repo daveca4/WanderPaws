@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -12,6 +12,30 @@ type DogCardProps = {
 
 export const DogCard: React.FC<DogCardProps> = ({ dog }) => {
   const router = useRouter();
+  const [signedImageUrl, setSignedImageUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getSignedUrl = async () => {
+      if (dog.imageUrl) {
+        try {
+          // Extract the key from the S3 URL
+          const key = dog.imageUrl.split('.com/').pop();
+          if (!key) return;
+
+          const response = await fetch(`/api/s3/signed-url?key=${encodeURIComponent(key)}`);
+          if (!response.ok) throw new Error('Failed to get signed URL');
+          
+          const data = await response.json();
+          setSignedImageUrl(data.signedUrl);
+        } catch (error) {
+          console.error('Error getting signed URL:', error);
+          setSignedImageUrl(null);
+        }
+      }
+    };
+
+    getSignedUrl();
+  }, [dog.imageUrl]);
 
   return (
     <div 
@@ -20,9 +44,9 @@ export const DogCard: React.FC<DogCardProps> = ({ dog }) => {
       onClick={() => router.push(`/owner-dashboard/dogs/${dog.id}`)}
     >
       <div className="h-48 bg-gray-200 relative">
-        {dog.imageUrl ? (
+        {signedImageUrl ? (
           <Image 
-            src={dog.imageUrl} 
+            src={signedImageUrl} 
             alt={dog.name} 
             fill
             className="object-cover"

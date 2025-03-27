@@ -62,13 +62,21 @@ export async function POST(req: NextRequest) {
     // Remove sensitive data
     const { passwordHash: _, ...userWithoutPassword } = user;
     
+    // Get the profile ID based on role
+    let profileId = '';
+    if (user.role === 'owner' && user.owner) {
+      profileId = user.owner.id;
+    } else if (user.role === 'walker' && user.walker) {
+      profileId = user.walker.id;
+    }
+    
     // Return user data with properly formatted fields
     const userResponse = {
       ...userWithoutPassword,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
       lastLogin: currentLoginTime,
-      profileId: user.role === 'owner' ? user.owner?.id : user.walker?.id || ""
+      profileId
     };
     
     return NextResponse.json({

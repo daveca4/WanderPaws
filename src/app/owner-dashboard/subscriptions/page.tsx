@@ -5,24 +5,25 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
-import { useData } from '@/lib/DataContext';
-import { SubscriptionPlan, UserSubscription } from '@/lib/types';
+import { useSubscriptionPlans, useUserSubscriptions, findActiveSubscription } from '@/lib/hooks/useSubscriptionData';
+import { SubscriptionPlan } from '@/lib/types';
 import StripeCheckoutButton from '@/components/StripeCheckoutButton';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 export default function SubscriptionsPage() {
   const { user } = useAuth();
-  const { subscriptionPlans, userSubscriptions } = useData();
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
+  // Fetch subscription plans and user subscriptions with React Query
+  const { data: subscriptionPlans = [], isLoading: plansLoading } = useSubscriptionPlans();
+  const { data: userSubscriptions = [], isLoading: subscriptionsLoading } = useUserSubscriptions(user?.id);
+  
+  // Find active subscription
+  const activeSubscription = findActiveSubscription(userSubscriptions);
+  
   useEffect(() => {
-    if (!user) return;
-    
-    // Data should be loaded from the DataContext
-    setLoading(false);
-    
     // Check for success parameter in URL
     const urlParams = new URLSearchParams(window.location.search);
     const success = urlParams.get('success');
@@ -31,22 +32,19 @@ export default function SubscriptionsPage() {
     if (success === 'true' && sessionId) {
       setSuccessMessage('Payment successful! Your subscription has been activated.');
     }
-  }, [user, subscriptionPlans, userSubscriptions]);
+  }, []);
   
   const handleSelectPlan = (planId: string) => {
     setSelectedPlanId(planId);
   };
   
-  // Find active subscription
-  const activeSubscription = userSubscriptions.find(sub => {
-    const now = new Date();
-    return sub.status === 'active' && new Date(sub.endDate) > now;
-  });
+  // Check if data is still loading
+  const isLoading = plansLoading || subscriptionsLoading;
   
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -256,19 +254,6 @@ export default function SubscriptionsPage() {
             );
           })}
         </div>
-
-        {/* Floating Button for Selected Plan */}
-        {selectedPlanId && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 flex justify-between items-center shadow-lg transform transition-transform duration-300 z-10">
-            <div className="text-gray-800 font-semibold">
-              Selected: {subscriptionPlans.find(p => p.id === selectedPlanId)?.name}
-            </div>
-            <StripeCheckoutButton 
-              plan={subscriptionPlans.find(p => p.id === selectedPlanId)!} 
-              buttonText="Subscribe Now"
-            />
-          </div>
-        )}
       </div>
     </RouteGuard>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
 
 interface DogImageUploaderProps {
@@ -15,7 +15,8 @@ export default function DogImageUploader({ initialImageUrl, onImageUploaded }: D
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Memoize the file upload function to avoid recreating it on each render
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
@@ -38,7 +39,7 @@ export default function DogImageUploader({ initialImageUrl, onImageUploaded }: D
     setUploadProgress(0);
     
     try {
-      // Step 1: Get a presigned URL for the upload
+      // Step 1: Get a presigned URL for the upload - perform basic validation client-side
       const presignedUrlResponse = await fetch('/api/s3/presigned-upload', {
         method: 'POST',
         headers: {
@@ -50,7 +51,7 @@ export default function DogImageUploader({ initialImageUrl, onImageUploaded }: D
           prefix: 'dog-profiles',
           metadata: {
             fileType: 'dog-profile',
-            timestamp: new Date().toISOString()
+            timestamp: Date.now().toString()
           }
         })
       });
@@ -83,10 +84,14 @@ export default function DogImageUploader({ initialImageUrl, onImageUploaded }: D
       const fullImageUrl = `https://${bucket}.s3.amazonaws.com/${key}`;
       
       // Update state and notify parent component
-      console.log('Upload complete, setting image URL:', fullImageUrl);
       setImageUrl(fullImageUrl);
       onImageUploaded(fullImageUrl);
       setUploadProgress(100);
+      
+      // Clear the file input to allow re-uploading the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       
       // Force a re-render by triggering a state update
       setTimeout(() => {
@@ -98,7 +103,7 @@ export default function DogImageUploader({ initialImageUrl, onImageUploaded }: D
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [onImageUploaded]);
 
   const triggerFileInput = () => {
     fileInputRef.current?.click();
@@ -121,11 +126,13 @@ export default function DogImageUploader({ initialImageUrl, onImageUploaded }: D
                 src={imageUrl} 
                 alt="Dog preview" 
                 fill 
+                loading="lazy"
                 unoptimized={true}
                 className="object-cover"
                 key={imageUrl}
                 onError={() => setImageUrl('')}
-                onLoad={() => console.log('Image loaded successfully:', imageUrl)}
+                sizes="128px"
+                priority={false}
               />
               <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-10 transition-opacity flex items-center justify-center">
                 <span className="text-white text-sm font-medium opacity-0 hover:opacity-100">Change</span>

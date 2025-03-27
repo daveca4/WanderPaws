@@ -86,7 +86,7 @@ export function WorkflowProgress() {
       // Set up workflow status
       const status = [
         { step: 'Register Account', completed: isRegistered, enabled: true },
-        { step: 'Add Dog', completed: hasAddedDogs, enabled: isRegistered },
+        { step: 'Add Dog', completed: hasAddedDogs, enabled: true },
         { step: 'Dog Assessment', completed: hasCompletedAssessment, enabled: hasAddedDogs },
         { step: 'Buy Subscription', completed: hasActiveSubscription, enabled: hasCompletedAssessment },
         { step: 'Book Walks', completed: hasBookings, enabled: hasActiveSubscription }
@@ -112,18 +112,19 @@ export function WorkflowProgress() {
     <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
       <div className="p-4 sm:p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Getting Started with WanderPaws</h2>
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 gap-4 auto-cols-fr" style={{
+          gridTemplateColumns: `repeat(${workflowStatus.filter(status => !status.completed).length}, minmax(0, 1fr))`
+        }}>
           {WORKFLOW_STEPS.map((step, index) => {
             const status = workflowStatus[index];
+            // Skip completed steps
+            if (status?.completed) return null;
+            
             let bgColor = "bg-gray-100";
             let textColor = "text-gray-500";
             let borderColor = "border-gray-200";
             
-            if (status?.completed) {
-              bgColor = "bg-green-50";
-              textColor = "text-green-700";
-              borderColor = "border-green-400";
-            } else if (status?.enabled && !status?.completed) {
+            if (status?.enabled && !status?.completed) {
               bgColor = "bg-blue-50";
               textColor = "text-blue-700";
               borderColor = "border-blue-400";
@@ -136,10 +137,10 @@ export function WorkflowProgress() {
                 className={`relative flex flex-col items-center p-4 rounded-lg border-2 ${borderColor} ${bgColor} ${!status?.enabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-md transition-shadow'}`}
                 onClick={(e: React.MouseEvent<HTMLAnchorElement>) => !status?.enabled && e.preventDefault()}
               >
-                <div className={`rounded-full p-2 mb-2 ${status?.completed ? 'bg-green-100' : (status?.enabled ? 'bg-blue-100' : 'bg-gray-200')}`}>
+                <div className={`rounded-full p-2 mb-2 ${status?.enabled ? 'bg-blue-100' : 'bg-gray-200'}`}>
                   <svg 
                     xmlns="http://www.w3.org/2000/svg" 
-                    className={`h-6 w-6 ${status?.completed ? 'text-green-600' : (status?.enabled ? 'text-blue-600' : 'text-gray-500')}`} 
+                    className={`h-6 w-6 ${status?.enabled ? 'text-blue-600' : 'text-gray-500'}`} 
                     fill="none" 
                     viewBox="0 0 24 24" 
                     stroke="currentColor"
@@ -149,13 +150,6 @@ export function WorkflowProgress() {
                 </div>
                 <span className={`text-sm font-medium ${textColor} text-center`}>{step.title}</span>
                 <span className="text-xs text-center mt-1">{step.description}</span>
-                {status?.completed && (
-                  <div className="absolute top-2 right-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                  </div>
-                )}
               </Link>
             );
           })}

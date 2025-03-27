@@ -95,8 +95,9 @@ export default function AssessmentRequestPage() {
       
       if (response.ok) {
         console.log('Assessment created successfully');
-        // Redirect to subscription page to continue the flow
-        router.push('/owner-dashboard/subscriptions');
+        // Redirect to assessment scheduling page instead of subscription page
+        const assessmentData = await response.json();
+        router.push(`/owner-dashboard/dogs/assessment-scheduling/${assessmentData.id}`);
       } else {
         const data = await response.json();
         throw new Error(data.error || 'Failed to create assessment');
@@ -159,7 +160,7 @@ export default function AssessmentRequestPage() {
                     fill
                     unoptimized={true}
                     className="object-cover"
-                    onError={(e) => {
+                    onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                       console.error('Error loading dog image:', e);
                       // Fallback to initial
                       const target = e.target as HTMLImageElement;
@@ -206,13 +207,13 @@ export default function AssessmentRequestPage() {
                   <span className="font-medium">Request assessment:</span> Submit your request for {dog.name}'s assessment
                 </li>
                 <li className="text-gray-700">
-                  <span className="font-medium">Schedule:</span> Our admin team will review and assign a qualified walker
+                  <span className="font-medium">Schedule:</span> Select an available time for the assessment
                 </li>
                 <li className="text-gray-700">
                   <span className="font-medium">Assessment:</span> The walker will meet with you and {dog.name} to assess behavior and compatibility
                 </li>
                 <li className="text-gray-700">
-                  <span className="font-medium">Approval:</span> Once approved, you can book walks for {dog.name}
+                  <span className="font-medium">Approval:</span> Once approved, you'll be directed to choose a subscription
                 </li>
               </ol>
               

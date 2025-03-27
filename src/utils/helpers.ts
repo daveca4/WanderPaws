@@ -136,4 +136,46 @@ export const getWalksByDate = (walks: Walk[], date: Date): Walk[] => {
 // Get all existing IDs of a certain type to avoid duplicates
 export const getExistingIds = (array: { id: string }[]): string[] => {
   return array.map(item => item.id);
+};
+
+// Get available time slots for a walker on a specific date
+export const getAvailableTimeSlots = (walkerId: string, date: string, walks: Walk[] = []): ('AM' | 'PM')[] => {
+  // Get all walks for this walker on this date
+  const walkerWalks = walks.filter(walk => 
+    walk.walkerId === walkerId && 
+    walk.date === date
+  );
+  
+  // Check which time slots are taken
+  const isMorningTaken = walkerWalks.some(walk => walk.timeSlot === 'AM');
+  const isAfternoonTaken = walkerWalks.some(walk => walk.timeSlot === 'PM');
+  
+  const availableSlots: ('AM' | 'PM')[] = [];
+  
+  if (!isMorningTaken) availableSlots.push('AM');
+  if (!isAfternoonTaken) availableSlots.push('PM');
+  
+  return availableSlots;
+};
+
+// Check if a walker is available at a specific time slot
+export const isWalkerAvailable = (walkerId: string, date: string, timeSlot: 'AM' | 'PM', walks: Walk[] = []): boolean => {
+  // Get all walks for this walker on this date
+  const walkerWalks = walks.filter(walk => 
+    walk.walkerId === walkerId && 
+    walk.date === date
+  );
+  
+  // Check if this time slot is already booked
+  return !walkerWalks.some(walk => walk.timeSlot === timeSlot);
+};
+
+// Get the actual time from a time slot
+export const getTimeFromTimeSlot = (timeSlot: 'AM' | 'PM'): string => {
+  return timeSlot === 'AM' ? '09:00' : '14:00';
+};
+
+// Get a booking by ID
+export const getBookingById = (walks: Walk[], id: string): Walk | undefined => {
+  return walks.find(walk => walk.id === id);
 }; 

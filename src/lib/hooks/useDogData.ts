@@ -23,13 +23,30 @@ export function useDogs() {
 export function useOwnerDogs(ownerId: string | undefined) {
   return useQuery(
     [...dogKeys.lists(), { owner: ownerId }],
-    () => {
-      if (!ownerId) return [];
-      return DogAPI.getByOwnerId(ownerId);
+    async () => {
+      if (!ownerId) {
+        console.log('No owner ID provided to useOwnerDogs');
+        return [];
+      }
+      
+      try {
+        console.log('Fetching dogs for owner:', ownerId);
+        const dogs = await DogAPI.getByOwnerId(ownerId);
+        console.log('Fetched dogs:', dogs);
+        return dogs;
+      } catch (error) {
+        console.error('Error fetching owner dogs:', error);
+        throw error;
+      }
     },
     {
       enabled: !!ownerId,
-      staleTime: 60000
+      staleTime: 60000,
+      retry: 2,
+      retryDelay: 1000,
+      onError: (error) => {
+        console.error('useOwnerDogs error:', error);
+      }
     }
   );
 }
@@ -76,42 +93,54 @@ export function useUpdateDog() {
       onMutate: async ({ id, data }) => {
         // Cancel outgoing refetches
         await queryClient.cancelQueries(dogKeys.detail(id));
+        await queryClient.cancelQueries(dogKeys.lists());
         
         // Snapshot the previous value
         const previousDog = queryClient.getQueryData<Dog>(dogKeys.detail(id));
+        const previousDogs = queryClient.getQueryData<Dog[]>(dogKeys.lists());
         
         // Optimistically update the cache
         if (previousDog) {
+          console.log('Optimistically updating dog in cache:', { ...previousDog, ...data });
           queryClient.setQueryData<Dog>(dogKeys.detail(id), {
             ...previousDog,
             ...data
           });
           
           // Also update in the dogs list
-          queryClient.setQueryData<Dog[]>(dogKeys.lists(), (old = []) => 
-            old.map(dog => dog.id === id ? { ...dog, ...data } : dog)
-          );
+          if (previousDogs) {
+            queryClient.setQueryData<Dog[]>(dogKeys.lists(), 
+              previousDogs.map(dog => dog.id === id ? { ...dog, ...data } : dog)
+            );
+          }
         }
         
-        return { previousDog };
+        return { previousDog, previousDogs };
       },
       
       // If the mutation fails, use the context we saved
       onError: (err, { id }, context: any) => {
+        console.error('Error in dog update mutation:', err);
+        
         if (context?.previousDog) {
+          // Revert the detail view
           queryClient.setQueryData(dogKeys.detail(id), context.previousDog);
-          
-          // Update list cache too
-          queryClient.setQueryData<Dog[]>(dogKeys.lists(), (old = []) => 
-            old.map(dog => dog.id === id ? context.previousDog : dog)
-          );
+        }
+        
+        if (context?.previousDogs) {
+          // Revert the list view
+          queryClient.setQueryData(dogKeys.lists(), context.previousDogs);
         }
       },
       
       // Always refetch after error or success to ensure cache consistency
       onSettled: (data, error, { id }) => {
+        console.log('Dog update settled, invalidating queries');
+        // Force refetch both the detail and list queries
         queryClient.invalidateQueries(dogKeys.detail(id));
         queryClient.invalidateQueries(dogKeys.lists());
+        queryClient.refetchQueries(dogKeys.detail(id));
+        queryClient.refetchQueries(dogKeys.lists());
       },
     }
   );

@@ -64,7 +64,7 @@ export default function DogDetailsPage() {
   }
 
   return (
-    <RouteGuard requiredPermission={{ action: 'view', resource: 'dogs' }}>
+    <RouteGuard requiredPermission={{ action: 'read', resource: 'dogs' }}>
       <div className="space-y-6">
         {/* Top section with navigation */}
         <div className="flex justify-between items-center">
@@ -115,9 +115,13 @@ export default function DogDetailsPage() {
                   src={dog.imageUrl} 
                   alt={dog.name} 
                   fill 
+                  unoptimized={true}
                   className="object-cover"
                   onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    e.currentTarget.src = '/dog-placeholder.png';
+                    // Fallback to default image on error
+                    const target = e.target as HTMLImageElement;
+                    target.src = '/dog-placeholder.png';
+                    console.log("Image failed to load, using placeholder", e);
                   }}
                 />
               ) : (

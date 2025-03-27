@@ -13,12 +13,26 @@ let prisma: PrismaClient;
 if (typeof window === 'undefined') {
   // We're on the server
   if (process.env.NODE_ENV === 'production') {
-    prisma = new PrismaClient();
+    prisma = new PrismaClient({
+      log: ['error'],
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL,
+        },
+      },
+    });
   } else {
     // In development, use a global variable so that the value
     // is preserved across module reloads caused by HMR (Hot Module Replacement).
     if (!global.prisma) {
-      global.prisma = new PrismaClient();
+      global.prisma = new PrismaClient({
+        log: ['query', 'error', 'warn'],
+        datasources: {
+          db: {
+            url: process.env.DATABASE_URL,
+          },
+        },
+      });
     }
     prisma = global.prisma;
   }
@@ -31,6 +45,22 @@ if (typeof window === 'undefined') {
         'PrismaClient cannot be accessed on the client side. Please use data context or server components for database access.'
       );
     },
+  });
+}
+
+// Add query performance monitoring in development
+if (process.env.NODE_ENV === 'development' && typeof window === 'undefined') {
+  prisma.$use(async (params, next) => {
+    const start = performance.now();
+    const result = await next(params);
+    const end = performance.now();
+    const time = end - start;
+    
+    if (time > 100) {
+      console.warn(`Slow query detected (${time.toFixed(2)}ms): ${params.model}.${params.action}`);
+    }
+    
+    return result;
   });
 }
 
@@ -166,6 +196,4 @@ export async function updateStripePaymentWithSubscription(
     console.error('Error updating Stripe payment record:', error);
     throw error;
   }
-}
-
-// Only export the necessary functions that are actually used directly in API routes 
+} 

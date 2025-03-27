@@ -116,7 +116,10 @@ export default function EditDogPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    if (!user || !user.profileId) return;
+    if (!user || !user.profileId) {
+      setError('User profile not found. Please try logging out and back in.');
+      return;
+    }
     
     setSaving(true);
     setError('');
@@ -134,13 +137,22 @@ export default function EditDogPage() {
       };
       
       console.log('Updating dog:', dogData);
+      console.log('Current user:', user);
+      console.log('User profile ID:', user.profileId);
       
       // Use React Query mutation with optimistic updates
-      // This will update the UI immediately while the API call happens in the background
-      await updateDogMutation.mutateAsync({ id: dogId, data: dogData });
+      const result = await updateDogMutation.mutateAsync({ id: dogId, data: dogData });
       
-      // Redirect after successful update
-      router.push(`/owner-dashboard/dogs/${dogId}`);
+      console.log('Update result:', result);
+      
+      // Only redirect if we got a successful response
+      if (result && !updateDogMutation.isError) {
+        // Redirect after successful update
+        router.push(`/owner-dashboard/dogs/${dogId}`);
+      } else {
+        setError('Failed to update dog');
+        setSaving(false);
+      }
     } catch (error) {
       console.error('Error updating dog:', error);
       setError(`Failed to update dog: ${error instanceof Error ? error.message : 'Unknown error'}`);

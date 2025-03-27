@@ -106,7 +106,7 @@ let s3Client: S3Client;
 if (typeof window === 'undefined') {
   // Server-side configuration
   const s3Config: S3ClientConfig = {
-    region: process.env.AWS_REGION || 'us-east-1',
+    region: process.env.AWS_REGION || 'eu-central-1',
     credentials: {
       accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
@@ -161,7 +161,7 @@ export const getPresignedUploadUrl = async (
     ? `${prefix}/${timestamp}-${sanitizedName}` 
     : `${timestamp}-${sanitizedName}`;
   
-  const bucketName = process.env.AWS_S3_BUCKET_NAME || 'wanderpaws-media';
+  const bucketName = process.env.AWS_S3_BUCKET_NAME || 'wanderpaws';
   
   // Create the command for the operation
   const command = new PutObjectCommand({

@@ -12,8 +12,9 @@ export default function DogDetailsPage() {
   const router = useRouter();
   const params = useParams();
   const dogId = params.id as string;
-  const { dogs, owners, walks, isLoading, error: dataError, getDogById, getOwnerById } = useData();
+  const { dogs, owners, walks, getDogById, getOwnerById } = useData();
   
+  const [isLoading, setIsLoading] = useState(true);
   const [healthInsights, setHealthInsights] = useState<any>(null);
   const [walkerRecommendation, setWalkerRecommendation] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +23,7 @@ export default function DogDetailsPage() {
     console.log('Dog ID from params:', dogId);
     console.log('All dogs:', dogs);
     
-    if (!isLoading && dogs.length > 0) {
+    if (dogs.length > 0) {
       // Check if the dog exists
       const dogExists = dogs.some(d => d.id === dogId);
       console.log('Dog exists in data?', dogExists);
@@ -30,8 +31,10 @@ export default function DogDetailsPage() {
       if (!dogExists) {
         setError(`Dog with ID ${dogId} not found in database`);
       }
+      
+      setIsLoading(false);
     }
-  }, [dogId, dogs, isLoading]);
+  }, [dogId, dogs]);
   
   // Get dog data
   const dog = getDogById(dogId);
@@ -89,11 +92,11 @@ export default function DogDetailsPage() {
   }
   
   // Show error state
-  if (dataError || error) {
+  if (error) {
     return (
       <div className="text-center py-12">
         <h1 className="text-2xl font-bold text-red-600">Error</h1>
-        <p className="mt-2 text-gray-600">{dataError || error || "Something went wrong"}</p>
+        <p className="mt-2 text-gray-600">{error}</p>
         <button 
           onClick={() => router.back()} 
           className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
@@ -141,7 +144,7 @@ export default function DogDetailsPage() {
             alt={dog.name}
             fill
             className="object-cover"
-            onError={(e) => {
+            onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
               // Fallback to default image on error
               const target = e.target as HTMLImageElement;
               target.src = '/images/default-dog.png';
@@ -227,7 +230,7 @@ export default function DogDetailsPage() {
               </dl>
               
               <div className="mt-6 flex space-x-3">
-                <Link href={`/dogs/${dogId}/edit`} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                <Link href={`/owner-dashboard/dogs/${dogId}/edit`} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
                   Edit Dog
                 </Link>
                 <Link href={`/schedule/new?dogId=${dogId}`} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700">
