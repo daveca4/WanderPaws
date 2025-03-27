@@ -24,4 +24,46 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const data = await request.json();
+    
+    // Validate required fields
+    if (!data.name || !data.description || !data.walkCredits || !data.price) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+    
+    // Create the subscription plan
+    const plan = await prisma.subscriptionPlan.create({
+      data: {
+        name: data.name,
+        description: data.description,
+        walkCredits: data.walkCredits,
+        walkDuration: data.walkDuration || 60,
+        price: data.price,
+        // Note: validityPeriod is not in the schema, we need to store this in features or add it to the schema
+        features: [`Valid for ${data.validityPeriod} days`],
+        isActive: data.isActive === undefined ? true : data.isActive,
+        discountPercentage: data.discountPercentage || 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+    });
+    
+    return NextResponse.json({ 
+      plan,
+      message: 'Subscription plan created successfully' 
+    }, { status: 201 });
+  } catch (error) {
+    console.error('Error creating subscription plan:', error);
+    return NextResponse.json(
+      { error: 'Failed to create subscription plan' },
+      { status: 500 }
+    );
+  }
 } 

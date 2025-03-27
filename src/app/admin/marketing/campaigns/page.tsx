@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import RouteGuard from '@/components/RouteGuard';
 import { formatPrice } from '@/utils/format';
-// Removed mock data import
+import { fetchMarketingCampaigns } from '@/utils/dataHelpers';
+import { MarketingCampaign } from '@/lib/types';
 
 // Campaign status options with colors for visual indicators
 const statusOptions = [
@@ -14,7 +15,6 @@ const statusOptions = [
   { value: 'scheduled', label: 'Scheduled', color: 'yellow' },
   { value: 'active', label: 'Active', color: 'green' },
   { value: 'completed', label: 'Completed', color: 'blue' },
-  { value: 'cancelled', label: 'Cancelled', color: 'red' },
 ];
 
 // Campaign type options
@@ -23,7 +23,6 @@ const typeOptions = [
   { value: 'email', label: 'Email', color: 'blue' },
   { value: 'sms', label: 'SMS', color: 'purple' },
   { value: 'in-app', label: 'In-App', color: 'green' },
-  { value: 'push', label: 'Push Notification', color: 'orange' },
 ];
 
 // Audience segment options
@@ -49,238 +48,61 @@ const sortOptions = [
   { value: 'conversion_low', label: 'Lowest conversion' },
 ];
 
-// Mock data for campaign list
-const mockCampaigns = [
-  { 
-    id: 'camp1', 
-    name: 'Summer Special Offer', 
-    type: 'email',
-    status: 'active',
-    audience: 'Low Usage Subscribers',
-    sent: 156,
-    opened: 102,
-    clicked: 68,
-    converted: 24,
-    conversionRate: 15.4,
-    revenue: 72000,
-    startDate: '2023-06-15',
-    endDate: '2023-07-15',
-    createdAt: '2023-06-10T12:00:00Z',
-    creator: 'Admin User',
-    description: 'Special summer promotion with discounts on subscription upgrades.'
-  },
-  { 
-    id: 'camp2', 
-    name: 'Renewal Reminder', 
-    type: 'email',
-    status: 'completed',
-    audience: 'Expiring Subscriptions',
-    sent: 85,
-    opened: 76,
-    clicked: 52,
-    converted: 38,
-    conversionRate: 44.7,
-    revenue: 114000,
-    startDate: '2023-05-20',
-    endDate: '2023-06-05',
-    createdAt: '2023-05-15T10:30:00Z',
-    creator: 'Admin User',
-    description: 'Reminder email for subscriptions expiring within 14 days.'
-  },
-  { 
-    id: 'camp3', 
-    name: 'New Premium Plan', 
-    type: 'in-app',
-    status: 'draft',
-    audience: 'All Active Users',
-    sent: 0,
-    opened: 0,
-    clicked: 0,
-    converted: 0,
-    conversionRate: 0,
-    revenue: 0,
-    startDate: '',
-    endDate: '',
-    createdAt: '2023-07-01T15:45:00Z',
-    creator: 'Marketing Manager',
-    description: 'Announcement of new premium subscription plan with added benefits.'
-  },
-  { 
-    id: 'camp4', 
-    name: 'Win Back Campaign', 
-    type: 'sms',
-    status: 'scheduled',
-    audience: 'Churned Customers',
-    sent: 0,
-    opened: 0,
-    clicked: 0,
-    converted: 0,
-    conversionRate: 0,
-    revenue: 0,
-    startDate: '2023-08-01',
-    endDate: '2023-08-15',
-    createdAt: '2023-07-20T09:15:00Z',
-    creator: 'Admin User',
-    description: 'Re-engagement campaign for customers who cancelled subscription in the last 90 days.'
-  },
-  { 
-    id: 'camp5', 
-    name: 'Loyalty Program Launch', 
-    type: 'email',
-    status: 'active',
-    audience: 'High Value Customers',
-    sent: 210,
-    opened: 185,
-    clicked: 142,
-    converted: 63,
-    conversionRate: 30.0,
-    revenue: 189000,
-    startDate: '2023-07-01',
-    endDate: '2023-08-01',
-    createdAt: '2023-06-25T14:00:00Z',
-    creator: 'Marketing Manager',
-    description: 'Introduction of new loyalty rewards program for premium subscribers.'
-  },
-  { 
-    id: 'camp6', 
-    name: 'Feedback Survey', 
-    type: 'email',
-    status: 'completed',
-    audience: 'Recent Customers',
-    sent: 320,
-    opened: 218,
-    clicked: 102,
-    converted: 0,
-    conversionRate: 0,
-    revenue: 0,
-    startDate: '2023-04-10',
-    endDate: '2023-04-20',
-    createdAt: '2023-04-05T11:20:00Z',
-    creator: 'Admin User',
-    description: 'Customer satisfaction survey for users who completed walks in the last 30 days.'
-  },
-  { 
-    id: 'camp7', 
-    name: 'Holiday Special', 
-    type: 'email',
-    status: 'draft',
-    audience: 'All Active Users',
-    sent: 0,
-    opened: 0,
-    clicked: 0,
-    converted: 0,
-    conversionRate: 0,
-    revenue: 0,
-    startDate: '2023-12-01',
-    endDate: '2023-12-25',
-    createdAt: '2023-07-15T16:30:00Z',
-    creator: 'Marketing Manager',
-    description: 'Holiday season special offers and discounts on multi-walk packages.'
-  },
-  { 
-    id: 'camp8', 
-    name: 'App Update Notification', 
-    type: 'in-app',
-    status: 'completed',
-    audience: 'All Active Users',
-    sent: 950,
-    opened: 750,
-    clicked: 320,
-    converted: 0,
-    conversionRate: 0,
-    revenue: 0,
-    startDate: '2023-03-01',
-    endDate: '2023-03-15',
-    createdAt: '2023-02-25T10:00:00Z',
-    creator: 'Admin User',
-    description: 'Notification about app updates and new features.'
-  },
-  { 
-    id: 'camp9', 
-    name: 'Credit Expiry Reminder', 
-    type: 'email',
-    status: 'active',
-    audience: 'Low Usage Subscribers',
-    sent: 75,
-    opened: 62,
-    clicked: 41,
-    converted: 18,
-    conversionRate: 24.0,
-    revenue: 36000,
-    startDate: '2023-07-10',
-    endDate: '2023-08-10',
-    createdAt: '2023-07-05T09:30:00Z',
-    creator: 'Admin User',
-    description: 'Reminder for subscribers with unused credits expiring soon.'
-  },
-  { 
-    id: 'camp10', 
-    name: 'New Walker Introduction', 
-    type: 'email',
-    status: 'scheduled',
-    audience: 'All Active Users',
-    sent: 0,
-    opened: 0,
-    clicked: 0,
-    converted: 0,
-    conversionRate: 0,
-    revenue: 0,
-    startDate: '2023-08-05',
-    endDate: '2023-08-20',
-    createdAt: '2023-07-25T13:45:00Z',
-    creator: 'Marketing Manager',
-    description: 'Introduction of new walkers joining the platform in specific areas.'
-  },
-];
-
 export default function CampaignsPage() {
   const router = useRouter();
-  
-  // Filter states
+  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [audienceFilter, setAudienceFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDateRange, setSelectedDateRange] = useState('all');
   const [sortBy, setSortBy] = useState('newest');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
+  const [campaigns, setCampaigns] = useState<MarketingCampaign[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
-  
-  // UI states
-  const [actionInProgress, setActionInProgress] = useState('');
-  const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([]);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
-  const [isAllSelected, setIsAllSelected] = useState(false);
 
-  // Handle select all campaigns
-  const handleSelectAll = () => {
-    if (isAllSelected) {
-      setSelectedCampaigns([]);
-    } else {
-      setSelectedCampaigns(filteredCampaigns.map(camp => camp.id));
-    }
-    setIsAllSelected(!isAllSelected);
-  };
+  // Fetch campaigns from API
+  useEffect(() => {
+    const getCampaigns = async () => {
+      try {
+        setLoading(true);
+        const data = await fetchMarketingCampaigns();
+        setCampaigns(data);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching campaigns:', err);
+        setError('Failed to load campaigns. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Handle toggle selection of a campaign
-  const handleSelectCampaign = (id: string) => {
-    setSelectedCampaigns(prev => 
-      prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]
-    );
-  };
-  
-  // Apply all filters
-  const filteredCampaigns = mockCampaigns.filter(campaign => {
+    getCampaigns();
+  }, []);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, typeFilter, audienceFilter, searchQuery, selectedDateRange, sortBy]);
+
+  // Apply filters
+  const filteredCampaigns = campaigns.filter(campaign => {
     // Filter by status
-    if (statusFilter !== 'all' && campaign.status !== statusFilter) {
+    if (statusFilter !== 'all' && campaign.status !== statusFilter && 
+        (statusFilter === 'active' || statusFilter === 'completed' || 
+         statusFilter === 'draft' || statusFilter === 'scheduled')) {
       return false;
     }
     
     // Filter by type
-    if (typeFilter !== 'all' && campaign.type !== typeFilter) {
+    if (typeFilter !== 'all' && campaign.type !== typeFilter && 
+        (typeFilter === 'email' || typeFilter === 'in-app' || typeFilter === 'sms')) {
       return false;
     }
     
@@ -313,9 +135,11 @@ export default function CampaignsPage() {
     }
     
     return true;
-  }).sort((a, b) => {
-    // Apply sorting
-    switch (sortBy) {
+  });
+
+  // Apply sorting
+  const sortedCampaigns = [...filteredCampaigns].sort((a, b) => {
+    switch(sortBy) {
       case 'newest':
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       case 'oldest':
@@ -340,22 +164,24 @@ export default function CampaignsPage() {
   // Calculate pagination
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredCampaigns.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredCampaigns.length / itemsPerPage);
+  const currentItems = sortedCampaigns.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(sortedCampaigns.length / itemsPerPage);
 
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [statusFilter, typeFilter, audienceFilter, searchQuery, selectedDateRange, sortBy]);
+  const handleSelectAll = () => {
+    if (selectedCampaigns.length === filteredCampaigns.length) {
+      setSelectedCampaigns([]);
+    } else {
+      setSelectedCampaigns(filteredCampaigns.map(campaign => campaign.id));
+    }
+  };
 
-  // Update isAllSelected when selections change
-  useEffect(() => {
-    setIsAllSelected(
-      filteredCampaigns.length > 0 && 
-      selectedCampaigns.length === filteredCampaigns.length
+  // Handle toggle selection of a campaign
+  const handleSelectCampaign = (id: string) => {
+    setSelectedCampaigns(prev => 
+      prev.includes(id) ? prev.filter(cid => cid !== id) : [...prev, id]
     );
-  }, [selectedCampaigns, filteredCampaigns]);
-
+  };
+  
   // Handle campaign deletion
   const handleDeleteCampaign = async (id: string) => {
     setCampaignToDelete(id);
@@ -365,8 +191,6 @@ export default function CampaignsPage() {
   // Confirm deletion
   const confirmDelete = async () => {
     if (!campaignToDelete) return;
-    
-    setActionInProgress('delete');
     
     try {
       // In a real app, this would call an API endpoint
@@ -384,16 +208,12 @@ export default function CampaignsPage() {
     } catch (error) {
       console.error('Error deleting campaign:', error);
       alert('Failed to delete campaign');
-    } finally {
-      setActionInProgress('');
     }
   };
 
   // Handle bulk actions
   const handleBulkAction = async (action: 'delete' | 'duplicate' | 'cancel' | 'activate') => {
     if (selectedCampaigns.length === 0) return;
-    
-    setActionInProgress(action);
     
     try {
       // In a real app, this would call an API endpoint
@@ -413,15 +233,11 @@ export default function CampaignsPage() {
     } catch (error) {
       console.error(`Error performing bulk ${action}:`, error);
       alert(`Failed to ${action} campaigns`);
-    } finally {
-      setActionInProgress('');
     }
   };
 
   // Handle duplicate campaign
   const handleDuplicateCampaign = async (id: string) => {
-    setActionInProgress('duplicate');
-    
     try {
       // In a real app, this would call an API endpoint
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -432,8 +248,6 @@ export default function CampaignsPage() {
     } catch (error) {
       console.error('Error duplicating campaign:', error);
       alert('Failed to duplicate campaign');
-    } finally {
-      setActionInProgress('');
     }
   };
 
@@ -469,7 +283,7 @@ export default function CampaignsPage() {
           <div className="bg-white overflow-hidden shadow rounded-lg">
             <div className="px-4 py-5 sm:p-6">
               <dt className="text-sm font-medium text-gray-500 truncate">Total Campaigns</dt>
-              <dd className="mt-1 text-3xl font-semibold text-gray-900">{mockCampaigns.length}</dd>
+              <dd className="mt-1 text-3xl font-semibold text-gray-900">{campaigns.length}</dd>
             </div>
           </div>
           
@@ -477,7 +291,7 @@ export default function CampaignsPage() {
             <div className="px-4 py-5 sm:p-6">
               <dt className="text-sm font-medium text-gray-500 truncate">Active</dt>
               <dd className="mt-1 text-3xl font-semibold text-green-600">
-                {mockCampaigns.filter(c => c.status === 'active').length}
+                {campaigns.filter(c => c.status === 'active').length}
               </dd>
             </div>
           </div>
@@ -486,7 +300,7 @@ export default function CampaignsPage() {
             <div className="px-4 py-5 sm:p-6">
               <dt className="text-sm font-medium text-gray-500 truncate">Scheduled</dt>
               <dd className="mt-1 text-3xl font-semibold text-amber-600">
-                {mockCampaigns.filter(c => c.status === 'scheduled').length}
+                {campaigns.filter(c => c.status === 'scheduled').length}
               </dd>
             </div>
           </div>
@@ -495,7 +309,7 @@ export default function CampaignsPage() {
             <div className="px-4 py-5 sm:p-6">
               <dt className="text-sm font-medium text-gray-500 truncate">Completed</dt>
               <dd className="mt-1 text-3xl font-semibold text-blue-600">
-                {mockCampaigns.filter(c => c.status === 'completed').length}
+                {campaigns.filter(c => c.status === 'completed').length}
               </dd>
             </div>
           </div>
@@ -504,7 +318,7 @@ export default function CampaignsPage() {
             <div className="px-4 py-5 sm:p-6">
               <dt className="text-sm font-medium text-gray-500 truncate">Total Revenue</dt>
               <dd className="mt-1 text-3xl font-semibold text-gray-900">
-                {formatPrice(mockCampaigns.reduce((sum, camp) => sum + camp.revenue, 0))}
+                {formatPrice(campaigns.reduce((sum, camp) => sum + camp.revenue, 0))}
               </dd>
             </div>
           </div>
@@ -620,7 +434,6 @@ export default function CampaignsPage() {
               <button
                 type="button"
                 onClick={() => handleBulkAction('activate')}
-                disabled={actionInProgress !== ''}
                 className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none"
               >
                 Activate
@@ -628,7 +441,6 @@ export default function CampaignsPage() {
               <button
                 type="button"
                 onClick={() => handleBulkAction('cancel')}
-                disabled={actionInProgress !== ''}
                 className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-yellow-700 bg-yellow-100 hover:bg-yellow-200 focus:outline-none"
               >
                 Cancel
@@ -636,7 +448,6 @@ export default function CampaignsPage() {
               <button
                 type="button"
                 onClick={() => handleBulkAction('duplicate')}
-                disabled={actionInProgress !== ''}
                 className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none"
               >
                 Duplicate
@@ -644,7 +455,6 @@ export default function CampaignsPage() {
               <button
                 type="button"
                 onClick={() => handleBulkAction('delete')}
-                disabled={actionInProgress !== ''}
                 className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none"
               >
                 Delete
@@ -665,7 +475,7 @@ export default function CampaignsPage() {
                         id="select-all"
                         type="checkbox"
                         className="h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                        checked={isAllSelected}
+                        checked={selectedCampaigns.length === filteredCampaigns.length}
                         onChange={handleSelectAll}
                       />
                       <label htmlFor="select-all" className="sr-only">
@@ -731,8 +541,6 @@ export default function CampaignsPage() {
                             ? 'bg-blue-100 text-blue-800' 
                             : campaign.type === 'sms'
                             ? 'bg-purple-100 text-purple-800'
-                            : campaign.type === 'push'
-                            ? 'bg-orange-100 text-orange-800'
                             : 'bg-green-100 text-green-800'
                         }`}>
                           {campaign.type.toUpperCase()}
@@ -746,8 +554,6 @@ export default function CampaignsPage() {
                             ? 'bg-blue-100 text-blue-800'
                             : campaign.status === 'scheduled'
                             ? 'bg-yellow-100 text-yellow-800'
-                            : campaign.status === 'cancelled'
-                            ? 'bg-red-100 text-red-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}>
                           {campaign.status.toUpperCase()}
@@ -775,14 +581,12 @@ export default function CampaignsPage() {
                         <button
                           onClick={() => handleDuplicateCampaign(campaign.id)}
                           className="text-blue-600 hover:text-blue-900"
-                          disabled={actionInProgress !== ''}
                         >
                           Duplicate
                         </button>
                         <button
                           onClick={() => handleDeleteCampaign(campaign.id)}
                           className="text-red-600 hover:text-red-900"
-                          disabled={actionInProgress !== ''}
                         >
                           Delete
                         </button>
@@ -801,8 +605,8 @@ export default function CampaignsPage() {
                 <div>
                   <p className="text-sm text-gray-700">
                     Showing <span className="font-medium">{indexOfFirstItem + 1}</span> to{' '}
-                    <span className="font-medium">{Math.min(indexOfLastItem, filteredCampaigns.length)}</span> of{' '}
-                    <span className="font-medium">{filteredCampaigns.length}</span> results
+                    <span className="font-medium">{Math.min(indexOfLastItem, sortedCampaigns.length)}</span> of{' '}
+                    <span className="font-medium">{sortedCampaigns.length}</span> results
                   </p>
                 </div>
                 <div>
@@ -879,9 +683,8 @@ export default function CampaignsPage() {
                   type="button"
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:col-start-2 sm:text-sm"
                   onClick={confirmDelete}
-                  disabled={actionInProgress === 'delete'}
                 >
-                  {actionInProgress === 'delete' ? 'Deleting...' : 'Delete'}
+                  Delete
                 </button>
                 <button
                   type="button"

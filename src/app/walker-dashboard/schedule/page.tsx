@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
+import { useData } from '@/lib/DataContext';
 import { getUpcomingWalks, formatDate, formatTime, getDogById } from '@/utils/helpers';
 import { Walk } from '@/lib/types';
 import Image from 'next/image';
@@ -28,36 +29,55 @@ interface HolidayRequest {
   adminNotes?: string; // Admin notes on the request
 }
 
-// Mock holiday requests data - in a real app, this would come from a database
-const mockHolidayRequests: HolidayRequest[] = [
-  { id: 'h1', walkerId: 'w1', date: '2025-06-05', status: 'approved', reason: 'Family vacation', updatedAt: '2025-05-20T14:30:00Z', adminNotes: 'Approved, coverage arranged' },
-  { id: 'h2', walkerId: 'w1', date: '2025-06-15', status: 'pending', reason: 'Doctor appointment', createdAt: '2025-05-25T10:15:00Z' },
-  { id: 'h3', walkerId: 'w1', date: '2025-06-25', status: 'denied', reason: 'Personal day', updatedAt: '2025-05-22T09:45:00Z', adminNotes: 'Denied due to high demand' },
-  { id: 'h4', walkerId: 'w2', date: '2025-06-10', status: 'pending', reason: 'Wedding attendance', createdAt: '2025-05-26T16:20:00Z' },
-  { id: 'h5', walkerId: 'w2', date: '2025-07-04', status: 'approved', reason: 'Independence Day', updatedAt: '2025-06-01T11:10:00Z' },
-  { id: 'h6', walkerId: 'w3', date: '2025-06-30', status: 'pending', reason: 'Family emergency', createdAt: '2025-06-02T08:45:00Z' },
-];
-
 export default function WalkerSchedulePage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { walks, dogs, getDogById } = useData();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('calendar');
-  const [currentDate, setCurrentDate] = useState(new Date(2025, 5, 1)); // Starting with June 2025 for mock data
-  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month'); // Add calendar view state
-  const [holidayRequests, setHolidayRequests] = useState<HolidayRequest[]>(mockHolidayRequests);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [calendarView, setCalendarView] = useState<'day' | 'week' | 'month'>('month');
+  const [holidayRequests, setHolidayRequests] = useState<HolidayRequest[]>([]);
   const [showHolidayRequestForm, setShowHolidayRequestForm] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [reason, setReason] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+
+  // Fetch holiday requests for the walker
+  useEffect(() => {
+    const fetchHolidayRequests = async () => {
+      if (!user?.profileId) return;
+      
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/holiday-requests?walkerId=${user.profileId}`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch holiday requests');
+        }
+        
+        const data = await response.json();
+        setHolidayRequests(data.requests || []);
+      } catch (error) {
+        console.error('Error fetching holiday requests:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    if (user?.profileId) {
+      fetchHolidayRequests();
+    }
+  }, [user?.profileId]);
 
   // Redirect if not a walker or admin
   useEffect(() => {
-    if (!loading && user && user.role !== 'walker' && user.role !== 'admin') {
+    if (!authLoading && user && user.role !== 'walker' && user.role !== 'admin') {
       router.push('/unauthorized');
     }
-  }, [user, loading, router]);
+  }, [user, authLoading, router]);
 
   // If loading or not walker/admin, show loading state
-  if (loading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
+  if (authLoading || loading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -66,7 +86,13 @@ export default function WalkerSchedulePage() {
   }
 
   const walkerId = user.profileId || '';
-  const upcomingWalks = getUpcomingWalks(undefined, undefined, walkerId);
+  
+  // Get upcoming walks for this walker
+  const upcomingWalks = walks.filter(walk => 
+    walk.walkerId === walkerId && 
+    walk.status === 'scheduled' &&
+    new Date(walk.date) >= new Date()
+  );
 
   // Get walker's holiday requests
   const walkerHolidayRequests = holidayRequests.filter(req => req.walkerId === walkerId);
@@ -128,7 +154,7 @@ export default function WalkerSchedulePage() {
       return "bg-blue-100 text-blue-800 border-blue-200"; // Group walks
     }
     
-    // For mocking purposes, let's add some variety
+    // Different styling based on walk ID
     if (walk.id.includes('1') || walk.id.includes('5')) {
       return "bg-primary-100 text-primary-800 border-primary-200"; // Regular walks
     } else if (walk.id.includes('2') || walk.id.includes('7')) {
@@ -162,8 +188,7 @@ export default function WalkerSchedulePage() {
   };
 
   const goToToday = () => {
-    // For demo purposes, we'll stay in 2025 to show the mock data
-    setCurrentDate(new Date(2025, 5, 1));
+    setCurrentDate(new Date());
   };
 
   // Get the week range for the week view
@@ -356,7 +381,7 @@ export default function WalkerSchedulePage() {
     setReason('');
   };
 
-  const submitHolidayRequest = (e: React.FormEvent) => {
+  const submitHolidayRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Check if date has walks scheduled
@@ -371,27 +396,56 @@ export default function WalkerSchedulePage() {
       return;
     }
     
-    // Create new request
-    const newRequest: HolidayRequest = {
-      id: `h${Date.now()}`,
-      walkerId,
-      date: selectedDate,
-      status: 'pending',
-      reason,
-      createdAt: new Date().toISOString(),
-    };
-    
-    // Add to holiday requests
-    setHolidayRequests([...holidayRequests, newRequest]);
-    closeHolidayRequestForm();
-    
-    // Show success message
-    alert("Your time off request has been submitted successfully and is awaiting approval.");
+    try {
+      // Submit the holiday request to the API
+      const response = await fetch('/api/holiday-requests', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          walkerId,
+          date: selectedDate,
+          reason
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to submit holiday request');
+      }
+      
+      const data = await response.json();
+      
+      // Add to holiday requests
+      setHolidayRequests([...holidayRequests, data.request]);
+      closeHolidayRequestForm();
+      
+      // Show success message
+      alert("Your time off request has been submitted successfully and is awaiting approval.");
+    } catch (error) {
+      console.error('Error submitting holiday request:', error);
+      alert("Failed to submit holiday request. Please try again.");
+    }
   };
 
-  const cancelHolidayRequest = (id: string) => {
+  const cancelHolidayRequest = async (id: string) => {
     if (confirm("Are you sure you want to cancel this holiday request?")) {
-      setHolidayRequests(holidayRequests.filter(req => req.id !== id));
+      try {
+        const response = await fetch(`/api/holiday-requests/${id}`, {
+          method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to cancel holiday request');
+        }
+        
+        // Remove from holiday requests
+        setHolidayRequests(holidayRequests.filter(req => req.id !== id));
+        alert("Holiday request cancelled successfully.");
+      } catch (error) {
+        console.error('Error cancelling holiday request:', error);
+        alert("Failed to cancel holiday request. Please try again.");
+      }
     }
   };
 
@@ -821,7 +875,7 @@ export default function WalkerSchedulePage() {
                                   <div className="flex items-center">
                                     <span className="mr-1">🦮</span>
                                     <span>
-                                      {dog.walkingPreferences.preferredTimes.join(', ')} walker
+                                      30 min walk
                                     </span>
                                   </div>
                                 </div>

@@ -1,59 +1,89 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import Image from 'next/image';
-// Removed mock data import
-import { useAuth } from '@/lib/AuthContext';
-import { TimeSlot } from '@/lib/types';
+import Link from 'next/link';
+import { Walker } from '@/lib/types';
 
-export default function WalkerDetail({ params }: { params: { id: string } }) {
-  const router = useRouter();
-  const { user } = useAuth();
-  const [walker, setWalker] = useState<any>(null);
+interface WalkerDetailPageProps {
+  params: {
+    id: string;
+  };
+}
+
+export default function WalkerDetailPage({ params }: WalkerDetailPageProps) {
+  const [walker, setWalker] = useState<Walker | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || user.role !== 'admin') {
-      router.push('/auth/login');
-      return;
+    async function fetchWalker() {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/data/walkers/${params.id}`);
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error('Walker not found');
+          }
+          throw new Error('Failed to fetch walker details');
+        }
+        
+        const walkerData = await response.json();
+        setWalker(walkerData);
+      } catch (err) {
+        console.error('Error fetching walker:', err);
+        setError(err instanceof Error ? err.message : 'An error occurred');
+      } finally {
+        setLoading(false);
+      }
     }
-
-    // Fetch walker data
-    const foundWalker = mockWalkers.find(w => w.id === params.id);
-    if (foundWalker) {
-      setWalker(foundWalker);
-    }
-    setLoading(false);
-  }, [params.id, router, user]);
+    
+    fetchWalker();
+  }, [params.id]);
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      <div className="animate-pulse space-y-8">
+        <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+        <div className="flex flex-col md:flex-row gap-8">
+          <div className="w-full md:w-1/3">
+            <div className="h-64 bg-gray-200 rounded-lg"></div>
+          </div>
+          <div className="w-full md:w-2/3 space-y-4">
+            <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+            <div className="h-32 bg-gray-200 rounded"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white shadow rounded-lg p-6">
+        <h1 className="text-xl font-bold text-red-600">Error</h1>
+        <p className="my-4">{error}</p>
+        <Link 
+          href="/walkers" 
+          className="bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700"
+        >
+          Back to Walkers
+        </Link>
       </div>
     );
   }
 
   if (!walker) {
     return (
-      <div className="p-6">
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-yellow-700">
-                Walker not found. The walker may have been removed or you may have the wrong ID.
-              </p>
-            </div>
-          </div>
-        </div>
-        <Link href="/walkers" className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700">
+      <div className="bg-white shadow rounded-lg p-6">
+        <h1 className="text-xl font-bold text-red-600">Walker Not Found</h1>
+        <p className="my-4">The walker you are looking for could not be found.</p>
+        <Link 
+          href="/walkers" 
+          className="bg-primary-600 text-white px-4 py-2 rounded hover:bg-primary-700"
+        >
           Back to Walkers
         </Link>
       </div>
@@ -61,153 +91,139 @@ export default function WalkerDetail({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center">
-          <Link href="/walkers" className="mr-4 text-gray-500 hover:text-gray-700">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-            </svg>
-          </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Walker Details</h1>
-        </div>
-        <div className="flex space-x-3">
-          <Link 
-            href={`/walkers/${params.id}/edit`} 
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="-ml-1 mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <Link href="/walkers" className="text-primary-600 hover:text-primary-800 flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+          Back to Walkers
+        </Link>
+        <div className="flex space-x-2">
+          <Link href={`/walkers/${walker.id}/edit`} className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
             Edit Walker
+          </Link>
+          <Link href={`/walkers/${walker.id}/schedule`} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700">
+            Schedule Walk
           </Link>
         </div>
       </div>
-
-      <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row">
-            <div className="flex-shrink-0 mb-4 md:mb-0">
-              <div className="h-32 w-32 rounded-full overflow-hidden bg-gray-100 relative">
-                <Image
-                  src={walker.imageUrl || 'https://via.placeholder.com/128'}
-                  alt={walker.name}
-                  fill
-                  className="object-cover"
-                />
-              </div>
+      
+      <div className="bg-white shadow-sm rounded-lg overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-1 p-6">
+            <div className="aspect-w-1 aspect-h-1 w-full overflow-hidden rounded-lg bg-gray-100">
+              <Image
+                src={walker.imageUrl || 'https://via.placeholder.com/400'}
+                alt={walker.name}
+                width={400}
+                height={400}
+                className="object-cover"
+              />
             </div>
             
-            <div className="md:ml-6 flex-1">
-              <div className="flex flex-col md:flex-row md:justify-between">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">{walker.name}</h2>
-                  <div className="flex items-center mt-1">
-                    <div className="flex items-center">
-                      {[...Array(5)].map((_, i) => (
-                        <svg 
-                          key={i} 
-                          xmlns="http://www.w3.org/2000/svg" 
-                          className={`h-5 w-5 ${i < Math.floor(walker.rating) ? 'text-yellow-400' : 'text-gray-300'}`} 
-                          viewBox="0 0 20 20" 
-                          fill="currentColor"
-                        >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
-                      ))}
-                      <span className="ml-1 text-sm text-gray-600">{walker.rating.toFixed(1)} ({walker.reviews || 0} reviews)</span>
-                    </div>
-                  </div>
+            <div className="mt-6">
+              <h3 className="text-sm font-medium text-gray-900">Contact Information</h3>
+              <dl className="mt-2 space-y-1">
+                <div className="flex justify-between">
+                  <dt className="text-sm text-gray-500">Email:</dt>
+                  <dd className="text-sm text-gray-900">{walker.email}</dd>
                 </div>
-                <div className="mt-4 md:mt-0">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                    {walker.status || 'Active'}
-                  </span>
-                </div>
-              </div>
-              
-              <div className="mt-6 border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-semibold text-gray-900">Bio</h3>
-                <p className="mt-2 text-gray-600">{walker.bio}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="mt-8 border-t border-gray-200 pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Contact Information</h3>
-              <dl className="mt-2 space-y-3">
-                <div className="flex">
-                  <dt className="text-sm font-medium text-gray-500 w-24">Email:</dt>
-                  <dd className="text-sm text-gray-900">{walker.email || 'Not provided'}</dd>
-                </div>
-                <div className="flex">
-                  <dt className="text-sm font-medium text-gray-500 w-24">Phone:</dt>
-                  <dd className="text-sm text-gray-900">{walker.phone || 'Not provided'}</dd>
-                </div>
-                <div className="flex">
-                  <dt className="text-sm font-medium text-gray-500 w-24">Location:</dt>
-                  <dd className="text-sm text-gray-900">{walker.location || 'Not provided'}</dd>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-gray-500">Phone:</dt>
+                  <dd className="text-sm text-gray-900">{walker.phone}</dd>
                 </div>
               </dl>
             </div>
+
+            <div className="mt-6">
+              <h3 className="text-sm font-medium text-gray-900">Preferred Dog Sizes</h3>
+              <div className="mt-2 flex flex-wrap gap-1">
+                {walker.preferredDogSizes.map((size) => (
+                  <span key={size} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    {size.charAt(0).toUpperCase() + size.slice(1)}
+                  </span>
+                ))}
+              </div>
+            </div>
             
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Specialties</h3>
+            <div className="mt-6">
+              <h3 className="text-sm font-medium text-gray-900">Certifications</h3>
+              <ul className="mt-2 text-sm text-gray-600 space-y-1">
+                {walker.certificationsOrTraining.map((cert) => (
+                  <li key={cert} className="flex items-start">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    {cert}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          
+          <div className="md:col-span-2 p-6">
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{walker.name}</h1>
+                <div className="flex items-center mt-1">
+                  <div className="flex items-center">
+                    {[...Array(5)].map((_, i) => (
+                      <svg 
+                        key={i} 
+                        xmlns="http://www.w3.org/2000/svg" 
+                        className={`h-5 w-5 ${i < Math.floor(walker.rating) ? 'text-yellow-400' : 'text-gray-300'}`} 
+                        viewBox="0 0 20 20" 
+                        fill="currentColor"
+                      >
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    ))}
+                    <span className="ml-1 text-sm text-gray-600">{walker.rating.toFixed(1)}</span>
+                  </div>
+                </div>
+              </div>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Available
+              </span>
+            </div>
+            
+            <div className="mt-6">
+              <h2 className="text-lg font-medium text-gray-900">About</h2>
+              <p className="mt-2 text-gray-600">{walker.bio}</p>
+            </div>
+            
+            <div className="mt-6">
+              <h2 className="text-lg font-medium text-gray-900">Specialties</h2>
               <div className="mt-2 flex flex-wrap gap-2">
-                {walker.specialties?.map((specialty: string) => (
-                  <span key={specialty} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                {walker.specialties.map((specialty) => (
+                  <span key={specialty} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     {specialty}
                   </span>
                 ))}
               </div>
             </div>
-          </div>
-          
-          <div className="mt-8 border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900">Experience & Certifications</h3>
-            <div className="mt-2">
-              <p className="text-gray-600">{walker.experience || 'No experience information provided.'}</p>
-            </div>
             
-            {walker.certifications && walker.certifications.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-md font-medium text-gray-900">Certifications</h4>
-                <ul className="mt-2 list-disc list-inside text-gray-600">
-                  {walker.certifications.map((cert: string) => (
-                    <li key={cert}>{cert}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-          
-          <div className="mt-8 border-t border-gray-200 pt-6">
-            <h3 className="text-lg font-semibold text-gray-900">Availability</h3>
-            <div className="mt-4 grid grid-cols-1 gap-4">
-              {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
-                const hasAMSlot = walker.availability && 
-                  walker.availability[day] && 
-                  walker.availability[day].some((slot: TimeSlot) => slot.start === '08:00');
-                
-                const hasPMSlot = walker.availability && 
-                  walker.availability[day] && 
-                  walker.availability[day].some((slot: TimeSlot) => slot.start === '13:00');
-                
-                return (
-                  <div key={day} className="border rounded-md p-3">
-                    <h4 className="text-md font-medium text-gray-900 capitalize">{day}</h4>
-                    <div className="mt-2 grid grid-cols-2 gap-3">
-                      <div className={`p-2 rounded text-center ${hasAMSlot ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-400'}`}>
-                        <span className="text-sm font-medium">AM (8:00 - 11:00)</span>
-                      </div>
-                      <div className={`p-2 rounded text-center ${hasPMSlot ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-400'}`}>
-                        <span className="text-sm font-medium">PM (1:00 - 4:00)</span>
-                      </div>
+            <div className="mt-6">
+              <h2 className="text-lg font-medium text-gray-900">Availability</h2>
+              <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
+                {Object.entries(walker.availability).map(([day, slots]) => (
+                  <div key={day} className="bg-gray-50 rounded-lg p-3">
+                    <h3 className="text-sm font-medium text-gray-900 capitalize">{day}</h3>
+                    <div className="mt-1 text-xs text-gray-600">
+                      {slots.length > 0 ? (
+                        slots.map((slot, index) => (
+                          <div key={index}>
+                            {slot.start} - {slot.end}
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-red-500">Not available</span>
+                      )}
                     </div>
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
           </div>
         </div>

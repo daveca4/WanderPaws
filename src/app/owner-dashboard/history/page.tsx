@@ -4,30 +4,31 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import RouteGuard from '@/components/RouteGuard';
-// Removed mock data import
 import { useAuth } from '@/lib/AuthContext';
-import { formatDate, formatTime, getDogById, getWalkerById } from '@/utils/helpers';
+import { useData } from '@/lib/DataContext';
+import { formatDate, formatTime } from '@/utils/helpers';
 import { Walk } from '@/lib/types';
 
 export default function WalkHistoryPage() {
   const { user } = useAuth();
+  const { walks, dogs, walkers, getDogById, getWalkerById } = useData();
   const [loading, setLoading] = useState(true);
   const [pastWalks, setPastWalks] = useState<Walk[]>([]);
 
   // Load owner's past walks
   useEffect(() => {
-    if (!user) return;
+    if (!user || !dogs.length || !walks.length) return;
 
     const loadPastWalks = () => {
       // Get the owner's dogs
-      const ownersDogs = mockDogs.filter(dog => dog.ownerId === user.profileId);
+      const ownersDogs = dogs.filter(dog => dog.ownerId === user.profileId);
       const ownerDogIds = ownersDogs.map(dog => dog.id);
       
       // Get past walks for those dogs
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      const filteredWalks = mockWalks.filter(walk => {
+      const filteredWalks = walks.filter(walk => {
         // Check if this walk is for one of the owner's dogs
         if (!ownerDogIds.includes(walk.dogId)) return false;
         
@@ -55,9 +56,8 @@ export default function WalkHistoryPage() {
       setLoading(false);
     };
 
-    // Simulate API call
-    setTimeout(loadPastWalks, 500);
-  }, [user]);
+    loadPastWalks();
+  }, [user, dogs, walks]);
 
   return (
     <RouteGuard requiredPermission={{ action: 'read', resource: 'walks' }}>
@@ -96,7 +96,7 @@ export default function WalkHistoryPage() {
                         <div className="flex-shrink-0">
                           <div className="h-12 w-12 rounded-full relative overflow-hidden">
                             <Image
-                              src={dog.imageUrl || 'https://via.placeholder.com/100'}
+                              src={dog.imageUrl || '/images/default-dog.png'}
                               alt={dog.name}
                               width={48}
                               height={48}

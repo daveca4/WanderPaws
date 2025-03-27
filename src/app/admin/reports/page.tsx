@@ -1,136 +1,227 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  BarChart, Bar, 
-  LineChart, Line, 
-  PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, 
-  Tooltip, Legend, ResponsiveContainer,
-  ComposedChart, AreaChart, Area, ScatterChart, Scatter
-} from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, BarChart, Bar } from 'recharts';
 import RouteGuard from '@/components/RouteGuard';
-import Link from 'next/link';
+import AdminHeader from '@/components/admin/AdminHeader';
+import Card from '@/components/Card';
+import { formatCurrency } from '@/lib/utils';
 
-// Default/empty data to use until API provides real data
-const defaultReportData = {
-  walkActivityData: [],
-  walkerPerformanceData: [],
-  dogActivityData: [],
-  revenueTrendsData: [],
-  subscriptionActivityData: [],
-  subscriptionPlanData: [],
-  subscriptionPlanComparisonData: [],
-  subscriptionExpiryForecastData: [],
-  subscriptionCreditUsageData: [],
-  ownerSpendingData: [],
-  spendingBySubscriptionType: [],
-  topOwnerSpendingTrends: [],
-  spendingFrequencyDistribution: [],
-  dogActivityBreakdownData: []
-};
+interface RevenueData {
+  month: string;
+  amount: number;
+}
 
-// Colors for charts
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
-const creditUsageColors = ['#FF8042', '#FFBB28', '#00C49F', '#0088FE'];
+interface WalkData {
+  month: string;
+  count: number;
+  amount: number;
+  byDay: {
+    monday: number;
+    tuesday: number;
+    wednesday: number;
+    thursday: number;
+    friday: number;
+    saturday: number;
+    sunday: number;
+  };
+}
 
-export default function AdminReportsPage() {
-  const [reportData, setReportData] = useState(defaultReportData);
-  const [selectedReport, setSelectedReport] = useState('walk-activity');
-  const [timeRange, setTimeRange] = useState('7d');
-  const [isLoading, setIsLoading] = useState(true);
+interface SubscriptionData {
+  name: string;
+  count: number;
+}
+
+export default function ReportsPage() {
+  const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
+  const [walkData, setWalkData] = useState<WalkData[]>([]);
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Filter states for interactive reports
-  const [breedFilter, setBreedFilter] = useState('all');
-  const [sizeFilter, setSizeFilter] = useState('all');
-  const [walkerFilter, setWalkerFilter] = useState('all');
-  const [metricFilter, setMetricFilter] = useState('walks');
-  
-  // Fetch report data from API
+
   useEffect(() => {
     async function fetchReportData() {
-      setIsLoading(true);
       try {
-        const response = await fetch(`/api/reports?timeRange=${timeRange}`);
+        setLoading(true);
+        const response = await fetch('/api/admin/reports');
         
-        if (response.ok) {
-          const data = await response.json();
-          setReportData(data);
-          setError(null);
-        } else {
+        if (!response.ok) {
           throw new Error('Failed to fetch report data');
         }
+        
+        const data = await response.json();
+        setRevenueData(data.revenue || []);
+        setWalkData(data.walks || []);
+        setSubscriptionData(data.subscriptions || []);
       } catch (err) {
         console.error('Error fetching report data:', err);
-        setError('Failed to load reports. Please try again later.');
+        setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     }
     
     fetchReportData();
-  }, [timeRange]);
-
-  // Format currency values
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
-      minimumFractionDigits: 0
-    }).format(amount);
-  };
+  }, []);
 
   const handleExport = () => {
-    // Implementation for exporting reports would go here
-    console.log('Exporting report:', selectedReport);
-  };
-
-  const handlePrint = () => {
-    // Implementation for printing reports would go here
-    window.print();
+    // Export functionality would go here
+    alert('Export feature will be implemented soon');
   };
 
   return (
     <RouteGuard requiredPermission={{ action: 'access', resource: 'admin-dashboard' }}>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Analytics & Reports</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              View detailed analytics and export reports
-            </p>
-          </div>
-          <div className="flex space-x-2">
+        <AdminHeader 
+          title="Reports & Analytics" 
+          actionButton={
             <button
               onClick={handleExport}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md bg-white text-gray-700 hover:bg-gray-50"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
             >
-              Export
+              Export Data
             </button>
-            <button
-              onClick={handlePrint}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md bg-white text-gray-700 hover:bg-gray-50"
-            >
-              Print
-            </button>
-          </div>
-        </div>
-
-        {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+          }
+        />
+        
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-white rounded-lg shadow-md p-6 h-72">
+                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                <div className="h-56 bg-gray-100 rounded"></div>
+              </div>
+            ))}
           </div>
         ) : error ? (
-          <div className="bg-red-50 p-4 rounded-md">
-            <p className="text-red-700">{error}</p>
+          <div className="bg-red-50 border-l-4 border-red-400 p-4 mb-6">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">
+                  {error}
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
-          <>
-            {/* Report selection tabs and content would go here */}
-            {/* This would be the existing report visualization UI, but using the fetched data */}
-            {/* ... */}
-          </>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card title="Monthly Revenue">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    width={500}
+                    height={300}
+                    data={revenueData}
+                    margin={{
+                      top: 5,
+                      right: 30,
+                      left: 20,
+                      bottom: 5,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis 
+                      tickFormatter={(value) => formatCurrency(value)}
+                    />
+                    <Tooltip 
+                      formatter={(value) => formatCurrency(Number(value))}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="amount" stroke="#8884d8" activeDot={{ r: 8 }} name="Revenue" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+            
+            <Card title="Walks Completed">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    width={500}
+                    height={300}
+                    data={walkData}
+                    margin={{
+                      top: 5,
+                      right: 30,
+                      left: 20,
+                      bottom: 5,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#82ca9d" name="Walks" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+            
+            <Card title="Active Subscriptions">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    width={500}
+                    height={300}
+                    data={subscriptionData}
+                    margin={{
+                      top: 5,
+                      right: 30,
+                      left: 20,
+                      bottom: 5,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#8884d8" name="Subscribers" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+            
+            <Card title="Weekly Walk Distribution">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    width={500}
+                    height={300}
+                    data={[
+                      { day: 'Monday', count: walkData.reduce((acc, curr) => acc + (curr.byDay?.monday || 0), 0) },
+                      { day: 'Tuesday', count: walkData.reduce((acc, curr) => acc + (curr.byDay?.tuesday || 0), 0) },
+                      { day: 'Wednesday', count: walkData.reduce((acc, curr) => acc + (curr.byDay?.wednesday || 0), 0) },
+                      { day: 'Thursday', count: walkData.reduce((acc, curr) => acc + (curr.byDay?.thursday || 0), 0) },
+                      { day: 'Friday', count: walkData.reduce((acc, curr) => acc + (curr.byDay?.friday || 0), 0) },
+                      { day: 'Saturday', count: walkData.reduce((acc, curr) => acc + (curr.byDay?.saturday || 0), 0) },
+                      { day: 'Sunday', count: walkData.reduce((acc, curr) => acc + (curr.byDay?.sunday || 0), 0) },
+                    ]}
+                    margin={{
+                      top: 5,
+                      right: 30,
+                      left: 20,
+                      bottom: 5,
+                    }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="day" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#ffc658" name="Walks" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </Card>
+          </div>
         )}
       </div>
     </RouteGuard>

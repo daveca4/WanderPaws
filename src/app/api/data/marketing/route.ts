@@ -22,8 +22,8 @@ interface Campaign {
   description: string;
 }
 
-// Sample data for campaign list
-const mockCampaigns: Campaign[] = [
+// Sample data for now until database schema is updated
+const sampleCampaigns: Campaign[] = [
   { 
     id: 'camp1', 
     name: 'Summer Special Offer', 
@@ -59,42 +59,6 @@ const mockCampaigns: Campaign[] = [
     createdAt: '2023-05-15T10:30:00Z',
     creator: 'Admin User',
     description: 'Reminder email for subscriptions expiring within 14 days.'
-  },
-  { 
-    id: 'camp3', 
-    name: 'New Premium Plan', 
-    type: 'in-app',
-    status: 'draft',
-    audience: 'All Active Users',
-    sent: 0,
-    opened: 0,
-    clicked: 0,
-    converted: 0,
-    conversionRate: 0,
-    revenue: 0,
-    startDate: '',
-    endDate: '',
-    createdAt: '2023-07-01T15:45:00Z',
-    creator: 'Marketing Manager',
-    description: 'Announcement of new premium subscription plan with added benefits.'
-  },
-  { 
-    id: 'camp4', 
-    name: 'Win Back Campaign', 
-    type: 'sms',
-    status: 'scheduled',
-    audience: 'Churned Customers',
-    sent: 0,
-    opened: 0,
-    clicked: 0,
-    converted: 0,
-    conversionRate: 0,
-    revenue: 0,
-    startDate: '2023-08-01',
-    endDate: '2023-08-15',
-    createdAt: '2023-07-20T09:15:00Z',
-    creator: 'Admin User',
-    description: 'Re-engagement campaign for customers who cancelled subscription in the last 90 days.'
   }
 ];
 
@@ -104,9 +68,11 @@ export async function GET(request: NextRequest) {
   const campaignId = searchParams.get('id');
   
   try {
+    // In a real app, this would fetch from the database using prisma
+    // For now, we'll use the sample data
     if (campaignId) {
       // Return a single campaign if ID is provided
-      const campaign = mockCampaigns.find(c => c.id === campaignId);
+      const campaign = sampleCampaigns.find(c => c.id === campaignId);
       
       if (!campaign) {
         return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
@@ -116,7 +82,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Return all campaigns
-    return NextResponse.json(mockCampaigns);
+    return NextResponse.json(sampleCampaigns);
   } catch (error) {
     console.error('Error fetching marketing campaigns:', error);
     return NextResponse.json({ error: 'Failed to fetch marketing data' }, { status: 500 });
@@ -128,14 +94,25 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
     
-    // In a real app, this would save to a database
-    // For now, we'll just return the data with a generated ID
+    // Validate required fields
+    if (!data.name || !data.type || !data.status || !data.audience) {
+      return NextResponse.json(
+        { error: 'Missing required fields: name, type, status, and audience are required' },
+        { status: 400 }
+      );
+    }
+    
+    // In a real app, this would save to a database using prisma
     const newCampaign = {
       ...data,
-      id: `camp${mockCampaigns.length + 1}`,
+      id: `camp${sampleCampaigns.length + 1}`,
       createdAt: new Date().toISOString(),
-      conversionRate: 0,
-      revenue: 0
+      sent: data.sent || 0,
+      opened: data.opened || 0,
+      clicked: data.clicked || 0,
+      converted: data.converted || 0,
+      conversionRate: data.conversionRate || 0,
+      revenue: data.revenue || 0
     };
     
     return NextResponse.json(newCampaign, { status: 201 });

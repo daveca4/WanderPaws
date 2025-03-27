@@ -82,6 +82,11 @@ export function hasPermission(user: User | null, action: string, resource: strin
     return true;
   }
   
+  // Special case for walkers accessing walker-dashboard
+  if (user.role === 'walker' && action === 'access' && resource === 'walker-dashboard') {
+    return true;
+  }
+  
   // Special case for owners accessing owner-dashboard
   if (user.role === 'owner' && action === 'access' && resource === 'owner-dashboard') {
     return true;

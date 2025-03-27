@@ -1,16 +1,43 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
 // Removed mock data import
 // Removed mock data import
 import { SubscriptionPlan } from '@/lib/types';
+import { formatPrice, calculateDiscount, formatPricePerWalk } from '@/lib/subscriptionService';
 
 export default function AdminSubscriptionsPage() {
-  const [plans, setPlans] = useState<SubscriptionPlan[]>(mockSubscriptionPlans);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
   const [showInactive, setShowInactive] = useState<boolean>(false);
   const [planToDelete, setPlanToDelete] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch subscription plans
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/subscriptions/plans');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch subscription plans');
+        }
+        
+        const data = await response.json();
+        setPlans(data.plans || []);
+      } catch (err) {
+        console.error('Error fetching subscription plans:', err);
+        setError('Failed to load subscription plans. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    
+    fetchPlans();
+  }, []);
 
   const displayedPlans = showInactive 
     ? plans 
@@ -20,20 +47,27 @@ export default function AdminSubscriptionsPage() {
     setPlanToDelete(planId);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (planToDelete) {
-      // Filter out the plan with the matching ID
-      const updatedPlans = plans.filter(plan => plan.id !== planToDelete);
-      setPlans(updatedPlans);
-      
-      // Update the mock data to reflect the change
-      const planIndex = mockSubscriptionPlans.findIndex(plan => plan.id === planToDelete);
-      if (planIndex !== -1) {
-        mockSubscriptionPlans.splice(planIndex, 1);
+      try {
+        const response = await fetch(`/api/subscriptions/plans/${planToDelete}`, {
+          method: 'DELETE',
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to delete subscription plan');
+        }
+        
+        // Filter out the deleted plan from state
+        const updatedPlans = plans.filter(plan => plan.id !== planToDelete);
+        setPlans(updatedPlans);
+        
+        // Close the confirmation dialog
+        setPlanToDelete(null);
+      } catch (err) {
+        console.error('Error deleting subscription plan:', err);
+        setError('Failed to delete subscription plan. Please try again.');
       }
-      
-      // Close the confirmation dialog
-      setPlanToDelete(null);
     }
   };
 
@@ -41,6 +75,47 @@ export default function AdminSubscriptionsPage() {
     setPlanToDelete(null);
   };
 
+  if (loading) {
+    return (
+      <RouteGuard requiredPermission={{ action: 'read', resource: 'subscription_plans' }}>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-900">Subscription Plans</h1>
+          </div>
+          <div className="bg-white shadow-sm rounded-lg p-6">
+            <div className="animate-pulse space-y-4">
+              <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+              <div className="h-10 bg-gray-200 rounded w-full"></div>
+              <div className="h-10 bg-gray-200 rounded w-full"></div>
+              <div className="h-10 bg-gray-200 rounded w-full"></div>
+            </div>
+          </div>
+        </div>
+      </RouteGuard>
+    );
+  }
+
+  if (error) {
+    return (
+      <RouteGuard requiredPermission={{ action: 'read', resource: 'subscription_plans' }}>
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h1 className="text-2xl font-bold text-gray-900">Subscription Plans</h1>
+          </div>
+          <div className="bg-white shadow-sm rounded-lg p-6">
+            <div className="text-red-500">{error}</div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      </RouteGuard>
+    );
+  }
+  
   return (
     <RouteGuard requiredPermission={{ action: 'read', resource: 'subscription_plans' }}>
       <div className="space-y-6">

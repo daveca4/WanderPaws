@@ -22,9 +22,9 @@ const WORKFLOW_STEPS = [
   },
   { 
     title: 'Dog Assessment',
-    description: 'Schedule an assessment',
+    description: 'All dogs need to be assessed before they can be walked with WanderPaws',
     icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
-    href: '/owner-dashboard/dogs'
+    href: '/owner-dashboard/assessment'
   },
   { 
     title: 'Buy Subscription',
@@ -44,9 +44,19 @@ export function WorkflowProgress() {
   const { user } = useAuth();
   const { dogs = [], assessments = [], walks = [], userSubscriptions = [] } = useData();
   const [workflowStatus, setWorkflowStatus] = useState<
-    {step: string; completed: boolean; enabled: boolean}[]
+    {step: string; completed: boolean; enabled: boolean; pendingAssessment?: boolean}[]
   >([]);
   const [loading, setLoading] = useState(true);
+
+  // Check if there's already an assessment and determine the appropriate URL
+  const dogAssessmentStepUrl = () => {
+    // Check if there's already an assessment
+    const hasAssessment = user && user.profileId && assessments.some(a => a.ownerId === user.profileId);
+    
+    return hasAssessment 
+      ? '/owner-dashboard/assessment/status' 
+      : '/owner-dashboard/assessment';
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -66,6 +76,11 @@ export function WorkflowProgress() {
       );
       const hasCompletedAssessment = dogAssessments.some(assessment => 
         assessment.status === 'completed' && assessment.result === 'approved'
+      );
+      
+      // Check if there are any pending or scheduled assessments
+      const hasPendingAssessment = dogAssessments.some(assessment => 
+        assessment.status === 'pending' || assessment.status === 'scheduled'
       );
 
       // Step 4: Buy Subscription - check if user has an active subscription
@@ -87,7 +102,7 @@ export function WorkflowProgress() {
       const status = [
         { step: 'Register Account', completed: isRegistered, enabled: true },
         { step: 'Add Dog', completed: hasAddedDogs, enabled: true },
-        { step: 'Dog Assessment', completed: hasCompletedAssessment, enabled: hasAddedDogs },
+        { step: 'Dog Assessment', completed: hasCompletedAssessment, enabled: hasAddedDogs, pendingAssessment: hasPendingAssessment },
         { step: 'Buy Subscription', completed: hasActiveSubscription, enabled: hasCompletedAssessment },
         { step: 'Book Walks', completed: hasBookings, enabled: hasActiveSubscription }
       ];
@@ -130,10 +145,29 @@ export function WorkflowProgress() {
               borderColor = "border-blue-400";
             }
             
+            // Determine href based on status
+            let href = step.href;
+            let stepIcon = step.icon;
+            let statusDescription = step.description;
+            
+            // If it's a Dog Assessment with pending/scheduled assessment
+            if (step.title === 'Dog Assessment' && status?.pendingAssessment) {
+              href = dogAssessmentStepUrl(); // Link to assessment status page
+              stepIcon = 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'; // Checkmark in circle icon
+              statusDescription = 'Assessment pending';
+              
+              // Change colors to indicate pending status
+              if (!status.completed) {
+                bgColor = "bg-yellow-50";
+                textColor = "text-yellow-700";
+                borderColor = "border-yellow-400";
+              }
+            }
+            
             return (
               <Link 
                 key={step.title}
-                href={status?.enabled ? step.href : "#"}
+                href={status?.enabled ? href : "#"}
                 className={`relative flex flex-col items-center p-4 rounded-lg border-2 ${borderColor} ${bgColor} ${!status?.enabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-md transition-shadow'}`}
                 onClick={(e: React.MouseEvent<HTMLAnchorElement>) => !status?.enabled && e.preventDefault()}
               >
@@ -145,11 +179,11 @@ export function WorkflowProgress() {
                     viewBox="0 0 24 24" 
                     stroke="currentColor"
                   >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={step.icon} />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={stepIcon} />
                   </svg>
                 </div>
                 <span className={`text-sm font-medium ${textColor} text-center`}>{step.title}</span>
-                <span className="text-xs text-center mt-1">{step.description}</span>
+                <span className="text-xs text-center mt-1">{statusDescription}</span>
               </Link>
             );
           })}

@@ -4,9 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import RouteGuard from '@/components/RouteGuard';
-// Removed mock data import
 import { SubscriptionPlan } from '@/lib/types';
 import { generateId } from '@/utils/helpers';
+import { formatPrice } from '@/lib/subscriptionService';
 
 export default function CreateSubscriptionPage() {
   const router = useRouter();
@@ -37,7 +37,7 @@ export default function CreateSubscriptionPage() {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setFormError(null);
@@ -55,28 +55,34 @@ export default function CreateSubscriptionPage() {
       return;
     }
     
-    // Simulate API call to create the plan
-    setTimeout(() => {
-      const now = new Date().toISOString();
+    try {
+      // Create plan via API
+      const response = await fetch('/api/subscriptions/plans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }),
+      });
       
-      // Create a new plan
-      const newPlan: SubscriptionPlan = {
-        ...formData,
-        id: generateId('plan'),
-        createdAt: now,
-        updatedAt: now
-      };
+      if (!response.ok) {
+        throw new Error('Failed to create subscription plan');
+      }
       
-      // In a real app, this would add the plan to the database
-      console.log('Created new plan:', newPlan);
+      const data = await response.json();
+      console.log('Created new plan:', data.plan);
       
-      // Update the mock data (for demo purposes)
-      mockSubscriptionPlans.push(newPlan);
-      
-      setSaving(false);
       // Redirect to the subscriptions list page
       router.push('/admin/subscriptions');
-    }, 1000);
+    } catch (error) {
+      console.error('Error creating subscription plan:', error);
+      setFormError('Failed to create the subscription plan. Please try again.');
+      setSaving(false);
+    }
   };
 
   return (
@@ -267,7 +273,7 @@ export default function CreateSubscriptionPage() {
 
                 <div className="sm:col-span-6">
                   <label htmlFor="price" className="block text-sm font-medium text-gray-700">
-                    Price (in pounds) *
+                    Price (in pence) *
                   </label>
                   <div className="mt-1 relative rounded-md shadow-sm">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -278,7 +284,6 @@ export default function CreateSubscriptionPage() {
                       name="price"
                       id="price"
                       min="1"
-                      step="0.01"
                       required
                       value={formData.price / 100}
                       onChange={(e) => setFormData({
@@ -301,7 +306,7 @@ export default function CreateSubscriptionPage() {
                 </div>
               </div>
             </div>
-            
+
             <div className="px-4 py-3 bg-gray-50 text-right sm:px-6">
               <button
                 type="submit"
@@ -314,7 +319,7 @@ export default function CreateSubscriptionPage() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Creating Plan...
+                    Saving...
                   </>
                 ) : 'Create Plan'}
               </button>

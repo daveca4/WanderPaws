@@ -5,11 +5,12 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
-// Removed mock data import
+import { useData } from '@/lib/DataContext';
 import { Walk, Dog } from '@/lib/types';
 
 export default function StartWalkPage({ params }: { params: { id: string } }) {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { walks, dogs, getWalkById, getDogById, updateWalk } = useData();
   const router = useRouter();
   const walkId = params.id;
   
@@ -18,42 +19,47 @@ export default function StartWalkPage({ params }: { params: { id: string } }) {
   const [error, setError] = useState<string | null>(null);
   const [walkStatus, setWalkStatus] = useState<'pending' | 'in_progress' | 'completed'>('pending');
   const [dogStatus, setDogStatus] = useState<'pending' | 'picked_up' | 'dropped_off' | 'absent'>('pending');
+  const [loading, setLoading] = useState(true);
   
   // Redirect if not a walker or admin
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/login');
-      } else if (user.role !== 'walker' && user.role !== 'admin') {
+    if (!authLoading && user && walks.length > 0 && dogs.length > 0) {
+      if (user.role !== 'walker' && user.role !== 'admin') {
         router.push('/unauthorized');
       } else {
         // Find the walk by ID
-        const foundWalk = mockWalks.find(w => w.id === walkId);
+        const foundWalk = getWalkById(walkId);
         
         // Check if the walk exists and belongs to this walker
         if (!foundWalk) {
           setError('Walk not found');
-        } else if (foundWalk.walkerId !== user.profileId) {
+          setLoading(false);
+        } else if (foundWalk.walkerId !== user.profileId && user.role !== 'admin') {
           setError('You are not authorized to manage this walk');
+          setLoading(false);
         } else if (foundWalk.status !== 'scheduled') {
           setError('This walk is not scheduled. Only scheduled walks can be started.');
+          setLoading(false);
         } else {
           setWalk(foundWalk);
           
           // Get dog details
-          const dogInfo = mockDogs.find(d => d.id === foundWalk.dogId);
+          const dogInfo = getDogById(foundWalk.dogId);
           if (dogInfo) {
             setDog(dogInfo);
           } else {
             setError('Dog information not found');
           }
+          setLoading(false);
         }
       }
+    } else if (!authLoading && !user) {
+      router.push('/login');
     }
-  }, [walkId, user, loading, router]);
+  }, [walkId, user, authLoading, router, walks, dogs, getWalkById, getDogById]);
   
   // Update walk status
-  const updateWalkStatus = (newStatus: 'in_progress' | 'completed') => {
+  const handleUpdateWalkStatus = async (newStatus: 'in_progress' | 'completed') => {
     if (newStatus === 'in_progress' && dogStatus !== 'picked_up' && dogStatus !== 'absent') {
       alert('You must mark the dog as picked up or absent before starting the walk');
       return;
@@ -64,19 +70,33 @@ export default function StartWalkPage({ params }: { params: { id: string } }) {
       return;
     }
     
-    // In a real app, this would make an API call to update the status
+    // Update the walk status in the UI
     setWalkStatus(newStatus);
     
-    // Redirect to media upload page after a delay if completed
-    if (newStatus === 'completed') {
-      setTimeout(() => {
-        router.push(`/walker-dashboard/walks/${walkId}/media`);
-      }, 2000);
+    if (walk) {
+      try {
+        // Update the walk status in the database with proper mapping
+        // 'in_progress' is not a valid status in our schema, so we keep it as 'scheduled'
+        // When 'completed', we update the status to 'completed'
+        await updateWalk(walk.id, { 
+          status: newStatus === 'in_progress' ? 'scheduled' : 'completed' 
+        });
+        
+        // Redirect to media upload page after a delay if completed
+        if (newStatus === 'completed') {
+          setTimeout(() => {
+            router.push(`/walker-dashboard/walks/${walkId}/media`);
+          }, 2000);
+        }
+      } catch (error) {
+        console.error('Failed to update walk status:', error);
+        alert('Failed to update walk status. Please try again.');
+      }
     }
   };
   
   // If loading or not walker/admin, show loading state
-  if (loading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
+  if (authLoading || loading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -134,7 +154,7 @@ export default function StartWalkPage({ params }: { params: { id: string } }) {
           <div className="flex items-center mb-6">
             <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100 relative flex-shrink-0">
               <Image
-                src={dog.imageUrl || 'https://via.placeholder.com/64'}
+                src={dog.imageUrl || '/images/default-dog.png'}
                 alt={dog.name}
                 width={64}
                 height={64}
@@ -250,31 +270,30 @@ export default function StartWalkPage({ params }: { params: { id: string } }) {
                 </div>
               )}
               
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-                {walkStatus === 'pending' && (
-                  <button 
-                    onClick={() => updateWalkStatus('in_progress')}
-                    className="py-3 px-4 rounded-md bg-blue-600 text-white font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    Start Walk
-                  </button>
-                )}
-                
-                {walkStatus === 'in_progress' && (
-                  <button 
-                    onClick={() => updateWalkStatus('completed')}
-                    className="py-3 px-4 rounded-md bg-green-600 text-white font-medium hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    Complete Walk
-                  </button>
-                )}
-                
-                <Link
-                  href={`/walker-dashboard/walks/${walkId}`}
-                  className="py-3 px-4 rounded-md bg-gray-100 text-gray-700 font-medium text-center hover:bg-gray-200"
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <button
+                  onClick={() => handleUpdateWalkStatus('in_progress')}
+                  disabled={walkStatus !== 'pending' || (dogStatus !== 'picked_up' && dogStatus !== 'absent')}
+                  className={`py-3 px-4 rounded-md text-center font-medium ${
+                    walkStatus === 'in_progress' 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  } ${(walkStatus !== 'pending' || (dogStatus !== 'picked_up' && dogStatus !== 'absent')) ? 'opacity-50 cursor-not-allowed' : ''}`}
                 >
-                  Cancel
-                </Link>
+                  Start Walk
+                </button>
+                
+                <button
+                  onClick={() => handleUpdateWalkStatus('completed')}
+                  disabled={walkStatus !== 'in_progress' || (dogStatus !== 'dropped_off' && dogStatus !== 'absent')}
+                  className={`py-3 px-4 rounded-md text-center font-medium ${
+                    walkStatus === 'completed' 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-green-600 text-white hover:bg-green-700'
+                  } ${(walkStatus !== 'in_progress' || (dogStatus !== 'dropped_off' && dogStatus !== 'absent')) ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  Complete Walk
+                </button>
               </div>
             </div>
           </div>

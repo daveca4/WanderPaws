@@ -179,7 +179,12 @@ export async function cancelUserSubscription(
 
 // Utility functions
 export function formatPrice(pence: number): string {
-  return `£${(pence / 100).toFixed(2)}`;
+  return new Intl.NumberFormat('en-GB', {
+    style: 'currency',
+    currency: 'GBP',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(pence / 100);
 }
 
 export function calculatePricePerWalk(plan: SubscriptionPlan): number {

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
-// Removed mock data import
+import { useData } from '@/lib/DataContext';
 import { Walk, Dog } from '@/lib/types';
 
 // Format date for display
@@ -24,49 +24,53 @@ const formatTime = (timeString: string) => {
   });
 };
 
-// Function to get dog details by ID
-const getDogById = (dogId: string): Dog | undefined => {
-  return mockDogs.find(dog => dog.id === dogId);
-};
-
 export default function WalkDetailPage({ params }: { params: { id: string } }) {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { walks, dogs, getWalkById, getDogById } = useData();
   const router = useRouter();
   const walkId = params.id;
   
   const [walk, setWalk] = useState<Walk | null>(null);
   const [dog, setDog] = useState<Dog | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   
   // Redirect if not a walker or admin
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/login');
-      } else if (user.role !== 'walker' && user.role !== 'admin') {
+    if (!authLoading && user && walks.length > 0 && dogs.length > 0) {
+      if (user.role !== 'walker' && user.role !== 'admin') {
         router.push('/unauthorized');
       } else {
         // Find the walk by ID
-        const foundWalk = mockWalks.find(w => w.id === walkId);
+        const foundWalk = getWalkById(walkId);
         
         // Check if the walk exists and belongs to this walker
         if (!foundWalk) {
           setError('Walk not found');
-        } else if (foundWalk.walkerId !== user.profileId) {
+          setLoading(false);
+        } else if (foundWalk.walkerId !== user.profileId && user.role !== 'admin') {
           setError('You are not authorized to view this walk');
+          setLoading(false);
         } else {
           setWalk(foundWalk);
+          
+          // Get dog details
           const dogInfo = getDogById(foundWalk.dogId);
           if (dogInfo) {
             setDog(dogInfo);
+          } else {
+            setError('Dog information not found');
           }
+          setLoading(false);
         }
       }
+    } else if (!authLoading && !user) {
+      router.push('/login');
     }
-  }, [walkId, user, loading, router]);
+  }, [walkId, user, authLoading, router, walks, dogs, getWalkById, getDogById]);
   
   // If loading or not walker/admin, show loading state
-  if (loading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
+  if (authLoading || loading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -171,7 +175,7 @@ export default function WalkDetailPage({ params }: { params: { id: string } }) {
             <div className="flex items-center mb-6">
               <div className="w-16 h-16 rounded-full overflow-hidden bg-gray-100 relative flex-shrink-0">
                 <Image
-                  src={dog.imageUrl || 'https://via.placeholder.com/64'}
+                  src={dog.imageUrl || '/images/default-dog.png'}
                   alt={dog.name}
                   width={64}
                   height={64}
@@ -207,49 +211,31 @@ export default function WalkDetailPage({ params }: { params: { id: string } }) {
               </div>
             )}
             
-            {/* Special needs or preferences section */}
-            {(dog.specialNeeds.length > 0 || dog.walkingPreferences) && (
+            {/* Special needs section */}
+            {dog.specialNeeds.length > 0 && (
               <div className="border-t border-gray-100 pt-6">
                 <h3 className="text-sm font-medium text-gray-500 mb-3">Dog Information</h3>
                 
-                {dog.specialNeeds.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-gray-700">Special Needs</h4>
-                    <ul className="mt-1 list-disc pl-5 text-gray-900">
-                      {dog.specialNeeds.map((need, i) => (
-                        <li key={i}>{need}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                <div className="mb-4">
+                  <h4 className="text-sm font-medium text-gray-700">Special Needs</h4>
+                  <ul className="mt-1 list-disc pl-5 text-gray-900">
+                    {dog.specialNeeds.map((need, i) => (
+                      <li key={i}>{need}</li>
+                    ))}
+                  </ul>
+                </div>
                 
-                {dog.walkingPreferences && (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700">Walking Preferences</h4>
-                    <dl className="mt-1 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
-                      <div className="sm:col-span-1">
-                        <dt className="text-sm font-medium text-gray-500">Preferred Times</dt>
-                        <dd className="mt-1 text-sm text-gray-900">
-                          {dog.walkingPreferences.preferredTimes.join(', ')}
-                        </dd>
-                      </div>
-                      <div className="sm:col-span-1">
-                        <dt className="text-sm font-medium text-gray-500">Duration</dt>
-                        <dd className="mt-1 text-sm text-gray-900">
-                          {dog.walkingPreferences.duration} minutes
-                        </dd>
-                      </div>
-                      {dog.walkingPreferences.preferredRoutes && (
-                        <div className="sm:col-span-2">
-                          <dt className="text-sm font-medium text-gray-500">Preferred Routes</dt>
-                          <dd className="mt-1 text-sm text-gray-900">
-                            {dog.walkingPreferences.preferredRoutes.join(', ')}
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
-                  </div>
-                )}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700">Walking Preferences</h4>
+                  <dl className="mt-1 grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                    <div className="sm:col-span-1">
+                      <dt className="text-sm font-medium text-gray-500">Duration</dt>
+                      <dd className="mt-1 text-sm text-gray-900">
+                        30 min
+                      </dd>
+                    </div>
+                  </dl>
+                </div>
               </div>
             )}
           </div>

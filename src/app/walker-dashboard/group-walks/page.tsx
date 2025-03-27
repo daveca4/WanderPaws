@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
-// Removed mock data import
+import { useData } from '@/lib/DataContext';
 import { Walk, Dog } from '@/lib/types';
 
 // Function to format date
@@ -22,11 +22,6 @@ const formatTime = (timeString: string) => {
     minute: '2-digit',
     hour12: true,
   });
-};
-
-// Function to get dog details by ID
-const getDogById = (dogId: string): Dog | undefined => {
-  return mockDogs.find(dog => dog.id === dogId);
 };
 
 interface DogWalkStatus {
@@ -51,16 +46,18 @@ interface GroupWalkSession {
 }
 
 export default function GroupWalksPage() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { walks, dogs } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [groupWalks, setGroupWalks] = useState<GroupWalkSession[]>([]);
   const [activeSession, setActiveSession] = useState<GroupWalkSession | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
 
   // Redirect to the new location
   useEffect(() => {
-    if (!loading) {
+    if (!authLoading) {
       // Preserve any query parameters
       const date = searchParams.get('date');
       const time = searchParams.get('time');
@@ -73,13 +70,13 @@ export default function GroupWalksPage() {
       
       router.push(`/walker-dashboard/walks${queryParams}`);
     }
-  }, [loading, router, searchParams]);
+  }, [authLoading, router, searchParams]);
 
   // Group walks by date and time slot
   useEffect(() => {
-    if (user?.profileId) {
+    if (user?.profileId && walks && dogs) {
       // Get all scheduled walks for this walker
-      const walkerWalks = mockWalks.filter(
+      const walkerWalks = walks.filter(
         walk => walk.walkerId === user.profileId && walk.status === 'scheduled'
       );
       
@@ -110,7 +107,7 @@ export default function GroupWalksPage() {
             
             // Convert to dogs with status
             const dogsWithStatus = walks.map(walk => {
-              const dog = getDogById(walk.dogId);
+              const dog = dogs.find(d => d.id === walk.dogId);
               if (!dog) throw new Error(`Dog not found: ${walk.dogId}`);
               
               return {
@@ -146,8 +143,9 @@ export default function GroupWalksPage() {
       });
       
       setGroupWalks(sessions);
+      setLoading(false);
     }
-  }, [user]);
+  }, [user, walks, dogs]);
 
   // Toggle a group's expanded state
   const toggleGroupExpanded = (sessionKey: string) => {

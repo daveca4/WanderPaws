@@ -5,37 +5,45 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
-// Removed mock data import
+import { useData } from '@/lib/DataContext';
 import { Dog } from '@/lib/types';
 
 export default function WalkerDogsPage() {
   const { user, loading } = useAuth();
+  const { dogs, walks } = useData();
   const router = useRouter();
   const [assignedDogs, setAssignedDogs] = useState<Dog[]>([]);
+  const [dataLoading, setDataLoading] = useState(true);
 
   // Redirect if not a walker or admin
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/login');
-      } else if (user.role !== 'walker' && user.role !== 'admin') {
-        router.push('/unauthorized');
-      } else if (user.profileId) {
-        // Filter dogs based on the current walker's assigned walks
-        const walkerDogs = mockDogs.filter(dog => 
-          mockWalks.some(walk => 
-            walk.dogId === dog.id && 
-            walk.walkerId === user.profileId && 
-            (walk.status === 'scheduled' || walk.status === 'completed')
-          )
-        );
-        setAssignedDogs(walkerDogs);
-      }
+    if (!loading && !user) {
+      router.push('/login');
+    } else if (!loading && user && user.role !== 'walker' && user.role !== 'admin') {
+      router.push('/unauthorized');
     }
   }, [user, loading, router]);
 
+  // Load assigned dogs
+  useEffect(() => {
+    if (user?.profileId && dogs.length > 0 && walks.length > 0) {
+      // Filter dogs based on the current walker's assigned walks
+      const walkerDogs = dogs.filter(dog => 
+        walks.some(walk => 
+          walk.dogId === dog.id && 
+          walk.walkerId === user.profileId && 
+          (walk.status === 'scheduled' || walk.status === 'completed')
+        )
+      );
+      setAssignedDogs(walkerDogs);
+      setDataLoading(false);
+    } else if (dogs.length > 0 && walks.length > 0) {
+      setDataLoading(false);
+    }
+  }, [user, dogs, walks]);
+
   // If loading or not walker/admin, show loading state
-  if (loading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
+  if (loading || dataLoading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -57,7 +65,7 @@ export default function WalkerDogsPage() {
             <Link key={dog.id} href={`/dogs/${dog.id}`} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
               <div className="h-48 relative">
                 <Image
-                  src={dog.imageUrl || 'https://via.placeholder.com/400x200'}
+                  src={dog.imageUrl || '/images/default-dog.png'}
                   alt={dog.name}
                   fill
                   className="object-cover"
@@ -87,10 +95,10 @@ export default function WalkerDogsPage() {
                     <p className="text-gray-900">{dog.age} years</p>
                     
                     <p className="text-gray-500">Walk time:</p>
-                    <p className="text-gray-900">{dog.walkingPreferences.duration} min</p>
+                    <p className="text-gray-900">30 min</p>
                   </div>
                   
-                  {dog.specialNeeds.length > 0 && (
+                  {dog.specialNeeds && dog.specialNeeds.length > 0 && (
                     <div className="mt-3 p-2 bg-yellow-50 rounded-md">
                       <p className="text-xs font-medium text-yellow-800">Special needs:</p>
                       <ul className="mt-1 text-xs text-yellow-700 list-disc pl-4">
