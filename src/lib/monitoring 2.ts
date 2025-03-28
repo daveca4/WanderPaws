@@ -126,5 +126,4 @@ function reportPerformanceMetric(metricName: string, data: Record<string, any>) 
     console.info(`Performance metric - ${metricName}:`, data);
     // TODO: Send to performance monitoring service
   }
-}
-
+} 

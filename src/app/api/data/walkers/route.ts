@@ -30,9 +30,23 @@ export async function GET() {
         : 4.0; // Default rating for new walkers
       
       // Parse the availability from JSON
-      const walkerAvailability = typeof walker.availability === 'object' 
-        ? walker.availability 
-        : JSON.parse(walker.availability as string);
+      let walkerAvailability;
+      try {
+        walkerAvailability = typeof walker.availability === 'object' 
+          ? walker.availability 
+          : JSON.parse(walker.availability as string);
+      } catch (e) {
+        console.error('Error parsing availability:', e);
+        walkerAvailability = {
+          monday: [],
+          tuesday: [],
+          wednesday: [],
+          thursday: [],
+          friday: [],
+          saturday: [],
+          sunday: []
+        };
+      }
       
       return {
         id: walker.id,
@@ -56,7 +70,7 @@ export async function GET() {
   } catch (error) {
     console.error('Error fetching walkers:', error);
     return new NextResponse(
-      JSON.stringify({ error: 'Failed to fetch walkers' }),
+      JSON.stringify({ error: 'Failed to fetch walkers', details: error instanceof Error ? error.message : 'Unknown error' }),
       { status: 500 }
     );
   }
