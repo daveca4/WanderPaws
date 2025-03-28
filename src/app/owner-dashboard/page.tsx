@@ -54,16 +54,15 @@ export default function OwnerDashboard() {
           setHasApprovedAssessment(hasApproved);
           
           // Check subscription status if subscription data exists
-          // Note: Subscription feature is not yet implemented, so we'll default to false
-          setHasActiveSubscription(false);
+          console.log('User subscriptions available:', userSubscriptions.length);
           
-          /* Uncomment when subscription endpoints are implemented
+          // Enable subscription functionality
           const hasSub = userSubscriptions.some(sub => 
             sub.ownerId === user.profileId && 
             new Date(sub.endDate) > new Date()
           );
+          console.log('Active subscription found:', hasSub);
           setHasActiveSubscription(hasSub);
-          */
         }
       } catch (error) {
         console.error('Error loading user data:', error);

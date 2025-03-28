@@ -128,21 +128,21 @@ export default function SubscriptionsPage() {
             }
           }
           
-          // Try a direct mock subscription as a last resort
+          // Final attempt with the subscriptions data API
           if (!gotSubscriptions) {
             try {
-              console.log('Trying direct mock API');
-              const mockResponse = await fetch(`/api/data/subscriptions?userId=${user.id}`);
-              if (mockResponse.ok) {
-                const mockData = await mockResponse.json();
-                console.log('Mock API subscription data:', mockData);
-                if (Array.isArray(mockData) && mockData.length > 0) {
-                  setUserSubscriptions(mockData);
+              console.log('Trying subscriptions data API');
+              const dataResponse = await fetch(`/api/data/subscriptions?userId=${user.id}`);
+              if (dataResponse.ok) {
+                const subscriptionsData = await dataResponse.json();
+                console.log('Subscriptions data API response:', subscriptionsData);
+                if (Array.isArray(subscriptionsData) && subscriptionsData.length > 0) {
+                  setUserSubscriptions(subscriptionsData);
                   gotSubscriptions = true;
                 }
               }
             } catch (error) {
-              console.warn('Failed to fetch from mock API:', error);
+              console.warn('Failed to fetch from subscriptions data API:', error);
             }
           }
           
@@ -495,8 +495,8 @@ export default function SubscriptionsPage() {
               </svg>
               Refresh Data
             </button>
-            
-            {activeSubscription && (
+          
+          {activeSubscription && (
               <Link
                 href="/owner-dashboard/create-booking"
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
@@ -504,7 +504,7 @@ export default function SubscriptionsPage() {
                 Book a Walk
               </Link>
             )}
-          </div>
+            </div>
         </div>
 
         {/* Display a warning if we have plans but no user subscriptions */}
@@ -601,9 +601,9 @@ export default function SubscriptionsPage() {
               </div>
               <div className="ml-3 flex-grow">
                 <div className="flex justify-between items-start">
-                  <h3 className="text-sm font-medium text-green-800">
-                    Active Subscription
-                  </h3>
+                <h3 className="text-sm font-medium text-green-800">
+                  Active Subscription
+                </h3>
                   <button 
                     onClick={reloadSubscriptionData}
                     className="bg-green-100 p-1 rounded-full text-green-600 hover:bg-green-200"

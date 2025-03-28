@@ -1,67 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { cookies } from 'next/headers';
-import { parseJsonFields } from '@/lib/dbOperations';
+import { verifyAdminRequest } from '../../../../lib/apiAuth';
 
 export async function GET(request: NextRequest) {
   try {
-    // Get auth cookie and parse it
-    const authCookie = cookies().get('wanderpaws_auth')?.value;
-    
-    // If no auth cookie or unable to parse it
-    if (!authCookie) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401 }
-      );
-    }
-    
-    // Try to parse the user from the cookie
-    let currentUser;
-    try {
-      currentUser = JSON.parse(authCookie);
-    } catch (e) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Invalid auth token' }),
-        { status: 401 }
-      );
-    }
-    
-    // Check if the user is an admin
-    if (!currentUser || currentUser.role !== 'admin') {
-      return new NextResponse(
-        JSON.stringify({ error: 'Unauthorized' }),
+    // Verify this is an admin request
+    const adminAuth = await verifyAdminRequest(request);
+    if (!adminAuth.authorized) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Admin access required' },
         { status: 403 }
       );
     }
     
-    // Get all users with their profile information
+    // Parse query parameters
+    const { searchParams } = new URL(request.url);
+    const role = searchParams.get('role');
+    const query = searchParams.get('query') || '';
+    
+    // Set up the where clause for the query
+    const whereClause: any = {};
+    
+    // Add role filter if specified
+    if (role) {
+      whereClause.role = role;
+    }
+    
+    // Add search query if provided
+    if (query) {
+      whereClause.OR = [
+        { name: { contains: query, mode: 'insensitive' } },
+        { email: { contains: query, mode: 'insensitive' } }
+      ];
+    }
+    
+    // Fetch users
     const users = await prisma.user.findMany({
-      include: {
-        owner: true,
-        walker: true,
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        createdAt: true,
+        owner: {
+          select: {
+            id: true
+          }
+        },
+        walker: {
+          select: {
+            id: true
+          }
+        }
+      },
+      orderBy: {
+        name: 'asc'
       }
     });
     
-    // Don't expose password hashes
-    const sanitizedUsers = users.map(user => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { passwordHash, ...sanitizedUser } = user;
-      return sanitizedUser;
-    });
-    
-    // Process the data but ensure it's still an array
-    const processedUsers = parseJsonFields(sanitizedUsers);
-    
-    // Debug
-    console.log('Type of processed users:', Array.isArray(processedUsers) ? 'array' : typeof processedUsers);
-    
-    // Ensure we're returning an array
-    return NextResponse.json(Array.isArray(processedUsers) ? processedUsers : sanitizedUsers);
+    return NextResponse.json({ users });
   } catch (error) {
     console.error('Error fetching users:', error);
-    return new NextResponse(
-      JSON.stringify({ error: 'Failed to fetch users', details: error instanceof Error ? error.message : 'Unknown error' }),
+    return NextResponse.json(
+      { error: 'Failed to fetch users', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

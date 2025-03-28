@@ -20,7 +20,7 @@ export default function MessagePanel({ conversation }: MessagePanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const conversationMessages = messages.filter(msg => msg.conversationId === conversation.id);
 
-  // Get conversation title - replace mockUser with user ID when real user service is implemented
+  // Get conversation title based on participants
   const getConversationTitle = () => {
     if (conversation.title) return conversation.title;
     
@@ -28,7 +28,7 @@ export default function MessagePanel({ conversation }: MessagePanelProps) {
     if (conversation.type === 'direct') {
       const otherParticipantId = conversation.participants.find(id => id !== user?.id);
       
-      // Use the participant ID as a fallback until real user service is implemented
+      // Use the participant ID as a fallback
       return otherParticipantId || 'Conversation';
     }
     
@@ -50,7 +50,10 @@ export default function MessagePanel({ conversation }: MessagePanelProps) {
     if (!newMessage.trim() && attachments.length === 0) return;
     
     try {
-      await sendMessage(newMessage, attachments.length > 0 ? attachments : undefined);
+      // Send message with conversation ID and text content
+      // Note: This API doesn't currently support attachments
+      await sendMessage(conversation.id, newMessage);
+      
       setNewMessage('');
       setAttachments([]);
     } catch (error) {

@@ -94,6 +94,10 @@ export interface Walk {
   };
   // Track if this walk is part of a subscription
   subscriptionId?: string;
+  
+  // Include optional nested related objects when included from API
+  dog?: Dog;
+  walker?: Walker;
 }
 
 export interface AIRecommendation {

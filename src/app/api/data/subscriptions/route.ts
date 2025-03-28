@@ -1,41 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
-
-// Mock user subscription data for the current user
-function getMockUserSubscription(userId: string) {
-  // Create a subscription that's active for the next 30 days
-  const now = new Date();
-  const endDate = new Date(now);
-  endDate.setDate(now.getDate() + 30);
-  
-  return {
-    id: `sub_${userId.substring(0, 8)}`,
-    userId: userId,
-    ownerId: userId,
-    planId: 'plan2', // Premium plan
-    startDate: now.toISOString(),
-    endDate: endDate.toISOString(),
-    creditsRemaining: 8,
-    status: 'active',
-    purchaseAmount: 9995,
-    purchaseDate: now.toISOString()
-  };
-}
+import prisma from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
   try {
-    console.log('GET /api/data/subscriptions - returning mock data');
+    // Get userId from query parameters or headers
+    const searchParams = request.nextUrl.searchParams;
+    const userId = searchParams.get('userId') || request.headers.get('user-id') || '';
+    const userProfileId = request.headers.get('user-profile-id') || '';
     
-    // Get userId from query parameter
-    const userId = request.nextUrl.searchParams.get('userId');
+    console.log('GET /api/data/subscriptions - fetching real data');
+    console.log('User identifiers:', { userId, userProfileId });
     
-    if (!userId) {
-      return NextResponse.json([]);
+    if (!userId && !userProfileId) {
+      console.error('No user ID or profile ID provided');
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
     
-    // Return mock subscription for the user
-    return NextResponse.json([getMockUserSubscription(userId)]);
+    // Query the database for real subscription data
+    const subscriptions = await prisma.userSubscription.findMany({
+      where: {
+        OR: [
+          { userId: userId },
+          { userId: userProfileId }
+        ]
+      }
+    });
+    
+    console.log(`Found ${subscriptions.length} subscriptions for user ${userId}`);
+    
+    // Transform data to match expected format
+    const formattedSubscriptions = subscriptions.map(sub => ({
+      id: sub.id,
+      userId: sub.userId,
+      planId: sub.planId,
+      planName: sub.planName,
+      status: sub.status,
+      startDate: sub.startDate,
+      endDate: sub.endDate,
+      creditsRemaining: sub.creditsRemaining,
+      walkCredits: sub.walkCredits,
+      walkDuration: sub.walkDuration,
+      purchaseAmount: sub.purchaseAmount,
+      purchaseDate: sub.purchaseDate,
+      createdAt: sub.createdAt,
+      updatedAt: sub.updatedAt
+    }));
+    
+    // Return real subscription data
+    return NextResponse.json(formattedSubscriptions);
   } catch (error) {
-    console.error('Error in subscriptions API:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('Error fetching subscriptions:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch subscription data' },
+      { status: 500 }
+    );
   }
 }
+
