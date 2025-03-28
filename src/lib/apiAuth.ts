@@ -7,6 +7,7 @@ export interface AuthVerification {
   userId?: string;
   profileId?: string;
   role?: string;
+  error?: string;
 }
 
 /**

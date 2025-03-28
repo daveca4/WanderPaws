@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { verifyAdminRequest } from '@/lib/apiAuth';
+import { verifyAdminRequest } from '../../../../lib/apiAuth';
 
 export async function POST(request: NextRequest) {
   try {
