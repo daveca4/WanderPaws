@@ -122,6 +122,21 @@ export function hasPermission(user: User | null, action: string, resource: strin
     return true;
   }
   
+  // Special case for walkers updating assessments
+  if (user.role === 'walker' && action === 'update' && resource === 'assessments') {
+    return true;
+  }
+  
+  // Special case for walkers reading assessments
+  if (user.role === 'walker' && action === 'read' && resource === 'assessments') {
+    return true;
+  }
+  
+  // Special case for walkers submitting assessment feedback
+  if (user.role === 'walker' && action === 'submit' && resource === 'assessment_feedback') {
+    return true;
+  }
+  
   const permission = `${action}_${resource}` as Permission;
   const userPermissions = rolePermissions[user.role] || [];
   return userPermissions.includes(permission);

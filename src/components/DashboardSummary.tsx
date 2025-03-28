@@ -1,6 +1,7 @@
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import Link from 'next/link';
+import { Dog, Assessment } from '@/lib/types';
 
 interface StatItem {
   label: string;
@@ -12,9 +13,25 @@ interface StatItem {
   };
 }
 
-export function DashboardSummary() {
+interface DashboardSummaryProps {
+  dogs?: Dog[];
+  assessments?: Assessment[];
+  hasApprovedAssessment?: boolean;
+  hasActiveSubscription?: boolean;
+}
+
+export function DashboardSummary({ 
+  dogs: propDogs, 
+  assessments: propAssessments,
+  hasApprovedAssessment,
+  hasActiveSubscription
+}: DashboardSummaryProps = {}) {
   const { user } = useAuth();
-  const { walks, dogs, walkers, assessments } = useData();
+  const { walks, dogs: allDogs, walkers, assessments: allAssessments } = useData();
+  
+  // Use props if provided, otherwise use context data
+  const dogs = propDogs || allDogs;
+  const assessments = propAssessments || allAssessments;
   
   // Get stats based on user role
   let stats: StatItem[] = [];
@@ -71,10 +88,31 @@ export function DashboardSummary() {
       return walkDate >= firstDayOfMonth;
     });
     
+    // Get assessments pending review
+    const pendingReviewAssessments = assessments.filter(assessment => 
+      assessment.status === 'feedback_submitted' || 
+      assessment.status === 'ready_for_review'
+    );
+    
     stats = [
       { label: 'Active Dogs', value: ownerDogs.length },
-      { label: 'Walks This Month', value: walksThisMonth.length },
-      { label: 'Upcoming Walks', value: upcomingWalks.length },
+      { 
+        label: 'Pending Reviews', 
+        value: pendingReviewAssessments.length,
+        highlight: pendingReviewAssessments.length > 0,
+        action: pendingReviewAssessments.length > 0 ? {
+          label: 'View Assessments',
+          href: '/owner-dashboard/assessment/status'
+        } : undefined
+      },
+      { 
+        label: 'Approved Dogs', 
+        value: ownerDogs.filter(dog => dog.assessmentStatus === 'approved').length,
+        action: {
+          label: 'Book Walks',
+          href: '/owner-dashboard/walks/book'
+        }
+      },
     ];
   } else if (user?.role === 'admin') {
     // Pending assessments 

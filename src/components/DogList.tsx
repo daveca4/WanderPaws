@@ -5,7 +5,11 @@ import { useData } from '@/lib/DataContext';
 import { Dog, Owner, Walk } from '@/lib/types';
 import S3Image from '@/components/S3Image';
 
-export function DogList() {
+interface DogListProps {
+  userDogs?: Dog[];
+}
+
+export function DogList({ userDogs }: DogListProps = {}) {
   const { user } = useAuth();
   const { dogs, owners, walks, refreshData, deleteDog } = useData();
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
@@ -16,7 +20,10 @@ export function DogList() {
   // If user is admin, show all dogs
   let filteredDogs = dogs;
   
-  if (user) {
+  // Use provided userDogs if available, otherwise filter from context
+  if (userDogs) {
+    filteredDogs = userDogs;
+  } else if (user) {
     if (user.role === 'owner' && user.profileId) {
       filteredDogs = dogs.filter(dog => dog.ownerId === user.profileId);
     } else if (user.role === 'walker' && user.profileId) {
@@ -146,6 +153,35 @@ export function DogList() {
                     <p className="text-xs text-gray-500 mt-1">
                       Owner: {dogOwner.name}
                     </p>
+                  )}
+                  
+                  {/* Display Assessment Status */}
+                  {dog.assessmentStatus && (
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                        dog.assessmentStatus === 'approved' 
+                          ? 'bg-green-100 text-green-800' 
+                          : dog.assessmentStatus === 'denied' 
+                          ? 'bg-red-100 text-red-800'
+                          : dog.assessmentStatus === 'pending_review'
+                          ? 'bg-purple-100 text-purple-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {dog.assessmentStatus === 'approved' && 'Approved ✓'}
+                        {dog.assessmentStatus === 'denied' && 'Assessment Denied'}
+                        {dog.assessmentStatus === 'pending_review' && 'Assessment Pending Review'}
+                        {dog.assessmentStatus === 'scheduled' && 'Assessment Scheduled'}
+                        {dog.assessmentStatus === 'pending' && 'Assessment Pending'}
+                        {dog.assessmentStatus === 'in_progress' && 'Assessment In Progress'}
+                        {dog.assessmentStatus !== 'approved' && 
+                         dog.assessmentStatus !== 'denied' && 
+                         dog.assessmentStatus !== 'pending_review' &&
+                         dog.assessmentStatus !== 'scheduled' &&
+                         dog.assessmentStatus !== 'pending' &&
+                         dog.assessmentStatus !== 'in_progress' && 
+                         dog.assessmentStatus}
+                      </span>
+                    </div>
                   )}
                 </div>
               </Link>

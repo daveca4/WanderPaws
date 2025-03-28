@@ -78,61 +78,14 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const userId = request.headers.get('user-id');
-    const userRole = request.headers.get('user-role') as Role;
-    const userProfileId = request.headers.get('user-profile-id');
-    
-    console.log('GET dog request:', { id: params.id, userId, userRole, userProfileId });
-
-    if (!userId || !userRole) {
-      console.error('Missing user headers:', { userId, userRole });
-      return NextResponse.json({ error: 'Unauthorized - Missing user information' }, { status: 401 });
-    }
-
     const id = params.id;
+    console.log(`Fetching dog with ID: ${id}`);
     
-    // Get from cache first
-    const cacheKey = `dog-${id}`;
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      console.log(`Cache hit for dog ${id}`);
-      
-      // For now, we'll skip the cache authorization check to simplify things
-      return NextResponse.json(cached.data);
-    }
-    
-    console.log(`Cache miss for dog ${id}, fetching from database`);
-    
-    // If not in cache, get from database
+    // Find the dog
     const dog = await prisma.dog.findUnique({
       where: { id },
-      include: { 
-        owner: {
-          select: {
-            id: true,
-            userId: true,
-            name: true,
-            email: true,
-            phone: true
-          }
-        },
-        walks: {
-          select: {
-            id: true,
-            date: true,
-            status: true,
-            notes: true,
-            walkerId: true,
-            walker: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                phone: true
-              }
-            }
-          }
-        }
+      include: {
+        owner: true  // Include owner data
       }
     });
     
@@ -140,80 +93,67 @@ export async function GET(
       console.error(`Dog not found with ID: ${id}`);
       return NextResponse.json({ error: 'Dog not found' }, { status: 404 });
     }
-
-    console.log('Found dog:', { 
-      id: dog.id, 
-      name: dog.name,
-      ownerId: dog.ownerId, 
-      ownerUserId: dog.owner?.userId,
-      requestUserId: userId,
-      userProfileId
-    });
-
-    // Get owner profile if user role is owner
-    let ownerProfile = null;
-    if (userRole === 'owner') {
-      ownerProfile = await prisma.owner.findUnique({
-        where: { userId },
-        select: { 
-          id: true,
-          userId: true
-        }
-      });
-      console.log('Found owner profile:', ownerProfile);
-    }
-
-    // Check authorization
-    let isAuthorized = false;
     
-    if (userRole === 'admin') {
-      // Admin is always authorized
-      isAuthorized = true;
-      console.log('Admin user authorized');
-    } else if (userRole === 'owner') {
-      // Owner is authorized if they own the dog
-      if (ownerProfile && ownerProfile.id === dog.ownerId) {
-        isAuthorized = true;
-        console.log(`Owner authorized: profile ID ${ownerProfile.id} matches dog owner ID ${dog.ownerId}`);
-      } else if (userProfileId && userProfileId === dog.ownerId) {
-        isAuthorized = true;
-        console.log(`Owner authorized: profileId header ${userProfileId} matches dog owner ID ${dog.ownerId}`);
-      } else if (dog.owner?.userId === userId) {
-        isAuthorized = true;
-        console.log(`Owner authorized: dog owner userId ${dog.owner.userId} matches user ${userId}`);
-      } else {
-        console.log(`Owner not authorized: user ${userId} is not the owner of dog ${id}`);
+    // Get the latest assessment for this dog to show the accurate status
+    const latestAssessment = await prisma.assessment.findFirst({
+      where: {
+        dogId: id,
+      },
+      orderBy: {
+        updatedAt: 'desc'
       }
-    } else if (userRole === 'walker') {
-      // Check if the walker has walked this dog
-      isAuthorized = true; // Simplify for now, we can add more specific checks later
-      console.log('Walker authorized to view dog');
-    }
-    
-    if (!isAuthorized) {
-      console.error(`Authorization failed: User ${userId} (${userRole}) cannot view dog ${id}`);
-      return NextResponse.json({ 
-        error: 'Unauthorized to view this dog',
-        details: {
-          userRole,
-          userId,
-          userProfileId,
-          dogOwnerId: dog.ownerId,
-          dogOwnerUserId: dog.owner?.userId
-        }
-      }, { status: 403 });
-    }
-    
-    // Add to cache
-    cache.set(cacheKey, {
-      data: dog,
-      timestamp: Date.now()
     });
     
-    return NextResponse.json(dog);
+    // Update the dog with the latest assessment status
+    let dogWithAssessmentStatus = {
+      ...dog
+    };
+    
+    if (latestAssessment) {
+      // Map from assessment status to dog assessmentStatus
+      let assessmentStatus = 'pending';
+      
+      switch (latestAssessment.status) {
+        case 'scheduled':
+          assessmentStatus = 'scheduled';
+          break;
+        case 'assigned':
+          assessmentStatus = 'in_progress';
+          break;
+        case 'feedback_submitted':
+          assessmentStatus = 'pending_review';
+          break;
+        case 'ready_for_review':
+          assessmentStatus = 'pending_review';
+          break;
+        case 'completed':
+          assessmentStatus = latestAssessment.result || 'completed';
+          break;
+        case 'approved':
+          assessmentStatus = 'approved';
+          break;
+        case 'denied':
+          assessmentStatus = 'denied';
+          break;
+        default:
+          assessmentStatus = latestAssessment.status;
+      }
+      
+      dogWithAssessmentStatus.assessmentStatus = assessmentStatus;
+    }
+    
+    console.log(`Dog found: ${dog.name}, assessment status: ${dogWithAssessmentStatus.assessmentStatus}`);
+    
+    // Parse any JSON fields in the data
+    const parsedDog = parseJsonFields(dogWithAssessmentStatus);
+    
+    return NextResponse.json(parsedDog);
   } catch (error) {
-    console.error('Error getting dog:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    console.error('Error fetching dog:', error);
+    return NextResponse.json({ 
+      error: 'Failed to fetch dog',
+      details: error instanceof Error ? error.message : undefined
+    }, { status: 500 });
   }
 }
 

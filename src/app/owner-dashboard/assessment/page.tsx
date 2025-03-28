@@ -13,7 +13,7 @@ import { Dog } from '@/lib/types';
 
 export default function AssessmentPage() {
   const { user } = useAuth();
-  const { dogs } = useData();
+  const { dogs, refreshData } = useData();
   const router = useRouter();
   
   const [loading, setLoading] = useState(true);
@@ -24,8 +24,53 @@ export default function AssessmentPage() {
   const [availableDates, setAvailableDates] = useState<Date[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Generate available dates (next 7 days excluding today)
+  // Load user's dogs with the latest assessment status
+  const loadUserDogs = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      
+      // Refresh data from API to get the latest dog and assessment information
+      await refreshData();
+      
+      // Get fresh dog data with assessment status directly from API
+      const response = await fetch(`/api/data/owners/${user.profileId}/dogs`);
+      let ownedDogs: Dog[] = [];
+      
+      if (response.ok) {
+        ownedDogs = await response.json();
+      } else {
+        // Fall back to dogs from context if API fails
+        ownedDogs = getDogsByOwnerId(dogs, user.profileId || '');
+      }
+      
+      if (ownedDogs.length > 0) {
+        setUserDogs(ownedDogs);
+        
+        // Pre-select the first dog that doesn't have an approved assessment
+        const dogNeedingAssessment = ownedDogs.find(dog => 
+          !dog.assessmentStatus || 
+          !['approved', 'completed'].includes(dog.assessmentStatus)
+        );
+        
+        if (dogNeedingAssessment) {
+          setSelectedDog(dogNeedingAssessment);
+        } else {
+          setSelectedDog(ownedDogs[0]);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading dogs:', err);
+      setError('Failed to load your dogs. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate available dates and load user dogs when component mounts
   useEffect(() => {
+    // Generate available dates
     const dates = [];
     const currentDate = new Date();
     
@@ -39,42 +84,10 @@ export default function AssessmentPage() {
     }
     
     setAvailableDates(dates);
-  }, []);
-
-  // Load user's dogs
-  useEffect(() => {
-    if (!user) return;
     
-    const loadUserDogs = async () => {
-      try {
-        // Get dogs from context
-        const ownedDogs = getDogsByOwnerId(dogs, user.profileId || '');
-        
-        if (ownedDogs.length > 0) {
-          setUserDogs(ownedDogs);
-          // Pre-select the first dog that doesn't have an approved assessment
-          const dogNeedingAssessment = ownedDogs.find(dog => 
-            !dog.assessmentStatus || 
-            !['approved', 'completed'].includes(dog.assessmentStatus)
-          );
-          
-          if (dogNeedingAssessment) {
-            setSelectedDog(dogNeedingAssessment);
-          } else {
-            setSelectedDog(ownedDogs[0]);
-          }
-        }
-        
-        setLoading(false);
-      } catch (err) {
-        console.error('Error loading dogs:', err);
-        setError('Failed to load your dogs. Please try again later.');
-        setLoading(false);
-      }
-    };
-    
+    // Load user dogs
     loadUserDogs();
-  }, [user, dogs]);
+  }, [user]);
   
   const handleDogSelect = (dog: Dog) => {
     setSelectedDog(dog);
@@ -82,6 +95,12 @@ export default function AssessmentPage() {
   
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
+  };
+  
+  // Handle manual refresh button click
+  const handleRefresh = async () => {
+    setError(null);
+    await loadUserDogs();
   };
   
   const handleRequestAssessment = async () => {
@@ -110,8 +129,9 @@ export default function AssessmentPage() {
       
       if (response.ok) {
         console.log('Assessment created successfully');
-        // Redirect to assessment status page instead of subscription page
-        router.push('/owner-dashboard/assessment/status');
+        // Add cache busting parameter to ensure fresh data
+        const timestamp = new Date().getTime();
+        router.push(`/owner-dashboard/assessment/status?t=${timestamp}`);
       } else {
         const data = await response.json();
         throw new Error(data.error || 'Failed to create assessment');
@@ -152,6 +172,28 @@ export default function AssessmentPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Schedule a Dog Assessment</h1>
+          <button
+            onClick={handleRefresh}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            disabled={loading}
+          >
+            {loading ? (
+              <span className="flex items-center">
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Refreshing...
+              </span>
+            ) : (
+              <span className="flex items-center">
+                <svg className="-ml-1 mr-2 h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh Dogs
+              </span>
+            )}
+          </button>
         </div>
 
         <div className="bg-white shadow rounded-lg overflow-hidden">

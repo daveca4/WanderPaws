@@ -6,16 +6,127 @@ import Link from 'next/link';
 import Image from 'next/image';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
-// Removed mock data import
-import { getDogById, getOwnerById } from '@/utils/helpers';
 import { Assessment, AssessmentFeedback } from '@/lib/types';
 import { formatDate } from '@/utils/helpers';
+
+// Helper functions for API calls
+const getAssessmentById = async (id: string) => {
+  try {
+    const response = await fetch(`/api/data/assessments/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Error fetching assessment: ${errorData.error || response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch assessment:', error);
+    throw error;
+  }
+};
+
+const getDogById = async (dogId: string) => {
+  try {
+    const response = await fetch(`/api/data/dogs/${dogId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching dog: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch dog:', error);
+    throw error;
+  }
+};
+
+const getOwnerById = async (ownerId: string) => {
+  try {
+    const response = await fetch(`/api/data/owners/${ownerId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching owner: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch owner:', error);
+    throw error;
+  }
+};
+
+const submitAssessmentFeedback = async (assessmentId: string, feedbackData: any) => {
+  try {
+    const response = await fetch(`/api/data/assessments/${assessmentId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        feedback: feedbackData,
+        status: 'completed'
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Error submitting feedback: ${errorData.error || response.statusText}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to submit feedback:', error);
+    throw error;
+  }
+};
+
+const updateAssessment = async (assessmentId: string, updateData: any) => {
+  try {
+    const response = await fetch(`/api/data/assessments/${assessmentId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updateData),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to update assessment: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error updating assessment:', error);
+    return null;
+  }
+};
 
 export default function SubmitFeedbackPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
+  const [dog, setDog] = useState<any>(null);
+  const [owner, setOwner] = useState<any>(null);
   const [formData, setFormData] = useState<Omit<AssessmentFeedback, 'id' | 'assessmentId' | 'submittedDate'>>({
     walkerId: '',
     behaviorRatings: {
@@ -35,43 +146,69 @@ export default function SubmitFeedbackPage({ params }: { params: { id: string } 
   const [newStrength, setNewStrength] = useState('');
   const [newConcern, setNewConcern] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!user) return;
     
-    const loadAssessment = () => {
-      const foundAssessment = getAssessmentById(params.id);
-      
-      if (foundAssessment) {
-        setAssessment(foundAssessment);
+    const loadAssessment = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        // Get assessment by ID
+        const assessment = await getAssessmentById(params.id);
         
-        // Pre-populate form with walker ID
-        setFormData(prev => ({
-          ...prev,
-          walkerId: user.profileId || ''
-        }));
+        if (!assessment) {
+          setError('Assessment not found');
+          setLoading(false);
+          return;
+        }
         
-        // If feedback already exists, pre-populate the form
-        if (foundAssessment.feedback) {
+        // Get dog and owner info if available
+        let dogData = null;
+        let ownerData = null;
+        
+        if (assessment.dogId) {
+          try {
+            dogData = await getDogById(assessment.dogId);
+          } catch (err) {
+            console.error('Error fetching dog data:', err);
+            // Continue without dog data
+          }
+        }
+        
+        if (dogData && dogData.ownerId) {
+          try {
+            ownerData = await getOwnerById(dogData.ownerId);
+          } catch (err) {
+            console.error('Error fetching owner data:', err);
+            // Continue without owner data
+          }
+        }
+        
+        // Update state with fetched data
+        setAssessment(assessment);
+        setDog(dogData);
+        setOwner(ownerData);
+        
+        // Pre-populate form with any existing feedback
+        if (assessment.feedback) {
           setFormData({
-            walkerId: foundAssessment.feedback.walkerId,
-            behaviorRatings: foundAssessment.feedback.behaviorRatings,
-            concerns: foundAssessment.feedback.concerns,
-            strengths: foundAssessment.feedback.strengths,
-            recommendations: foundAssessment.feedback.recommendations,
-            suitableForGroupWalks: foundAssessment.feedback.suitableForGroupWalks,
-            walkerNotes: foundAssessment.feedback.walkerNotes,
-            photosOrVideos: foundAssessment.feedback.photosOrVideos,
-            recommendedWalkerExperience: foundAssessment.feedback.recommendedWalkerExperience
+            ...formData,
+            ...assessment.feedback
           });
         }
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Error loading assessment:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load assessment data');
+        setLoading(false);
       }
-      
-      setLoading(false);
     };
     
-    // Simulate API call
-    setTimeout(loadAssessment, 500);
+    loadAssessment();
   }, [params.id, user]);
 
   const handleRatingChange = (category: keyof AssessmentFeedback['behaviorRatings'], value: 1 | 2 | 3 | 4 | 5) => {
@@ -135,37 +272,67 @@ export default function SubmitFeedbackPage({ params }: { params: { id: string } 
     }
   };
 
+  // Submit feedback for an assessment
+  async function submitFeedback(id: string, feedbackData: any) {
+    try {
+      const response = await fetch(`/api/data/assessments/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          feedback: feedbackData,
+          status: 'feedback_submitted'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`Error submitting feedback: ${errorData.error || response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Failed to submit feedback:', error);
+      throw error;
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!assessment || !user) return;
+    if (!assessment) {
+      return;
+    }
     
-    setSubmitting(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      // Submit feedback
-      const feedback = submitAssessmentFeedback(assessment.id, formData);
+    try {
+      setSubmitting(true);
       
-      if (feedback) {
-        // Update assessment status to completed
-        const updatedAssessment = updateAssessment(assessment.id, {
-          status: 'completed',
-          feedback
-        });
-        
-        if (updatedAssessment) {
-          // Navigate back to walker dashboard
-          router.push('/walker-dashboard');
-        } else {
-          alert('An error occurred while updating the assessment.');
-          setSubmitting(false);
-        }
-      } else {
-        alert('An error occurred while submitting feedback.');
-        setSubmitting(false);
-      }
-    }, 1000);
+      // Make sure to add walkerId if not already set
+      const feedbackData = {
+        ...formData,
+        walkerId: user?.profileId || formData.walkerId || '',
+        id: assessment.id + '_feedback',
+        assessmentId: assessment.id,
+        submittedDate: new Date().toISOString()
+      };
+      
+      await submitFeedback(assessment.id, feedbackData);
+      
+      // Show success message
+      alert('Feedback submitted successfully');
+      
+      // Force a refresh of the assessments list to update status
+      const cacheParam = new Date().getTime();
+      
+      // Navigate to assessment list with cache-busting parameter
+      router.push(`/walker-dashboard/assessments?t=${cacheParam}`);
+    } catch (err) {
+      console.error('Error submitting feedback:', err);
+      alert(err instanceof Error ? err.message : 'Error submitting feedback');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (loading) {
@@ -229,11 +396,8 @@ export default function SubmitFeedbackPage({ params }: { params: { id: string } 
     );
   }
 
-  const dog = getDogById(assessment.dogId);
-  const owner = getOwnerById(assessment.ownerId);
-
   return (
-    <RouteGuard requiredPermission={{ action: 'update', resource: 'walks' }}>
+    <RouteGuard requiredPermission={{ action: 'update', resource: 'assessments' }}>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>

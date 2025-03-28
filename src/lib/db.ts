@@ -119,10 +119,26 @@ export async function createSubscription(
   stripePaymentId: string
 ) {
   try {
+    console.log('Creating subscription for user:', {
+      userId,
+      planId,
+      planName,
+      walkCredits,
+      validityPeriod,
+      amount,
+      stripePaymentId
+    });
+    
     // Calculate end date
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + validityPeriod);
+    
+    console.log('Subscription period:', {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      validityPeriod
+    });
     
     const subscription = await prisma.userSubscription.create({
       data: {
@@ -145,56 +161,90 @@ export async function createSubscription(
       },
     });
     
+    console.log('✅ Subscription created successfully:', {
+      subscriptionId: subscription.id,
+      userId,
+      planId,
+      status: subscription.status
+    });
+    
     return subscription;
   } catch (error) {
-    console.error('Error creating subscription:', error);
+    console.error('❌ Error creating subscription:', error);
     throw error;
   }
 }
 
 // Payment Functions
 export async function createStripePayment(
-  stripePaymentId: string,
-  stripeCustomerId: string | null,
+  id: string,
+  stripeCustomerId: string,
   amount: number,
   status: string,
   paymentIntentId?: string,
   checkoutSessionId?: string,
-  metadata?: any
+  metadata?: Record<string, string>
 ) {
   try {
-    return await prisma.stripePayment.create({
+    console.log('Creating Stripe payment record:', {
+      id,
+      customerId: stripeCustomerId,
+      amount,
+      status,
+      paymentIntentId,
+      checkoutSessionId
+    });
+    
+    const payment = await prisma.stripePayment.create({
       data: {
-        id: stripePaymentId,
+        id,
         stripeCustomerId,
         amount,
         status,
         paymentIntentId,
         checkoutSessionId,
-        metadata,
+        metadata: metadata || {},
       },
     });
+    
+    console.log('✅ Stripe payment record created:', payment.id);
+    return payment;
   } catch (error) {
-    console.error('Error creating Stripe payment record:', error);
+    console.error('❌ Error creating Stripe payment record:', error);
     throw error;
   }
 }
 
+// Update a Stripe payment with the subscription ID
 export async function updateStripePaymentWithSubscription(
-  paymentId: string, 
+  paymentId: string,
   subscriptionId: string
 ) {
   try {
-    return await prisma.stripePayment.update({
-      where: {
-        id: paymentId,
-      },
+    console.log('Updating payment record with subscription:', {
+      paymentId,
+      subscriptionId
+    });
+    
+    const payment = await prisma.stripePayment.update({
+      where: { id: paymentId },
       data: {
-        subscriptionId,
+        subscription: {
+          connect: {
+            id: subscriptionId,
+          },
+        },
       },
     });
+    
+    console.log('✅ Payment record updated with subscription ID:', {
+      paymentId: payment.id,
+      subscriptionId
+    });
+    
+    return payment;
   } catch (error) {
-    console.error('Error updating Stripe payment record:', error);
+    console.error('❌ Error updating payment with subscription:', error);
     throw error;
   }
 } 

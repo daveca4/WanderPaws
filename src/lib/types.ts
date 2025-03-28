@@ -15,7 +15,7 @@ export interface Dog {
     state: string;
     zip: string;
   };
-  assessmentStatus?: 'pending' | 'approved' | 'denied' | 'not_required'; // Dog assessment status
+  assessmentStatus?: 'pending' | 'approved' | 'denied' | 'not_required' | 'scheduled' | 'in_progress' | 'pending_review'; // Updated dog assessment status
   weight?: number; // Dog's weight in kg for health assessment
   behavioralIssues?: string[]; // Any behavioral issues the dog has
 }
@@ -171,18 +171,32 @@ export interface SubscriptionTransaction {
 
 // Dog Assessment System Types
 
+export type AssessmentStatus = 
+  | 'pending' 
+  | 'scheduled' 
+  | 'assigned'
+  | 'in_progress'
+  | 'completed' 
+  | 'feedback_submitted'
+  | 'ready_for_review'
+  | 'approved' 
+  | 'denied'
+  | 'cancelled';
+
 export interface Assessment {
   id: string;
   dogId: string;
   ownerId: string;
-  createdDate: string; // ISO date string
-  scheduledDate: string; // ISO date string
-  assignedWalkerId?: string; // Walker assigned to conduct the assessment
-  status: 'pending' | 'scheduled' | 'completed' | 'cancelled';
-  result?: 'approved' | 'denied';
-  adminNotes?: string; // Notes from admin for the walker
-  resultNotes?: string; // Final notes from admin regarding assessment result
+  createdDate: string;
+  scheduledDate: string;
+  assignedWalkerId?: string;
+  status: AssessmentStatus;
+  result?: 'approved' | 'denied' | null;
+  adminNotes?: string;
+  resultNotes?: string;
   feedback?: AssessmentFeedback;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface AssessmentFeedback {

@@ -12,6 +12,7 @@ export default function AssessmentsPage() {
   const [loading, setLoading] = useState(true);
   const [displayAssessments, setDisplayAssessments] = useState<Assessment[]>([]);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (assessments.length > 0) {
@@ -34,32 +35,92 @@ export default function AssessmentsPage() {
     setDisplayAssessments(filtered);
   };
 
-  const getStatusBadgeClass = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-800';
+  const getStatusBadgeColor = (status: string) => {
+    switch (status?.toLowerCase()) {
       case 'completed':
         return 'bg-green-100 text-green-800';
+      case 'scheduled':
+        return 'bg-blue-100 text-blue-800';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
       case 'cancelled':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-red-100 text-red-800';
+      case 'feedback_submitted':
+        return 'bg-purple-100 text-purple-800';
+      case 'ready_for_review':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'denied':
+        return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
+  const pendingReviewCount = assessments.filter(
+    assessment => assessment.status === 'feedback_submitted' || assessment.status === 'ready_for_review'
+  ).length;
+  
+  // Filter assessments based on search term and status filter
+  const filteredAssessments = assessments.filter(assessment => {
+    const dog = getDogById(assessment.dogId);
+    const owner = getOwnerById(assessment.ownerId);
+    
+    // Status filter
+    if (statusFilter !== 'all') {
+      if (statusFilter === 'needs_review') {
+        // Special filter for assessments needing review
+        if (assessment.status !== 'feedback_submitted' && assessment.status !== 'ready_for_review') {
+          return false;
+        }
+      } else if (assessment.status !== statusFilter) {
+        return false;
+      }
+    }
+    
+    // Search term filter
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      const dogMatch = dog && dog.name.toLowerCase().includes(searchLower);
+      const ownerMatch = owner && owner.name.toLowerCase().includes(searchLower);
+      const statusMatch = assessment.status.toLowerCase().includes(searchLower);
+      
+      return dogMatch || ownerMatch || statusMatch;
+    }
+    
+    return true;
+  });
+
   return (
     <RouteGuard requiredPermission={{ action: 'access', resource: 'admin-dashboard' }}>
       <div className="space-y-6">
-        <div className="sm:flex sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Assessments Management</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              View and manage all dog assessments
-            </p>
-          </div>
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900">Assessments</h1>
+          <Link
+            href="/admin/assessments/new"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+          >
+            Create Assessment
+          </Link>
         </div>
+        
+        {pendingReviewCount > 0 && (
+          <div className="bg-indigo-50 border-l-4 border-indigo-400 p-4">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-indigo-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-indigo-700">
+                  You have <span className="font-medium">{pendingReviewCount}</span> assessment{pendingReviewCount !== 1 ? 's' : ''} waiting for review.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 bg-white p-4 rounded-lg shadow mb-4">
           <div>
@@ -67,13 +128,16 @@ export default function AssessmentsPage() {
             <select
               id="statusFilter"
               name="statusFilter"
-              className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
             >
               <option value="all">All Statuses</option>
+              <option value="needs_review">Needs Review ({pendingReviewCount})</option>
               <option value="pending">Pending</option>
               <option value="scheduled">Scheduled</option>
+              <option value="feedback_submitted">Feedback Submitted</option>
+              <option value="ready_for_review">Ready for Review</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
@@ -120,7 +184,7 @@ export default function AssessmentsPage() {
                             <div className="text-gray-500">{owner?.email || 'No email'}</div>
                           </td>
                           <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                            <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusBadgeClass(assessment.status)}`}>
+                            <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${getStatusBadgeColor(assessment.status)}`}>
                               {assessment.status.charAt(0).toUpperCase() + assessment.status.slice(1)}
                             </span>
                           </td>
@@ -145,6 +209,15 @@ export default function AssessmentsPage() {
                                   className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none"
                                 >
                                   Schedule
+                                </Link>
+                              )}
+                              
+                              {(assessment.status === 'feedback_submitted' || assessment.status === 'ready_for_review') && (
+                                <Link
+                                  href={`/admin/assessments/${assessment.id}`}
+                                  className="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none"
+                                >
+                                  Review
                                 </Link>
                               )}
                             </div>

@@ -1,33 +1,83 @@
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import { getPastWalks, formatDate, formatTime } from '@/utils/helpers';
+import { Assessment, Dog, Walk } from '@/lib/types';
+import { format } from 'date-fns';
+import S3Image from '@/components/S3Image';
 
-export function RecentActivities() {
+interface RecentActivitiesProps {
+  userAssessments?: Assessment[];
+}
+
+export function RecentActivities({ userAssessments }: RecentActivitiesProps = {}) {
   const { user } = useAuth();
-  const { walks, dogs, walkers } = useData();
-  const walkerId = user?.profileId || undefined;
-  const recentWalks = getPastWalks(walks, 5, walkerId);
+  const { walks, assessments: allAssessments, dogs, getDogById, walkers } = useData();
+  const [activeTab, setActiveTab] = useState<'walks' | 'assessments'>('assessments');
   
+  // Use provided userAssessments if available
+  const assessments = userAssessments || allAssessments;
+
+  // Get relevant walks and assessments based on user role
+  let userWalks: Walk[] = [];
+  let filteredAssessments: Assessment[] = [];
+
+  if (user) {
+    if (user.role === 'owner' && user.profileId) {
+      // For owner, get walks for their dogs
+      userWalks = walks.filter(walk => {
+        const dog = getDogById(walk.dogId);
+        return dog?.ownerId === user.profileId;
+      });
+
+      // For owner, get assessments for their dogs
+      filteredAssessments = assessments.filter(
+        assessment => assessment.ownerId === user.profileId
+      );
+    } else if (user.role === 'walker' && user.profileId) {
+      // For walker, get walks they've done
+      userWalks = walks.filter(walk => walk.walkerId === user.profileId);
+
+      // For walker, get assessments they're assigned to
+      filteredAssessments = assessments.filter(
+        assessment => assessment.assignedWalkerId === user.profileId
+      );
+    } else if (user.role === 'admin') {
+      // For admin, get all recent walks and assessments
+      userWalks = walks.sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      ).slice(0, 5);
+
+      filteredAssessments = assessments.sort((a, b) => 
+        new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime()
+      ).slice(0, 5);
+    }
+  }
+
   // Helper functions
-  const getDogById = (id: string) => dogs.find(dog => dog.id === id);
-  const getWalkerById = (id: string) => walkers.find(walker => walker.id === id);
+  const getWalkerById = (id: string) => {
+    // Find the walker in the walkers data (assuming walker data is available)
+    const walkerWithId = walkers ? walkers.find(walker => walker.id === id) : null;
+    return walkerWithId;
+  };
   
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
       <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Activities</h2>
       
-      {recentWalks.length === 0 ? (
+      {userWalks.length === 0 && filteredAssessments.length === 0 ? (
         <div className="text-center py-8">
           <p className="text-gray-500">No recent activities</p>
         </div>
       ) : (
         <div className="space-y-6">
-          {recentWalks.map((walk) => {
+          {userWalks.map((walk) => {
             const dog = getDogById(walk.dogId);
             const walker = getWalkerById(walk.walkerId);
             
-            if (!dog || !walker) return null;
+            if (!dog) return null;
             
             return (
               <div key={walk.id} className="flex">
@@ -65,7 +115,7 @@ export function RecentActivities() {
                     
                     <div className="ml-3 flex-1">
                       <p className="text-sm text-gray-700">
-                        <span className="font-medium">{walker.name}</span> noted: "{walk.notes || 'Great walk!'}"
+                        <span className="font-medium">{walker?.name || 'Walker'}</span> noted: "{walk.notes || 'Great walk!'}"
                       </p>
                       
                       {walk.metrics && (

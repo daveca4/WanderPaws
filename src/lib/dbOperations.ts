@@ -316,6 +316,110 @@ export async function getAssessmentById(id: string) {
   }
 }
 
+export async function getAssessmentsByWalkerId(walkerId: string) {
+  try {
+    console.log('Searching for assessments with walkerId:', walkerId);
+    
+    // First try direct match with the provided ID
+    let assessments = await prisma.assessment.findMany({
+      where: { assignedWalkerId: walkerId },
+    });
+    
+    console.log('Found assessments by direct match:', assessments.length);
+    console.log('Assessment objects:', JSON.stringify(assessments, null, 2));
+    
+    // If no assessments found, try to find the walker in case profileId is userId or another ID
+    if (assessments.length === 0) {
+      // Check if we can find a walker with this ID
+      const walkerByDirectId = await prisma.walker.findUnique({
+        where: { id: walkerId },
+        include: { user: true }
+      });
+      
+      if (walkerByDirectId) {
+        console.log('Found walker by direct ID:', walkerByDirectId.id);
+        console.log('Walker object:', JSON.stringify(walkerByDirectId, null, 2));
+        // Use the Prisma API directly instead of raw SQL
+        const directCheck = await prisma.assessment.findMany({
+          where: { 
+            assignedWalkerId: walkerByDirectId.id 
+          }
+        });
+        console.log('Direct check for assessments:', JSON.stringify(directCheck, null, 2));
+      }
+      
+      // Try to find walker by userId
+      const walkerByUserId = await prisma.walker.findUnique({
+        where: { userId: walkerId },
+        include: { user: true }
+      });
+      
+      if (walkerByUserId) {
+        console.log('Found walker by userId:', walkerByUserId.id);
+        console.log('Walker object by userId:', JSON.stringify(walkerByUserId, null, 2));
+        // Search assessments again with the walker's actual ID
+        assessments = await prisma.assessment.findMany({
+          where: { assignedWalkerId: walkerByUserId.id },
+        });
+        console.log('Found assessments using walker.id from userId:', assessments.length);
+        console.log('Assessment objects from userId lookup:', JSON.stringify(assessments, null, 2));
+        
+        // If we found a walker by userId but no assessments, try a direct query
+        if (assessments.length === 0) {
+          const directCheck = await prisma.assessment.findMany({
+            where: { 
+              assignedWalkerId: walkerByUserId.id 
+            }
+          });
+          console.log('Direct check for assessments by walker ID from userId:', JSON.stringify(directCheck, null, 2));
+        }
+      }
+      
+      // If still no assessments, try one more approach - list all assessments and filter
+      if (assessments.length === 0) {
+        console.log('No assessments found with specific queries, listing all assessments to check manually');
+        
+        const allAssessments = await prisma.assessment.findMany({
+          where: {
+            assignedWalkerId: { not: null } // Only get assessments with an assigned walker
+          }
+        });
+        
+        console.log('Total assessments with assigned walkers:', allAssessments.length);
+        console.log('All assignedWalkerIds:', allAssessments.map(a => a.assignedWalkerId));
+        console.log('All assessments:', JSON.stringify(allAssessments, null, 2));
+        
+        // Try to find assessments where ownerId or dogId might match the walkerId 
+        // (in case fields were mixed up)
+        const possibleMixups = await prisma.assessment.findMany({
+          where: {
+            OR: [
+              { ownerId: walkerId },
+              { dogId: walkerId }
+            ]
+          }
+        });
+        
+        if (possibleMixups.length > 0) {
+          console.log('Warning: Found assessments where ownerId or dogId matches the walkerId:', JSON.stringify(possibleMixups, null, 2));
+        }
+      }
+    }
+    
+    // Map the database result to the Assessment type with string dates
+    return assessments.map(assessment => ({
+      ...assessment,
+      createdDate: assessment.createdDate.toISOString(),
+      scheduledDate: assessment.scheduledDate.toISOString(),
+      createdAt: assessment.createdAt.toISOString(),
+      updatedAt: assessment.updatedAt.toISOString()
+    }));
+  } catch (error) {
+    console.error(`Error getting assessments for walker ${walkerId}:`, error);
+    return [];
+  }
+}
+
 export async function createAssessment(assessmentData: any) {
   try {
     return await prisma.assessment.create({
@@ -425,49 +529,37 @@ export async function updateConversation(id: string, conversationData: any) {
 }
 
 // Helper function to handle JSON data when querying from DB
-export function parseJsonFields(data: any) {
-  if (!data) return null;
+export function parseJsonFields(data: any): any {
+  if (!data) return data;
   
+  // If it's an array, map over each item
+  if (Array.isArray(data)) {
+    return data.map(item => parseJsonFields(item));
+  }
+  
+  // Only process objects
+  if (typeof data !== 'object' || data === null) {
+    return data;
+  }
+  
+  // Create a clone of the object to avoid modifying the original
   const clonedData = { ...data };
   
-  // Handle JSON fields in Dog
-  if ('walkingPreferences' in clonedData && clonedData.walkingPreferences) {
-    clonedData.walkingPreferences = typeof clonedData.walkingPreferences === 'string' 
-      ? JSON.parse(clonedData.walkingPreferences) 
-      : clonedData.walkingPreferences;
-  }
+  // Process all potential JSON string fields
+  const jsonFields = [
+    'walkingPreferences', 'address', 'availability', 
+    'route', 'feedback', 'metrics'
+  ];
   
-  // Handle JSON fields in Owner
-  if ('address' in clonedData && clonedData.address) {
-    clonedData.address = typeof clonedData.address === 'string' 
-      ? JSON.parse(clonedData.address) 
-      : clonedData.address;
-  }
-  
-  // Handle JSON fields in Walker
-  if ('availability' in clonedData && clonedData.availability) {
-    clonedData.availability = typeof clonedData.availability === 'string' 
-      ? JSON.parse(clonedData.availability) 
-      : clonedData.availability;
-  }
-  
-  // Handle JSON fields in Walk
-  if ('route' in clonedData && clonedData.route) {
-    clonedData.route = typeof clonedData.route === 'string' 
-      ? JSON.parse(clonedData.route) 
-      : clonedData.route;
-  }
-  
-  if ('feedback' in clonedData && clonedData.feedback) {
-    clonedData.feedback = typeof clonedData.feedback === 'string' 
-      ? JSON.parse(clonedData.feedback) 
-      : clonedData.feedback;
-  }
-  
-  if ('metrics' in clonedData && clonedData.metrics) {
-    clonedData.metrics = typeof clonedData.metrics === 'string' 
-      ? JSON.parse(clonedData.metrics) 
-      : clonedData.metrics;
+  for (const field of jsonFields) {
+    if (field in clonedData && clonedData[field] && typeof clonedData[field] === 'string') {
+      try {
+        clonedData[field] = JSON.parse(clonedData[field]);
+      } catch (e) {
+        // If parsing fails, keep original value
+        console.warn(`Failed to parse JSON for field ${field}`, e);
+      }
+    }
   }
   
   return clonedData;

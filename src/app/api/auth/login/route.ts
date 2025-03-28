@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     const currentLoginTime = new Date().toISOString();
     
     // Remove sensitive data
-    const { passwordHash: _, ...userWithoutPassword } = user;
+    const { passwordHash: _, ...userWithoutSensitiveData } = user;
     
     // Get the profile ID based on role
     let profileId = '';
@@ -70,19 +70,60 @@ export async function POST(req: NextRequest) {
       profileId = user.walker.id;
     }
     
+    // Create user object for token and response
+    const userWithoutPassword = {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      emailVerified: user.emailVerified,
+      image: user.image,
+      profileId: profileId
+    };
+    
+    // If the user is a walker, include their walker ID
+    if (user.role === 'walker') {
+      try {
+        const walker = await prisma.walker.findUnique({
+          where: { userId: user.id },
+          select: { id: true }
+        });
+        
+        if (walker) {
+          console.log('Found walker record during login:', walker);
+          (userWithoutPassword as any).walkerId = walker.id;
+        }
+      } catch (error) {
+        console.error('Error finding walker record during login:', error);
+      }
+    }
+    
     // Return user data with properly formatted fields
     const userResponse = {
       ...userWithoutPassword,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
       lastLogin: currentLoginTime,
-      profileId
     };
     
-    return NextResponse.json({
+    // Create a response with the user data
+    const response = NextResponse.json({
       message: 'Login successful',
       user: userResponse,
     });
+    
+    // Set the token as an HTTP-only cookie
+    response.cookies.set({
+      name: 'wanderpaws_auth',
+      value: JSON.stringify(userWithoutPassword),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+    });
+    
+    return response;
   } catch (error) {
     console.error('Login error:', error instanceof Error ? error.stack : error);
     return NextResponse.json(

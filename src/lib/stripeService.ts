@@ -154,16 +154,29 @@ export async function handleWebhookEvent(body: string, signature: string) {
 }
 
 // Process a successful checkout to create a subscription
-async function handleSuccessfulCheckout(session: Stripe.Checkout.Session) {
+export async function handleSuccessfulCheckout(session: Stripe.Checkout.Session) {
+  console.log('🔄 Processing successful checkout for session:', session.id);
+  
   if (!session.metadata) {
-    console.error('No metadata in the session');
+    console.error('❌ No metadata in the session:', session.id);
     return;
   }
   
-  const { userId, planId, walkCredits, walkDuration, validityPeriod } = session.metadata;
+  const { userId, planId, walkCredits, walkDuration, validityPeriod, validityDays } = session.metadata;
+  
+  // Log the metadata to help debugging
+  console.log('📋 Session metadata:', {
+    userId,
+    planId,
+    walkCredits,
+    walkDuration,
+    validityPeriod,
+    validityDays,
+    allMetadata: session.metadata
+  });
   
   if (!userId || !planId) {
-    console.error('Missing required metadata');
+    console.error('❌ Missing required metadata in session:', session.id);
     return;
   }
   
@@ -176,10 +189,22 @@ async function handleSuccessfulCheckout(session: Stripe.Checkout.Session) {
     } = await import('./db');
   
     // Create payment record
+    console.log('💰 Creating payment record for session:', session.id);
     const paymentId = `payment_${session.id}`;
+
+    // Extract customer ID properly - it can be a string or expanded customer object
+    const customerId = typeof session.customer === 'string' 
+      ? session.customer 
+      : session.customer?.id || '';
+
+    console.log('📋 Customer information:', {
+      rawCustomer: session.customer,
+      extractedCustomerId: customerId
+    });
+
     await createStripePayment(
       paymentId,
-      session.customer as string,
+      customerId,
       session.amount_total as number,
       'succeeded',
       session.payment_intent as string | undefined,
@@ -187,23 +212,31 @@ async function handleSuccessfulCheckout(session: Stripe.Checkout.Session) {
       session.metadata
     );
     
+    // Use validityDays as fallback if validityPeriod is not set
+    const validity = parseInt(validityPeriod || validityDays || '30', 10);
+    
     // Create subscription record
+    console.log('📝 Creating subscription record for user:', userId);
     const subscription = await createSubscription(
       userId,
       planId,
       session.metadata.planName || 'Subscription Plan',
       parseInt(walkCredits, 10),
       parseInt(walkDuration, 10),
-      parseInt(validityPeriod, 10),
+      validity,
       session.amount_total as number,
       paymentId
     );
     
     // Update payment with subscription ID
+    console.log('🔄 Updating payment record with subscription ID:', subscription.id);
     await updateStripePaymentWithSubscription(paymentId, subscription.id);
     
-    console.log('Successfully processed payment and created subscription');
+    console.log('✅ Successfully processed payment and created subscription:', subscription.id);
+    
+    return subscription;
   } catch (error) {
-    console.error('Error handling successful checkout:', error);
+    console.error('❌ Error handling successful checkout:', error);
+    throw error; // Propagate the error for better error tracking
   }
 } 

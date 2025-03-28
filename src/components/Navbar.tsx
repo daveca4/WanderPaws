@@ -102,6 +102,14 @@ export function Navbar() {
                     Signed in as <span className="font-medium text-gray-900">{user.email}</span>
                   </div>
                   
+                  <Link 
+                    href="/profile" 
+                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    onClick={() => setDropdownOpen(false)}
+                  >
+                    Your Profile
+                  </Link>
+                  
                   <PermissionGate action="read" resource="owners" resourceOwnerId={user.profileId}>
                     <Link 
                       href={`/owners/${user.profileId}`} 

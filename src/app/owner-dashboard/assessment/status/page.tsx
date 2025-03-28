@@ -12,7 +12,7 @@ import { Assessment, Dog } from '@/lib/types';
 
 export default function AssessmentStatusPage() {
   const { user } = useAuth();
-  const { dogs, assessments } = useData();
+  const { dogs, assessments, refreshData } = useData();
   const router = useRouter();
   
   const [loading, setLoading] = useState(true);
@@ -20,35 +20,46 @@ export default function AssessmentStatusPage() {
   const [userDogs, setUserDogs] = useState<Dog[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadAssessments = async () => {
     if (!user || !user.profileId) return;
-
-    const fetchUserAssessments = async () => {
-      try {
-        setLoading(true);
-        
-        // Filter assessments by owner ID
-        const ownerAssessments = assessments.filter(assessment => 
-          assessment.ownerId === user.profileId
-        );
-        
-        // Filter dogs by owner ID
-        const ownerDogs = dogs.filter(dog => 
-          dog.ownerId === user.profileId
-        );
-        
-        setUserAssessments(ownerAssessments);
-        setUserDogs(ownerDogs);
-      } catch (err) {
-        console.error('Error fetching assessments:', err);
-        setError('Failed to load your assessments. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
     
-    fetchUserAssessments();
-  }, [user, dogs, assessments]);
+    try {
+      setLoading(true);
+      
+      // Make sure to refresh data to get the latest assessment status
+      await refreshData();
+      
+      // Filter assessments by owner ID
+      const ownerAssessments = assessments.filter(assessment => 
+        assessment.ownerId === user.profileId
+      );
+      
+      // Filter dogs by owner ID
+      const ownerDogs = dogs.filter(dog => 
+        dog.ownerId === user.profileId
+      );
+      
+      setUserAssessments(ownerAssessments);
+      setUserDogs(ownerDogs);
+    } catch (err) {
+      console.error('Error fetching assessments:', err);
+      setError('Failed to load your assessments. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadAssessments();
+    }
+  }, [user]);
+  
+  // Function to manually refresh data
+  const handleRefresh = async () => {
+    setError(null);
+    await loadAssessments();
+  };
   
   // Get dog by ID
   const getDogById = (dogId: string): Dog | undefined => {
@@ -57,13 +68,19 @@ export default function AssessmentStatusPage() {
   
   // Format assessment status for display
   const formatStatus = (status: string): { label: string; color: string } => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case 'pending':
-        return { label: 'Pending', color: 'bg-yellow-100 text-yellow-800' };
+        return { label: 'Pending Approval', color: 'bg-yellow-100 text-yellow-800' };
       case 'scheduled':
         return { label: 'Scheduled', color: 'bg-blue-100 text-blue-800' };
+      case 'assigned':
+        return { label: 'Assigned to Walker', color: 'bg-indigo-100 text-indigo-800' };
+      case 'in_progress':
+        return { label: 'In Progress', color: 'bg-blue-100 text-blue-800' };
       case 'completed':
         return { label: 'Completed', color: 'bg-green-100 text-green-800' };
+      case 'feedback_submitted':
+        return { label: 'Pending Review', color: 'bg-purple-100 text-purple-800' };
       case 'approved':
         return { label: 'Approved', color: 'bg-green-100 text-green-800' };
       case 'denied':
@@ -71,7 +88,46 @@ export default function AssessmentStatusPage() {
       case 'cancelled':
         return { label: 'Cancelled', color: 'bg-gray-100 text-gray-800' };
       default:
-        return { label: 'Unknown', color: 'bg-gray-100 text-gray-800' };
+        // For unknown statuses, just capitalize the status value
+        const label = status?.split('_')
+          .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(' ') || 'Unknown';
+        return { label, color: 'bg-gray-100 text-gray-800' };
+    }
+  };
+  
+  // Handle requesting admin review
+  const handleRequestAdminReview = async (assessmentId: string) => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/data/assessments/${assessmentId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'user-id': user?.id || '',
+          'user-role': user?.role || '',
+          'user-profile-id': user?.profileId || ''
+        },
+        body: JSON.stringify({
+          status: 'ready_for_review',
+          adminNotes: 'Owner has confirmed assessment is ready for review'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update assessment status');
+      }
+
+      // Refresh data to update UI
+      await refreshData();
+      await loadAssessments();
+      
+    } catch (err) {
+      console.error('Error requesting admin review:', err);
+      setError('Failed to request admin review. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -88,12 +144,36 @@ export default function AssessmentStatusPage() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Assessment Status</h1>
-          <Link
-            href="/owner-dashboard/assessment"
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-          >
-            Request New Assessment
-          </Link>
+          <div className="flex space-x-3">
+            <button
+              onClick={handleRefresh}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              disabled={loading}
+            >
+              {loading ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Refreshing...
+                </span>
+              ) : (
+                <span className="flex items-center">
+                  <svg className="-ml-1 mr-2 h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </span>
+              )}
+            </button>
+            <Link
+              href="/owner-dashboard/assessment"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+            >
+              Request New Assessment
+            </Link>
+          </div>
         </div>
         
         {error && (
@@ -177,6 +257,9 @@ export default function AssessmentStatusPage() {
                             <span className={`px-2 py-1 text-xs rounded-full ${statusInfo.color}`}>
                               {statusInfo.label}
                             </span>
+                            <p className="text-xs text-gray-400 mt-1 text-right">
+                              Status: {assessment.status}
+                            </p>
                           </div>
                         </div>
                         
@@ -221,6 +304,21 @@ export default function AssessmentStatusPage() {
                             >
                               Choose a Subscription
                             </Link>
+                          </div>
+                        )}
+
+                        {assessment.status === 'feedback_submitted' && (
+                          <div className="mt-4">
+                            <button
+                              onClick={() => handleRequestAdminReview(assessment.id)}
+                              disabled={loading}
+                              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                            >
+                              {loading ? 'Processing...' : 'Notify Admin for Review'}
+                            </button>
+                            <p className="text-xs text-gray-500 mt-2">
+                              Your walker has submitted feedback. Click the button above to notify our admin team to review the assessment.
+                            </p>
                           </div>
                         )}
                       </div>

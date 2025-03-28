@@ -6,54 +6,164 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
 // Removed mock data import
-import { getDogById, getOwnerById, formatDate } from '@/utils/helpers';
+import { formatDate } from '@/utils/helpers';
 import { Assessment, AssessmentFeedback } from '@/lib/types';
+
+// Helper functions to fetch data from API
+const getAssessmentById = async (id: string) => {
+  try {
+    const response = await fetch(`/api/data/assessments/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Error fetching assessment: ${errorData.error || response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch assessment:', error);
+    return null;
+  }
+};
+
+const getDogById = async (dogId: string) => {
+  try {
+    const response = await fetch(`/api/data/dogs/${dogId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching dog: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch dog:', error);
+    return null;
+  }
+};
+
+const getOwnerById = async (ownerId: string) => {
+  try {
+    const response = await fetch(`/api/data/owners/${ownerId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-store'
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error fetching owner: ${response.statusText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to fetch owner:', error);
+    return null;
+  }
+};
 
 export default function AssessmentDetailsPage({ params }: { params: { id: string } }) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [assessment, setAssessment] = useState<Assessment | null>(null);
+  const [dog, setDog] = useState<any>(null);
+  const [owner, setOwner] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/login');
-      } else if (user.role !== 'walker' && user.role !== 'admin') {
-        router.push('/unauthorized');
-      } else {
-        // Load assessment
-        const foundAssessment = getAssessmentById(params.id);
+    const loadAssessmentDetails = async () => {
+      if (!loading) {
+        if (!user) {
+          router.push('/login');
+          return;
+        } else if (user.role !== 'walker' && user.role !== 'admin') {
+          router.push('/unauthorized');
+          return;
+        }
+
+        setIsLoading(true);
         
-        // Redirect if assessment doesn't exist or doesn't belong to this walker
-        if (!foundAssessment || (user.role === 'walker' && foundAssessment.assignedWalkerId !== user.profileId)) {
-          router.push('/walker-dashboard/assessments');
-        } else {
+        try {
+          // Load assessment
+          const foundAssessment = await getAssessmentById(params.id);
+          
+          // Redirect if assessment doesn't exist or doesn't belong to this walker
+          if (!foundAssessment || (user.role === 'walker' && foundAssessment.assignedWalkerId !== user.profileId)) {
+            router.push('/walker-dashboard/assessments');
+            return;
+          }
+          
           setAssessment(foundAssessment);
+          
+          // Fetch dog and owner data
+          if (foundAssessment.dogId) {
+            const dogData = await getDogById(foundAssessment.dogId);
+            setDog(dogData);
+          }
+          
+          if (foundAssessment.ownerId) {
+            const ownerData = await getOwnerById(foundAssessment.ownerId);
+            setOwner(ownerData);
+          }
+        } catch (err) {
+          console.error('Error loading assessment details:', err);
+          setError('Failed to load assessment details');
+        } finally {
+          setIsLoading(false);
         }
       }
-    }
+    };
+    
+    loadAssessmentDetails();
   }, [params.id, user, loading, router]);
 
   // If loading or assessment not found, show loading state
-  if (loading || !assessment || !user) {
+  if (loading || isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
       </div>
     );
   }
-
-  const dog = getDogById(assessment.dogId);
-  const owner = getOwnerById(assessment.ownerId);
-  const feedback = assessment.feedback;
-
-  if (!dog || !owner) {
+  
+  // If error occurred
+  if (error) {
     return (
       <div className="text-center py-8">
-        <p className="text-red-500">Error: Dog or owner information not found</p>
+        <p className="text-red-500">{error}</p>
+        <Link href="/walker-dashboard/assessments" className="mt-4 text-primary-600 hover:text-primary-800">
+          Return to assessments
+        </Link>
       </div>
     );
   }
+
+  // If assessment, dog or owner not found
+  if (!assessment || !dog || !owner) {
+    return (
+      <div className="text-center py-8">
+        <p className="text-red-500">Error: Assessment details could not be loaded</p>
+        <Link href="/walker-dashboard/assessments" className="mt-4 text-primary-600 hover:text-primary-800">
+          Return to assessments
+        </Link>
+      </div>
+    );
+  }
+
+  const feedback = assessment.feedback;
 
   return (
     <div className="space-y-6">

@@ -31,7 +31,13 @@ export const getOwnerById = (owners: Owner[], id: string): Owner | undefined => 
   return owners.find(owner => owner.id === id);
 };
 
-export const getWalkerById = (walkers: Walker[], id: string): Walker | undefined => {
+export const getWalkerById = (walkers: Walker[] | Walker, id: string): Walker | undefined => {
+  // Handle case where walkers is not an array but a single walker object
+  if (!Array.isArray(walkers)) {
+    return walkers.id === id ? walkers : undefined;
+  }
+  
+  // Normal array case
   return walkers.find(walker => walker.id === id);
 };
 

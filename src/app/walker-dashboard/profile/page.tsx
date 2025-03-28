@@ -151,19 +151,50 @@ export default function WalkerProfilePage() {
   
   // Redirect if not a walker or admin
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/login');
-      } else if (user.role !== 'walker' && user.role !== 'admin') {
-        router.push('/unauthorized');
-      } else if (user.profileId) {
-        // Get walker profile
-        const walkerProfile = getWalkerById(user.profileId);
-        if (walkerProfile) {
-          setWalker(walkerProfile);
+    const fetchWalkerProfile = async () => {
+      if (!loading) {
+        if (!user) {
+          router.push('/login');
+        } else if (user.role !== 'walker' && user.role !== 'admin') {
+          router.push('/unauthorized');
+        } else if (user.profileId) {
+          try {
+            // First try to get walkerId from current-user API
+            const currentUserResponse = await fetch('/api/auth/current-user');
+            if (currentUserResponse.ok) {
+              const userData = await currentUserResponse.json();
+              console.log('Current user data:', userData);
+              
+              // If we have a walkerId from the API
+              if (userData.walkerId) {
+                // Fetch the walker profile
+                const walkerResponse = await fetch(`/api/data/walkers/${userData.walkerId}`);
+                if (walkerResponse.ok) {
+                  const walkerData = await walkerResponse.json();
+                  console.log('Walker data from API:', walkerData);
+                  setWalker(walkerData);
+                  return;
+                }
+              }
+            }
+            
+            // Fallback to using profileId
+            const walkerResponse = await fetch(`/api/data/walkers/${user.profileId}`);
+            if (walkerResponse.ok) {
+              const walkerData = await walkerResponse.json();
+              console.log('Walker data from API using profileId:', walkerData);
+              setWalker(walkerData);
+            } else {
+              console.error('Failed to fetch walker profile');
+            }
+          } catch (error) {
+            console.error('Error fetching walker profile:', error);
+          }
         }
       }
-    }
+    };
+    
+    fetchWalkerProfile();
   }, [user, loading, router]);
 
   // If loading or not walker/admin, show loading state

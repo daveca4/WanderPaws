@@ -31,7 +31,7 @@ interface DataContextType {
   updateWalk: (id: string, data: Partial<Walk>) => Promise<Walk>;
   updateAssessment: (id: string, data: Partial<Assessment>) => Promise<Assessment>;
   // Additional functions
-  refreshData: () => Promise<void>;
+  refreshData: () => Promise<boolean>;
   deleteDog: (id: string) => Promise<boolean>;
 }
 
@@ -54,66 +54,108 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const { user } = useAuth();
 
-  // Fetch data based on user role and permissions
+  // Fetch all data from API
   const fetchData = useCallback(async () => {
-    if (!user) return;
-
     try {
+      if (isLoading) return; // Prevent multiple simultaneous calls
       setIsLoading(true);
       setError(null);
 
+      // Set authentication headers
+      const headers = {
+        'user-id': user?.id || '',
+        'user-role': user?.role || '',
+        'user-profile-id': user?.profileId || ''
+      };
+
+      // Fetch walkers
+      try {
+        const walkersRes = await fetch('/api/data/walkers', { headers });
+        if (walkersRes.ok) {
+          const walkersData = await walkersRes.json();
+          setWalkers(walkersData);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch walkers:', error);
+      }
+
+      // Fetch owners
+      try {
+        const ownersRes = await fetch('/api/data/owners', { headers });
+        if (ownersRes.ok) {
+          const ownersData = await ownersRes.json();
+          setOwners(ownersData);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch owners:', error);
+      }
+
       // Fetch dogs
-      const dogsData = await DogAPI.getAll();
-      setDogs(dogsData);
-
-      // Fetch owners if admin or if user is an owner (to see their own data)
-      if (user.role === 'admin' || user.role === 'owner') {
-        const ownersData = await OwnerAPI.getAll();
-        setOwners(ownersData);
+      try {
+        const dogsRes = await fetch('/api/data/dogs', { headers });
+        if (dogsRes.ok) {
+          const dogsData = await dogsRes.json();
+          setDogs(dogsData);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch dogs:', error);
       }
 
-      // Fetch walkers if admin or if user is a walker
-      if (user.role === 'admin' || user.role === 'walker') {
-        const walkersData = await WalkerAPI.getAll();
-        setWalkers(walkersData);
+      // Fetch walks
+      try {
+        const walksRes = await fetch('/api/data/walks', { headers });
+        if (walksRes.ok) {
+          const walksData = await walksRes.json();
+          setWalks(walksData);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch walks:', error);
+      }
+      
+      // Fetch assessments - include all user types to see their assessments
+      try {
+        const assessmentsRes = await fetch('/api/data/assessments', { headers });
+        if (assessmentsRes.ok) {
+          const assessmentsData = await assessmentsRes.json();
+          setAssessments(assessmentsData);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch assessments:', error);
       }
 
-      // Fetch walks based on role
-      let walksData;
-      if (user.role === 'admin') {
-        walksData = await WalkAPI.getAll();
-      } else if (user.role === 'walker' && user.profileId) {
-        walksData = await WalkAPI.getByWalkerId(user.profileId);
-      } else if (user.role === 'owner' && user.profileId) {
-        // Get all dogs for this owner
-        const ownerDogs = dogsData.filter((dog: Dog) => dog.ownerId === user.profileId);
-        // Get walks for all owner's dogs
-        const walkPromises = ownerDogs.map((dog: Dog) => WalkAPI.getByDogId(dog.id));
-        const walkResults = await Promise.all(walkPromises);
-        walksData = walkResults.flat();
+      // Note: Subscription endpoints are commented out until they're implemented
+      /*
+      // Fetch user subscriptions
+      const subscriptionsRes = await fetch('/api/data/subscriptions', { headers });
+      if (subscriptionsRes.ok) {
+        const subscriptionsData = await subscriptionsRes.json();
+        setUserSubscriptions(subscriptionsData);
       }
-      if (walksData) {
-        setWalks(walksData);
+      
+      // Fetch subscription plans
+      const plansRes = await fetch('/api/data/subscription-plans', { headers });
+      if (plansRes.ok) {
+        const plansData = await plansRes.json();
+        setSubscriptionPlans(plansData);
       }
+      */
 
-      // Fetch assessments if admin or if user is a walker
-      if (user.role === 'admin' || user.role === 'walker') {
-        const assessmentsData = await AssessmentAPI.getAll();
-        setAssessments(assessmentsData);
-      }
-
+      return true;
     } catch (err) {
       console.error('Error fetching data:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      return false;
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [isLoading, user]);
 
   // Fetch data on mount and when user changes
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (user) {
+      fetchData();
+    }
+  }, [user, fetchData]);
 
   // Utility functions to get entities by ID
   const getDogById = useCallback((id: string) => dogs.find(dog => dog.id === id), [dogs]);
@@ -165,7 +207,65 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const refreshData = useCallback(() => fetchData(), [fetchData]);
+  const refreshData = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Force direct API calls to get the most up-to-date data, bypassing cache
+      try {
+        // Set authentication headers for API requests
+        const headers = {
+          'Cache-Control': 'no-cache', 
+          'user-id': user?.id || '',
+          'user-role': user?.role || '',
+          'user-profile-id': user?.profileId || ''
+        };
+        
+        // Fetch assessments directly
+        try {
+          const assessmentsResponse = await fetch('/api/data/assessments', {
+            cache: 'no-store',
+            headers
+          });
+          
+          if (assessmentsResponse.ok) {
+            const freshAssessments = await assessmentsResponse.json();
+            setAssessments(freshAssessments);
+          }
+        } catch (assessmentsError) {
+          console.warn('Error fetching assessments:', assessmentsError);
+        }
+        
+        // Fetch dogs directly 
+        try {
+          const dogsResponse = await fetch('/api/data/dogs', {
+            cache: 'no-store',
+            headers
+          });
+          
+          if (dogsResponse.ok) {
+            const freshDogs = await dogsResponse.json();
+            setDogs(freshDogs);
+          }
+        } catch (dogsError) {
+          console.warn('Error fetching dogs:', dogsError);
+        }
+      } catch (apiError) {
+        console.error('Error during direct API refresh:', apiError);
+        // Fall back to general fetchData if direct API calls fail
+        await fetchData();
+      }
+      
+      return true;
+    } catch (err) {
+      console.error('Error refreshing data:', err);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [fetchData, user]);
 
   const value = {
     dogs,

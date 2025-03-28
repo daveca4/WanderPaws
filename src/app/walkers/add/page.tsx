@@ -18,6 +18,8 @@ export default function AddWalker() {
     name: '',
     email: '',
     phone: '',
+    password: '',
+    confirmPassword: '',
     bio: '',
     specialties: [] as string[],
     preferredDogSizes: [] as ('small' | 'medium' | 'large')[],
@@ -166,22 +168,77 @@ export default function AddWalker() {
   // Form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate form
+    if (formData.password !== formData.confirmPassword) {
+      setFormError('Passwords do not match');
+      return;
+    }
+    
+    if (formData.password.length < 6) {
+      setFormError('Password must be at least 6 characters');
+      return;
+    }
+    
     setSaving(true);
+    setFormError('');
     
     try {
-      // In a real app, you'd make an API call here
-      // For this demo, we'll simulate a delay and redirect
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // First create the user account with walker role
+      const userResponse = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          role: 'walker',
+        }),
+      });
       
-      // Simulate successful creation
-      console.log('New walker data:', formData);
+      if (!userResponse.ok) {
+        const errorData = await userResponse.json();
+        throw new Error(errorData.error || 'Failed to create user account');
+      }
       
-      // In a real app, the API would return the new walker's ID
-      // For demo purposes, we'll just redirect to the walkers list
+      const userData = await userResponse.json();
+      
+      // Now create the walker profile linked to this user
+      const walkerData = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        bio: formData.bio || 'Professional dog walker',
+        rating: 5.0, // Default rating for new walkers
+        availability: formData.availability,
+        specialties: formData.specialties,
+        preferredDogSizes: formData.preferredDogSizes,
+        certificationsOrTraining: formData.certificationsOrTraining,
+        imageUrl: formData.imageUrl,
+        userId: userData.user.id, // Link to the user account
+      };
+      
+      const walkerResponse = await fetch('/api/data/walkers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(walkerData),
+      });
+      
+      if (!walkerResponse.ok) {
+        const errorData = await walkerResponse.json();
+        throw new Error(errorData.error || 'Failed to create walker profile');
+      }
+      
+      // Success - redirect to walkers list
       router.push('/walkers');
     } catch (error) {
       console.error('Error creating walker:', error);
-      setFormError('Failed to create walker. Please try again.');
+      setFormError(error instanceof Error ? error.message : 'Failed to create walker. Please try again.');
+    } finally {
       setSaving(false);
     }
   };
@@ -257,14 +314,46 @@ export default function AddWalker() {
 
               <div>
                 <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
-                  Phone Number
+                  Phone Number *
                 </label>
                 <input
                   type="tel"
                   id="phone"
                   name="phone"
+                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
                   value={formData.phone}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                  Password *
+                </label>
+                <input
+                  type="password"
+                  id="password"
+                  name="password"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  value={formData.password}
+                  onChange={handleChange}
+                />
+                <p className="mt-1 text-xs text-gray-500">Must be at least 6 characters</p>
+              </div>
+              
+              <div>
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                  Confirm Password *
+                </label>
+                <input
+                  type="password"
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                  value={formData.confirmPassword}
                   onChange={handleChange}
                 />
               </div>
@@ -285,7 +374,7 @@ export default function AddWalker() {
 
               <div className="md:col-span-2">
                 <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-1">
-                  Bio
+                  Bio / Description
                 </label>
                 <textarea
                   id="bio"

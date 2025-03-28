@@ -3,34 +3,150 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 // Removed mock data import
-import { getDogById, getOwnerById, formatDate } from '@/utils/helpers';
+import { formatDate } from '@/utils/helpers';
 import { Assessment } from '@/lib/types';
+import { getAssessmentsByWalkerId } from '@/lib/dbOperations';
+
+// Helper functions to fetch real data from the API
+const getDogById = async (dogId: string) => {
+  try {
+    const response = await fetch(`/api/data/dogs/${dogId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch dog: ${response.status}`);
+    }
+    const dogData = await response.json();
+    return dogData;
+  } catch (error) {
+    console.error(`Error fetching dog with ID ${dogId}:`, error);
+    // Return placeholder data instead of failing completely
+    return {
+      id: dogId,
+      name: "Loading...",
+      breed: "Loading...",
+      imageUrl: "https://via.placeholder.com/56"
+    };
+  }
+};
+
+const getOwnerById = async (ownerId: string) => {
+  try {
+    const response = await fetch(`/api/data/owners/${ownerId}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch owner: ${response.status}`);
+    }
+    const ownerData = await response.json();
+    return ownerData;
+  } catch (error) {
+    console.error(`Error fetching owner with ID ${ownerId}:`, error);
+    // Return placeholder data instead of failing completely
+    return {
+      id: ownerId,
+      name: "Loading...",
+      email: "loading@example.com"
+    };
+  }
+};
 
 export default function AssessmentsPage() {
-  const { user, loading } = useAuth();
-  const router = useRouter();
   const [assessments, setAssessments] = useState<Assessment[]>([]);
+  const [dogData, setDogData] = useState<{[key: string]: any}>({});
+  const [ownerData, setOwnerData] = useState<{[key: string]: any}>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
-  // Redirect if not a walker or admin
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/login');
-      } else if (user.role !== 'walker' && user.role !== 'admin') {
-        router.push('/unauthorized');
-      } else if (user.profileId) {
-        // Get assessments for this walker
-        const walkerAssessments = getAssessmentsByWalkerId(user.profileId);
-        setAssessments(walkerAssessments);
+    const fetchAssessments = async () => {
+      try {
+        if (!user) {
+          router.push('/login');
+          return;
+        }
+        
+        if (user.role !== 'walker' && user.role !== 'admin') {
+          router.push('/unauthorized');
+          return;
+        }
+
+        // First check if the user object already has walkerId (from current-user API)
+        let walkerId = (user as any).walkerId;
+        
+        // If not, try to get it from the current-user API
+        if (!walkerId) {
+          try {
+            const response = await fetch('/api/auth/current-user');
+            if (response.ok) {
+              const userData = await response.json();
+              walkerId = userData.walkerId;
+            }
+          } catch (error) {
+            console.error('Error fetching current user data:', error);
+          }
+        }
+        
+        // If still no walkerId, fall back to profileId
+        if (!walkerId && user.profileId) {
+          walkerId = user.profileId;
+        }
+        
+        if (!walkerId) {
+          console.error('No walkerId or profileId found for user');
+          setIsLoading(false);
+          return;
+        }
+        
+        // Try to get assessments using the walker ID
+        const response = await fetch(`/api/walkers/${walkerId}/assessments`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch assessments: ${response.status}`);
+        }
+        const fetchedAssessments = await response.json();
+
+        if (fetchedAssessments.length === 0) {
+          // Fallback to the old method as a backup
+          const backupAssessments = await getAssessmentsByWalkerId(walkerId);
+          
+          if (backupAssessments.length > 0) {
+            setAssessments(backupAssessments as unknown as Assessment[]);
+          } else {
+            setAssessments([]);
+          }
+        } else {
+          setAssessments(fetchedAssessments as unknown as Assessment[]);
+        }
+        
+        // Fetch dog and owner data for each assessment
+        const dogs: {[key: string]: any} = {};
+        const owners: {[key: string]: any} = {};
+        
+        for (const assessment of fetchedAssessments) {
+          if (!dogs[assessment.dogId]) {
+            dogs[assessment.dogId] = await getDogById(assessment.dogId);
+          }
+          if (!owners[assessment.ownerId]) {
+            owners[assessment.ownerId] = await getOwnerById(assessment.ownerId);
+          }
+        }
+        
+        setDogData(dogs);
+        setOwnerData(owners);
+      } catch (error) {
+        console.error("Error fetching assessments:", error);
+        setAssessments([]);
+      } finally {
+        setIsLoading(false);
       }
-    }
-  }, [user, loading, router]);
+    };
+
+    fetchAssessments();
+  }, [user, router, searchParams]);
 
   // If loading or not walker/admin, show loading state
-  if (loading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
+  if (isLoading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -58,10 +174,15 @@ export default function AssessmentsPage() {
         ) : (
           <div className="space-y-4">
             {assessments.map((assessment) => {
-              const dog = getDogById(assessment.dogId);
-              const owner = getOwnerById(assessment.ownerId);
+              const dog = dogData[assessment.dogId];
+              const owner = ownerData[assessment.ownerId];
               
-              if (!dog || !owner) return null;
+              if (!dog || !owner) {
+                return <div key={assessment.id} className="p-4 border border-red-200 bg-red-50 rounded">
+                  <p className="text-red-600">Missing data for assessment {assessment.id}</p>
+                  <p className="text-xs">Please try refreshing the page</p>
+                </div>;
+              }
               
               return (
                 <div 
@@ -98,7 +219,9 @@ export default function AssessmentsPage() {
                             ? 'bg-yellow-100 text-yellow-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}>
-                          {assessment.status.charAt(0).toUpperCase() + assessment.status.slice(1)}
+                          {assessment.status === 'completed' ? 'Completed' : 
+                           assessment.status === 'scheduled' ? 'Scheduled' : 
+                           assessment.status.charAt(0).toUpperCase() + assessment.status.slice(1)}
                         </span>
                         <p className="text-xs text-gray-500 mt-1">
                           {assessment.scheduledDate && formatDate(assessment.scheduledDate)}
@@ -107,7 +230,7 @@ export default function AssessmentsPage() {
                     </div>
                     
                     <div className="mt-3 flex justify-end">
-                      {assessment.status === 'completed' ? (
+                      {assessment.status === 'completed' || assessment.feedback ? (
                         <Link 
                           href={`/walker-dashboard/assessments/${assessment.id}`}
                           className="text-sm font-medium text-primary-600 hover:text-primary-700"

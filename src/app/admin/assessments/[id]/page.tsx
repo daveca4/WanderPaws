@@ -15,6 +15,7 @@ export default function AssessmentDetailPage() {
   const assessmentId = params.id as string;
   const router = useRouter();
   const { assessments, dogs, walkers, owners, getDogById, getOwnerById, getWalkerById, updateAssessment } = useData();
+  const { user } = useAuth();
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -35,6 +36,11 @@ export default function AssessmentDetailPage() {
     
     const loadData = async () => {
       try {
+        // Test direct API call to fetch walkers
+        const walkerResponse = await fetch('/api/data/walkers');
+        const walkersFromAPI = await walkerResponse.json();
+        console.log('Walkers from direct API call:', walkersFromAPI);
+        
         // Find the assessment
         const foundAssessment = assessments.find(a => a.id === assessmentId);
         
@@ -66,12 +72,17 @@ export default function AssessmentDetailPage() {
         setAdminNotes(foundAssessment.adminNotes || '');
         setResultNotes(foundAssessment.resultNotes || '');
         
-        // Filter walkers who can handle this dog size
-        const dogSizePreference = foundDog?.size || 'medium';
-        const filteredWalkers = walkers.filter(walker => 
-          walker.preferredDogSizes.includes(dogSizePreference)
-        );
-        setAvailableWalkers(filteredWalkers);
+        // Show all walkers instead of filtering by dog size
+        console.log('Walkers from context:', walkers);
+        console.log('Walkers length from context:', walkers.length);
+        
+        // Use walkers from API if the walkers array from context is empty
+        if (walkers.length === 0 && walkersFromAPI && walkersFromAPI.length > 0) {
+          console.log('Using walkers from direct API call instead of context');
+          setAvailableWalkers(walkersFromAPI);
+        } else {
+          setAvailableWalkers(walkers);
+        }
         
         setLoading(false);
       } catch (err) {
@@ -132,6 +143,61 @@ export default function AssessmentDetailPage() {
     }
   };
   
+  const handleCreateTestWalker = async () => {
+    try {
+      setSubmitting(true);
+      setError(null);
+      
+      // Create a test walker to use
+      const newWalker = {
+        name: "Test Walker",
+        email: "test.walker@example.com",
+        phone: "123-456-7890",
+        bio: "This is a test walker created for emergency assignments.",
+        rating: 4.5,
+        availability: {
+          monday: [{start: "09:00", end: "17:00"}],
+          tuesday: [{start: "09:00", end: "17:00"}],
+          wednesday: [{start: "09:00", end: "17:00"}],
+          thursday: [{start: "09:00", end: "17:00"}],
+          friday: [{start: "09:00", end: "17:00"}],
+          saturday: [],
+          sunday: []
+        },
+        specialties: ["Dog Walking", "Basic Training"],
+        preferredDogSizes: ["small", "medium", "large"],
+        certificationsOrTraining: ["Pet First Aid"]
+      };
+      
+      const response = await fetch('/api/data/walkers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newWalker),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to create test walker');
+      }
+      
+      const createdWalker = await response.json();
+      console.log('Created test walker:', createdWalker);
+      
+      // Add the new walker to the available walkers
+      setAvailableWalkers(prev => [...prev, createdWalker]);
+      setSuccess('Test walker created successfully');
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('Error creating test walker:', err);
+      setError('Failed to create test walker');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
   const handleUpdateStatus = async (newStatus: 'pending' | 'scheduled' | 'completed' | 'cancelled') => {
     if (!assessment) return;
     
@@ -159,6 +225,55 @@ export default function AssessmentDetailPage() {
     } catch (err) {
       console.error('Error updating assessment status:', err);
       setError('Failed to update assessment status');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
+  // Add a function to handle approving or denying an assessment
+  const handleApproveAssessment = async (approved: boolean) => {
+    if (!assessment) return;
+    
+    setSubmitting(true);
+    setError(null);
+    
+    try {
+      // Call the approve-assessment API endpoint
+      const response = await fetch('/api/admin/approve-assessment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'user-id': user?.id || '',
+          'user-role': user?.role || '',
+          'user-profile-id': user?.profileId || ''
+        },
+        body: JSON.stringify({
+          assessmentId: assessment.id,
+          approved: approved,
+          notes: resultNotes || `Assessment ${approved ? 'approved' : 'denied'} by admin.`
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process assessment');
+      }
+      
+      const data = await response.json();
+      setAssessment(data.assessment);
+      setSuccess(`Assessment ${approved ? 'approved' : 'denied'} successfully`);
+      
+      // Refresh assessment data
+      const foundAssessment = assessments.find(a => a.id === assessmentId);
+      if (foundAssessment) {
+        setAssessment(foundAssessment);
+      }
+      
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('Error processing assessment:', err);
+      setError(`Failed to ${approved ? 'approve' : 'deny'} assessment: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setSubmitting(false);
     }
@@ -202,7 +317,7 @@ export default function AssessmentDetailPage() {
     );
   }
   
-  const showAssignWalkerForm = assessment.status === 'pending' || !assessment.assignedWalkerId;
+  const showAssignWalkerForm = assessment.status === 'pending' || assessment.status === 'scheduled' || !assessment.assignedWalkerId;
   const showCompleteAssessmentForm = assessment.status === 'scheduled' && assessment.assignedWalkerId;
   
   return (
@@ -484,12 +599,29 @@ export default function AssessmentDetailPage() {
                         className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
                       >
                         <option value="">-- Select a walker --</option>
-                        {availableWalkers.map(walker => (
-                          <option key={walker.id} value={walker.id}>
-                            {walker.name} - {walker.preferredDogSizes.join(', ')}
-                          </option>
-                        ))}
+                        {availableWalkers.length > 0 ? (
+                          availableWalkers.map(walker => (
+                            <option key={walker.id} value={walker.id}>
+                              {walker.name} - {walker.preferredDogSizes.join(', ')}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="" disabled>No walkers available</option>
+                        )}
                       </select>
+                      {availableWalkers.length === 0 && (
+                        <div className="mt-1">
+                          <p className="text-sm text-red-600">No walkers available. Create walkers in the Walkers section or use the button below.</p>
+                          <button
+                            type="button"
+                            onClick={handleCreateTestWalker}
+                            disabled={submitting}
+                            className="mt-2 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                          >
+                            {submitting ? 'Creating...' : 'Create Test Walker'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                     
                     <div>
@@ -682,6 +814,56 @@ export default function AssessmentDetailPage() {
                       <p className="text-sm text-gray-700 whitespace-pre-line bg-gray-50 p-3 rounded-md">
                         {assessment.feedback.recommendations}
                       </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Approval Section for Assessments ready for review */}
+            {(assessment.status === 'feedback_submitted' || assessment.status === 'ready_for_review') && (
+              <div className="bg-white shadow rounded-lg overflow-hidden mt-6">
+                <div className="px-4 py-5 sm:px-6 border-b border-gray-200 bg-blue-50">
+                  <h2 className="text-lg font-medium text-blue-900">Assessment Ready For Review</h2>
+                  <p className="mt-1 text-sm text-blue-700">
+                    This assessment has been completed by the walker and is ready for your review.
+                  </p>
+                </div>
+                
+                <div className="px-4 py-5 sm:p-6">
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="resultNotes" className="block text-sm font-medium text-gray-700">
+                        Admin Notes
+                      </label>
+                      <textarea
+                        id="resultNotes"
+                        name="resultNotes"
+                        rows={3}
+                        value={resultNotes}
+                        onChange={(e) => setResultNotes(e.target.value)}
+                        placeholder="Add notes about your decision (will be visible to the owner)"
+                        className="mt-1 block w-full border-gray-300 shadow-sm focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-md"
+                      ></textarea>
+                    </div>
+                    
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => handleApproveAssessment(false)}
+                        disabled={submitting}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+                      >
+                        {submitting ? 'Processing...' : 'Deny Assessment'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApproveAssessment(true)}
+                        disabled={submitting}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                      >
+                        {submitting ? 'Processing...' : 'Approve Assessment'}
+                      </button>
                     </div>
                   </div>
                 </div>

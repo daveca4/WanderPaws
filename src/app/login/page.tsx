@@ -43,31 +43,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickLogin = async (userEmail: string) => {
-    setEmail(userEmail);
-    setPassword('password123'); // Mock password for all users
-    setLoading(true);
-
-    try {
-      const user = await login(userEmail, 'password123');
-      if (user) {
-        // If a returnUrl was specified, use that, otherwise use role-based dashboard
-        const redirectUrl = returnUrl || getDashboardUrlForRole(user.role);
-        router.push(redirectUrl);
-      }
-    } catch (err) {
-      // Display the actual error message from the API
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('An error occurred during login');
-      }
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
@@ -152,40 +127,6 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
-
-        <div className="mt-6">
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300" />
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gray-50 text-gray-500">Quick login options</span>
-            </div>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-3">
-            <button
-              onClick={() => handleQuickLogin('admin@wanderpaws.com')}
-              className="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Sign in as Admin
-            </button>
-            
-            <button
-              onClick={() => handleQuickLogin('john.smith@example.com')}
-              className="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
-            >
-              Sign in as Dog Owner
-            </button>
-            
-            <button
-              onClick={() => handleQuickLogin('emily.davis@example.com')}
-              className="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700"
-            >
-              Sign in as Dog Walker
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   );

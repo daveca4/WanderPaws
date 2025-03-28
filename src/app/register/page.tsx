@@ -44,12 +44,12 @@ export default function RegisterPage() {
     setLoading(true);
     
     try {
-      // Register the user in the database
+      // Register the user in the database with 'owner' role
       const result = await registerUser(
         formData.name,
         formData.email,
         formData.password,
-        formData.role
+        'owner' // Always use 'owner' role
       );
       
       if (result) {
@@ -160,22 +160,6 @@ export default function RegisterPage() {
                 placeholder="Confirm Password"
               />
             </div>
-          </div>
-
-          <div>
-            <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-              Account Type
-            </label>
-            <select
-              id="role"
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-            >
-              <option value="owner">Dog Owner</option>
-              <option value="walker">Dog Walker</option>
-            </select>
           </div>
 
           {error && (

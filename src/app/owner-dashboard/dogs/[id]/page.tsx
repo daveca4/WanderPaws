@@ -38,6 +38,37 @@ export default function DogDetailsPage() {
     }
   };
 
+  // Format assessment status for display
+  const formatAssessmentStatus = (status: string | null | undefined): { label: string; color: string } => {
+    if (!status) {
+      return { label: 'Not Requested', color: 'bg-gray-100 text-gray-800' };
+    }
+    
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return { label: 'Pending Approval', color: 'bg-yellow-100 text-yellow-800' };
+      case 'scheduled':
+        return { label: 'Scheduled', color: 'bg-blue-100 text-blue-800' };
+      case 'in_progress':
+        return { label: 'In Progress', color: 'bg-blue-100 text-blue-800' };
+      case 'pending_review':
+        return { label: 'Pending Review', color: 'bg-purple-100 text-purple-800' };
+      case 'completed':
+        return { label: 'Completed', color: 'bg-green-100 text-green-800' };
+      case 'approved':
+        return { label: 'Approved', color: 'bg-green-100 text-green-800' };
+      case 'denied':
+        return { label: 'Denied', color: 'bg-red-100 text-red-800' };
+      default:
+        return { 
+          label: status.split('_')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' '), 
+          color: 'bg-gray-100 text-gray-800' 
+        };
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-12">
@@ -203,6 +234,68 @@ export default function DogDetailsPage() {
             >
               Schedule a Walk
             </Link>
+          </div>
+        </div>
+
+        <div className="bg-white shadow sm:rounded-lg mt-6">
+          <div className="px-4 py-5 sm:px-6 bg-gray-50 border-b border-gray-200 sm:rounded-t-lg">
+            <h3 className="text-lg leading-6 font-medium text-gray-900">Assessment Status</h3>
+          </div>
+          <div className="px-4 py-5 sm:p-6">
+            {dog?.assessmentStatus ? (
+              <>
+                <div className="flex items-center">
+                  <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium ${
+                    formatAssessmentStatus(dog.assessmentStatus).color
+                  }`}>
+                    {formatAssessmentStatus(dog.assessmentStatus).label}
+                  </span>
+                  <span className="ml-2 text-xs text-gray-500">
+                    (Status: {dog.assessmentStatus})
+                  </span>
+                </div>
+                
+                {dog.assessmentStatus === 'denied' && (
+                  <div className="mt-4 bg-red-50 p-3 rounded-md">
+                    <p className="text-sm text-red-700">
+                      Your dog's assessment was not approved. Please contact our customer service for details.
+                    </p>
+                  </div>
+                )}
+                
+                {(dog.assessmentStatus === 'pending' || dog.assessmentStatus === 'scheduled' || dog.assessmentStatus === 'in_progress' || dog.assessmentStatus === 'pending_review') && (
+                  <div className="mt-4 bg-blue-50 p-3 rounded-md">
+                    <p className="text-sm text-blue-700">
+                      Your assessment is in progress. We'll notify you when it's complete.
+                    </p>
+                  </div>
+                )}
+                
+                {dog.assessmentStatus === 'approved' && (
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-500 mb-3">
+                      Your dog's assessment has been approved! You can now purchase a subscription and start booking walks.
+                    </p>
+                    <Link
+                      href="/owner-dashboard/subscriptions"
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    >
+                      View Subscription Plans
+                    </Link>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="text-center py-4">
+                <p className="text-gray-500 mb-4">No assessment has been scheduled for this dog yet.</p>
+                <Link
+                  href="/owner-dashboard/assessment"
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                >
+                  Schedule Assessment
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </div>
