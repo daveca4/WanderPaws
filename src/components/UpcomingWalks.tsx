@@ -6,16 +6,29 @@ import { useData } from '@/lib/DataContext';
 import { getUpcomingWalks, formatDate, formatTime } from '@/utils/helpers';
 import { Dog, Walker, Walk } from '@/lib/types';
 
-export function UpcomingWalks() {
+interface UpcomingWalksProps {
+  userDogs?: Dog[];
+}
+
+export function UpcomingWalks({ userDogs }: UpcomingWalksProps) {
   const { user } = useAuth();
   const { walks, dogs, walkers } = useData();
   const walkerId = user?.profileId || undefined;
   
-  // Filter to get 5 upcoming walks for the current walker
+  // Filter to get 5 upcoming walks for the current user
   const upcomingWalks = getUpcomingWalks(walks, 5, walkerId);
-  
+
   // Helper functions to get dog and walker data
-  const getDogById = (id: string): Dog | undefined => dogs.find(dog => dog.id === id);
+  const getDogById = (id: string): Dog | undefined => {
+    // First look in userDogs if provided
+    if (userDogs) {
+      const userDog = userDogs.find(dog => dog.id === id);
+      if (userDog) return userDog;
+    }
+    // Fall back to all dogs from context
+    return dogs.find(dog => dog.id === id);
+  };
+  
   const getWalkerById = (id: string): Walker | undefined => walkers.find(walker => walker.id === id);
   
   return (
