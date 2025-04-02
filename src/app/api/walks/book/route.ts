@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -17,10 +17,45 @@ const prisma = new PrismaClient();
  *   recurrenceEndDate: string (YYYY-MM-DD) - only if isRecurring is true
  * }
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    // Get authentication headers
+    const userId = request.headers.get('user-id');
+    const userRole = request.headers.get('user-role');
+    const userProfileId = request.headers.get('user-profile-id');
+
+    // Validate user authentication
+    if (!userId || !userRole) {
+      console.error('Missing authentication headers:', { userId, userRole });
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // Only owners can book walks
+    if (userRole !== 'owner' && userRole !== 'admin') {
+      console.error('Unauthorized role for booking walks:', userRole);
+      return NextResponse.json(
+        { error: 'Only owners can book walks' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { dogId, date, timeSlot, notes, isRecurring, recurrenceFrequency, recurrenceEndDate } = body;
+
+    console.log('Booking walk with data:', {
+      userId,
+      userRole,
+      userProfileId,
+      dogId,
+      date,
+      timeSlot,
+      isRecurring,
+      recurrenceFrequency,
+      recurrenceEndDate
+    });
 
     // Validate required fields
     if (!dogId || !date || !timeSlot) {
@@ -49,13 +84,29 @@ export async function POST(request: Request) {
 
     // Get dog information
     const dog = await prisma.dog.findUnique({
-      where: { id: dogId }
+      where: { id: dogId },
+      include: {
+        owner: true
+      }
     });
 
     if (!dog) {
       return NextResponse.json(
         { error: 'Dog not found' },
         { status: 404 }
+      );
+    }
+
+    // Verify dog ownership
+    if (userRole === 'owner' && dog.ownerId !== userProfileId) {
+      console.error('User does not own this dog:', {
+        userId,
+        userProfileId,
+        dogOwnerId: dog.ownerId
+      });
+      return NextResponse.json(
+        { error: 'You can only book walks for your own dogs' },
+        { status: 403 }
       );
     }
 
@@ -132,7 +183,7 @@ export async function POST(request: Request) {
 
     // Deduct walk credits from the owner's subscription
     // Number of walks to deduct = 1 for single booking or the number of recurring walks
-    const walksToDeduct = isRecurring ? recurringWalks.length + 1 : 1; // +1 for the initial walk
+    const walksToDeduct = isRecurring ? recurringWalks.length + 1 : 1;
     
     try {
       const userSubscription = await prisma.userSubscription.findFirst({

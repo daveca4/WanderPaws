@@ -1,333 +1,514 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import Link from 'next/link';
-import { useAuth } from '@/lib/AuthContext';
+import { useDog, useUpdateDog, useDeleteDog } from '@/lib/hooks/useDataHooks';
+import { Dog } from '@/lib/types';
+import { format } from 'date-fns';
 import RouteGuard from '@/components/RouteGuard';
-import { useDog, useDeleteDog } from '@/lib/hooks/useDogData';
+import Link from 'next/link';
+
+// Temporary placeholder UI components until proper ones are created
+const Tabs = ({ children, defaultValue }: { children: React.ReactNode, defaultValue?: string, value?: string, onValueChange?: (value: string) => void }) => <div>{children}</div>;
+const TabsList = ({ children, className }: { children: React.ReactNode, className?: string }) => <div className={className}>{children}</div>;
+const TabsTrigger = ({ children, value }: { children: React.ReactNode, value: string }) => <button>{children}</button>;
+const TabsContent = ({ children, value }: { children: React.ReactNode, value: string }) => <div>{children}</div>;
+
+const Card = ({ children }: { children: React.ReactNode }) => <div className="border rounded shadow-sm">{children}</div>;
+const CardHeader = ({ children }: { children: React.ReactNode }) => <div className="p-4 border-b">{children}</div>;
+const CardContent = ({ children, className }: { children: React.ReactNode, className?: string }) => <div className={`p-4 ${className || ''}`}>{children}</div>;
+const CardFooter = ({ children }: { children: React.ReactNode }) => <div className="p-4 border-t">{children}</div>;
+const CardTitle = ({ children }: { children: React.ReactNode }) => <h3 className="text-lg font-semibold">{children}</h3>;
+
+// Extend the Dog type with the additional properties used in this component
+interface ExtendedDog extends Dog {
+  photoUrl?: string;
+  birthdate?: string;
+  updatedAt?: string;
+  allergies?: string;
+  medications?: string;
+  veterinarianName?: string;
+  veterinarianPhone?: string;
+  lastVetVisit?: string;
+  vaccinationStatus?: string;
+  energyLevel?: string;
+  goodWithChildren?: boolean;
+  goodWithDogs?: boolean;
+  trainingStatus?: string;
+  walkingStyle?: string;
+  behavioralNotes?: string;
+}
+
+// Temporary placeholder components until proper ones are created
+const DogProfileForm = ({ dog, onChange }: { dog: Partial<ExtendedDog>, onChange: (field: string, value: any) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-700">Name</label>
+      <input 
+        type="text" 
+        value={dog.name || ''} 
+        onChange={(e) => onChange('name', e.target.value)}
+        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700">Breed</label>
+      <input 
+        type="text" 
+        value={dog.breed || ''} 
+        onChange={(e) => onChange('breed', e.target.value)}
+        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+      />
+    </div>
+  </div>
+);
+
+const DogHealthForm = ({ dog, onChange }: { dog: Partial<ExtendedDog>, onChange: (field: string, value: any) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-700">Allergies</label>
+      <input 
+        type="text" 
+        value={dog.allergies || ''} 
+        onChange={(e) => onChange('allergies', e.target.value)}
+        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700">Medications</label>
+      <input 
+        type="text" 
+        value={dog.medications || ''} 
+        onChange={(e) => onChange('medications', e.target.value)}
+        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+      />
+    </div>
+  </div>
+);
+
+const DogBehaviorPanel = ({ dog, onChange }: { dog: Partial<ExtendedDog>, onChange: (field: string, value: any) => void }) => (
+  <div className="space-y-4">
+    <div>
+      <label className="block text-sm font-medium text-gray-700">Temperament</label>
+      <input 
+        type="text" 
+        value={dog.temperament || ''} 
+        onChange={(e) => onChange('temperament', e.target.value)}
+        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+      />
+    </div>
+    <div>
+      <label className="block text-sm font-medium text-gray-700">Energy Level</label>
+      <select 
+        value={dog.energyLevel || ''} 
+        onChange={(e) => onChange('energyLevel', e.target.value)}
+        className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+      >
+        <option value="">Select Energy Level</option>
+        <option value="Low">Low</option>
+        <option value="Medium">Medium</option>
+        <option value="High">High</option>
+      </select>
+    </div>
+  </div>
+);
 
 export default function DogDetailsPage() {
   const params = useParams();
-  const dogId = params.id as string;
+  const dogId = params?.id as string;
   const router = useRouter();
-  const { user } = useAuth();
   
-  // Use React Query for data fetching
-  const { data: dog, isLoading, error: fetchError } = useDog(dogId);
-  const deleteDogMutation = useDeleteDog();
+  // Fetch dog data using React Query hook
+  const { 
+    data: dogData, 
+    isLoading, 
+    error, 
+    refetch 
+  } = useDog(dogId);
   
-  const [error, setError] = useState('');
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Cast the dog data to our extended type
+  const dog = dogData as ExtendedDog | undefined;
+  
+  // Mutations for updating and deleting dog
+  const { 
+    mutate: updateDog,
+    isLoading: isUpdating
+  } = useUpdateDog();
+  
+  const {
+    mutate: deleteDog,
+    isLoading: isDeleting
+  } = useDeleteDog();
 
-  const handleDelete = async () => {
-    if (!dogId) return;
+  // State for managing forms and UI
+  const [activeTab, setActiveTab] = useState('profile');
+  const [editMode, setEditMode] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  
+  // For form data
+  const [formData, setFormData] = useState<Partial<ExtendedDog>>({});
+
+  // Initialize form data when dog data is loaded
+  useEffect(() => {
+    if (dog) {
+      setFormData(dog);
+    }
+  }, [dog]);
+
+  // Handle form changes
+  const handleChange = (field: string, value: any) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
-    setIsDeleting(true);
-    setError('');
+    // Validate required fields
+    if (!formData.name) {
+      alert('Dog name is required');
+      return;
+    }
     
     try {
-      await deleteDogMutation.mutateAsync(dogId);
-      router.push('/owner-dashboard/dogs');
-    } catch (err) {
-      console.error("Error deleting dog:", err);
-      setError('Failed to delete dog');
-      setIsDeleting(false);
+      // Call the update mutation
+      updateDog(
+        { id: dogId, data: formData },
+        {
+          onSuccess: () => {
+            setEditMode(false);
+            refetch(); // Refresh dog data
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Error updating dog:', error);
+      alert('Failed to update dog information');
     }
   };
 
-  // Format assessment status for display
-  const formatAssessmentStatus = (status: string | null | undefined): { label: string; color: string } => {
-    if (!status) {
-      return { label: 'Not Requested', color: 'bg-gray-100 text-gray-800' };
+  // Handle delete confirmation
+  const handleDelete = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
     }
     
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return { label: 'Pending Approval', color: 'bg-yellow-100 text-yellow-800' };
-      case 'scheduled':
-        return { label: 'Scheduled', color: 'bg-blue-100 text-blue-800' };
-      case 'in_progress':
-        return { label: 'In Progress', color: 'bg-blue-100 text-blue-800' };
-      case 'pending_review':
-        return { label: 'Pending Review', color: 'bg-purple-100 text-purple-800' };
-      case 'completed':
-        return { label: 'Completed', color: 'bg-green-100 text-green-800' };
-      case 'approved':
-        return { label: 'Approved', color: 'bg-green-100 text-green-800' };
-      case 'denied':
-        return { label: 'Denied', color: 'bg-red-100 text-red-800' };
-      default:
-        return { 
-          label: status.split('_')
-            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(' '), 
-          color: 'bg-gray-100 text-gray-800' 
-        };
+    try {
+      deleteDog(dogId, {
+        onSuccess: () => {
+          router.push('/owner-dashboard/dogs');
+        }
+      });
+    } catch (error) {
+      console.error('Error deleting dog:', error);
+      alert('Failed to delete dog');
+      setConfirmDelete(false);
     }
+  };
+
+  // Reset confirmation if user changes their mind
+  const cancelDelete = () => {
+    setConfirmDelete(false);
   };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
 
-  if (fetchError || !dog) {
+  if (error) {
     return (
-      <div className="bg-white shadow rounded-lg p-6 text-center">
-        <h2 className="text-lg font-medium text-gray-900 mb-2">Error</h2>
-        <p className="text-gray-500 mb-4">
-          {fetchError instanceof Error ? fetchError.message : "Failed to load dog details"}
-        </p>
-        <Link
-          href="/owner-dashboard/dogs"
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+      <div className="p-4 bg-red-50 border border-red-200 rounded-md">
+        <h2 className="text-lg font-semibold text-red-700">Error Loading Dog Details</h2>
+        <p className="text-red-600">{error instanceof Error ? error.message : 'Failed to load dog details'}</p>
+        <button 
+          onClick={() => refetch()}
+          className="mt-2 px-4 py-2 bg-red-100 text-red-700 rounded hover:bg-red-200"
         >
-          Back to My Dogs
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (!dog) {
+    return (
+      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+        <h2 className="text-lg font-semibold text-yellow-700">Dog Not Found</h2>
+        <p className="text-yellow-600">The dog you're looking for could not be found.</p>
+        <Link href="/owner-dashboard/dogs" className="mt-2 inline-block px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700">
+          Back to Dogs
         </Link>
       </div>
     );
   }
 
   return (
-    <RouteGuard requiredPermission={{ action: 'read', resource: 'dogs' }}>
-      <div className="space-y-6">
-        {/* Top section with navigation */}
-        <div className="flex justify-between items-center">
+    <RouteGuard requiredPermission={{ action: 'view', resource: 'dogs' }}>
+      <div className="max-w-4xl mx-auto py-8 px-4">
+        <div className="flex justify-between items-center mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{dog.name}</h1>
-            <p className="text-sm text-gray-500">
-              {dog.breed} • {dog.age} years old • {dog.size.charAt(0).toUpperCase() + dog.size.slice(1)} Size
-            </p>
-          </div>
-          <div className="flex space-x-3">
             <Link 
-              href={`/owner-dashboard/dogs/${dogId}/edit`}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+              href="/owner-dashboard/dogs" 
+              className="text-primary-600 hover:text-primary-800 mb-2 inline-block"
             >
-              Edit Dog
+              ← Back to Dogs
             </Link>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-            >
-              Delete
-            </button>
+            <h1 className="text-2xl font-bold text-gray-900">{dog.name}</h1>
           </div>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-400 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Main content */}
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="flex flex-col md:flex-row">
-            {/* Dog Image */}
-            <div className="md:w-1/3 h-64 md:h-auto relative bg-gray-200">
-              {dog.imageUrl ? (
-                <Image 
-                  src={dog.imageUrl} 
-                  alt={dog.name} 
-                  fill 
-                  unoptimized={true}
-                  className="object-cover"
-                  onError={(e: React.SyntheticEvent<HTMLImageElement>) => {
-                    // Fallback to default image on error
-                    const target = e.target as HTMLImageElement;
-                    target.src = '/dog-placeholder.png';
-                    console.log("Image failed to load, using placeholder", e);
-                  }}
-                />
-              ) : (
-                <Image 
-                  src="/dog-placeholder.png" 
-                  alt="Dog placeholder" 
-                  fill 
-                  className="object-cover"
-                />
-              )}
-            </div>
-            
-            {/* Dog Details */}
-            <div className="p-6 md:w-2/3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Temperament */}
-                <div>
-                  <h2 className="text-lg font-medium text-gray-900 mb-3">Temperament</h2>
-                  {dog.temperament && dog.temperament.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {dog.temperament.map((trait: string, index: number) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-primary-100 text-primary-800"
-                        >
-                          {trait}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 italic">No temperament traits added yet</p>
-                  )}
-                </div>
-                
-                {/* Special Needs */}
-                <div>
-                  <h2 className="text-lg font-medium text-gray-900 mb-3">Special Needs</h2>
-                  {dog.specialNeeds && dog.specialNeeds.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {dog.specialNeeds.map((need: string, index: number) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-red-100 text-red-800"
-                        >
-                          {need}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500 italic">No special needs</p>
-                  )}
-                </div>
-                
-                {/* Address */}
-                <div className="md:col-span-2">
-                  <h2 className="text-lg font-medium text-gray-900 mb-3">Address</h2>
-                  {dog.address ? (
-                    <address className="not-italic text-gray-700">
-                      {dog.address.street}<br />
-                      {dog.address.city}, {dog.address.state} {dog.address.zip}
-                    </address>
-                  ) : (
-                    <p className="text-gray-500 italic">No address added yet</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Scheduled walks section would go here */}
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Scheduled Walks</h2>
-          <p className="text-gray-500">No walks scheduled for {dog.name} yet.</p>
-          <div className="mt-4">
-            <Link
-              href={`/owner-dashboard/schedule-walk?dogId=${dog.id}`}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-            >
-              Schedule a Walk
-            </Link>
-          </div>
-        </div>
-
-        <div className="bg-white shadow sm:rounded-lg mt-6">
-          <div className="px-4 py-5 sm:px-6 bg-gray-50 border-b border-gray-200 sm:rounded-t-lg">
-            <h3 className="text-lg leading-6 font-medium text-gray-900">Assessment Status</h3>
-          </div>
-          <div className="px-4 py-5 sm:p-6">
-            {dog?.assessmentStatus ? (
-              <>
-                <div className="flex items-center">
-                  <span className={`inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium ${
-                    formatAssessmentStatus(dog.assessmentStatus).color
-                  }`}>
-                    {formatAssessmentStatus(dog.assessmentStatus).label}
-                  </span>
-                  <span className="ml-2 text-xs text-gray-500">
-                    (Status: {dog.assessmentStatus})
-                  </span>
-                </div>
-                
-                {dog.assessmentStatus === 'denied' && (
-                  <div className="mt-4 bg-red-50 p-3 rounded-md">
-                    <p className="text-sm text-red-700">
-                      Your dog's assessment was not approved. Please contact our customer service for details.
-                    </p>
-                  </div>
-                )}
-                
-                {(dog.assessmentStatus === 'pending' || dog.assessmentStatus === 'scheduled' || dog.assessmentStatus === 'in_progress' || dog.assessmentStatus === 'pending_review') && (
-                  <div className="mt-4 bg-blue-50 p-3 rounded-md">
-                    <p className="text-sm text-blue-700">
-                      Your assessment is in progress. We'll notify you when it's complete.
-                    </p>
-                  </div>
-                )}
-                
-                {dog.assessmentStatus === 'approved' && (
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-500 mb-3">
-                      Your dog's assessment has been approved! You can now purchase a subscription and start booking walks.
-                    </p>
-                    <Link
-                      href="/owner-dashboard/subscriptions"
-                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                    >
-                      View Subscription Plans
-                    </Link>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="text-center py-4">
-                <p className="text-gray-500 mb-4">No assessment has been scheduled for this dog yet.</p>
-                <Link
-                  href="/owner-dashboard/assessment"
-                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
-                >
-                  Schedule Assessment
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      
-      {/* Delete confirmation modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-3">Delete {dog.name}</h3>
-            <p className="text-gray-500 mb-4">
-              Are you sure you want to delete {dog.name}? This action cannot be undone, and you'll lose all associated walk history.
-            </p>
-            <div className="flex justify-end space-x-3">
+          
+          <div className="flex space-x-2">
+            {!editMode ? (
               <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(false)}
-                className="inline-flex justify-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm hover:bg-gray-50"
+                onClick={() => setEditMode(true)}
+                className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+              >
+                Edit Dog
+              </button>
+            ) : (
+              <button
+                onClick={() => setEditMode(false)}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
               >
                 Cancel
               </button>
+            )}
+            
+            <button
+              onClick={handleDelete}
+              className={`px-4 py-2 ${confirmDelete ? 'bg-red-600' : 'bg-red-100 text-red-700'} rounded-md ${confirmDelete ? 'hover:bg-red-700 text-white' : 'hover:bg-red-200'}`}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Deleting...' : confirmDelete ? 'Confirm Delete' : 'Delete Dog'}
+            </button>
+            
+            {confirmDelete && (
               <button
-                type="button"
-                onClick={handleDelete}
-                disabled={isDeleting || deleteDogMutation.isLoading}
-                className="inline-flex justify-center px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md shadow-sm hover:bg-red-700 disabled:opacity-50"
+                onClick={cancelDelete}
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
               >
-                {isDeleting || deleteDogMutation.isLoading ? 'Deleting...' : 'Delete'}
+                Cancel
               </button>
-            </div>
+            )}
           </div>
         </div>
-      )}
+        
+        {editMode ? (
+          // Edit mode - Show forms with submit button
+          <form onSubmit={handleSubmit}>
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-3 mb-8">
+                <TabsTrigger value="profile">Profile</TabsTrigger>
+                <TabsTrigger value="health">Health</TabsTrigger>
+                <TabsTrigger value="behavior">Behavior</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="profile">
+                <DogProfileForm dog={formData} onChange={handleChange} />
+              </TabsContent>
+              
+              <TabsContent value="health">
+                <DogHealthForm dog={formData} onChange={handleChange} />
+              </TabsContent>
+              
+              <TabsContent value="behavior">
+                <DogBehaviorPanel dog={formData} onChange={handleChange} />
+              </TabsContent>
+            </Tabs>
+            
+            <div className="mt-6 flex justify-end">
+              <button
+                type="submit"
+                className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
+                disabled={isUpdating}
+              >
+                {isUpdating ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        ) : (
+          // View mode - Read-only display
+          <Tabs defaultValue="profile">
+            <TabsList className="grid w-full grid-cols-3 mb-8">
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="health">Health</TabsTrigger>
+              <TabsTrigger value="behavior">Behavior</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="profile">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-1">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Profile Picture</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex justify-center">
+                      {dog.photoUrl ? (
+                        <div className="relative w-40 h-40 rounded-full overflow-hidden">
+                          <Image 
+                            src={dog.photoUrl} 
+                            alt={dog.name}
+                            fill
+                            style={{ objectFit: 'cover' }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-40 h-40 rounded-full bg-gray-200 flex items-center justify-center">
+                          <span className="text-gray-400 text-4xl">🐾</span>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+                
+                <div className="md:col-span-2">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Basic Information</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-500">Name</div>
+                        <div className="text-lg">{dog.name}</div>
+                      </div>
+                      
+                      <div>
+                        <div className="text-sm font-medium text-gray-500">Breed</div>
+                        <div>{dog.breed || 'Not specified'}</div>
+                      </div>
+                      
+                      <div>
+                        <div className="text-sm font-medium text-gray-500">Age</div>
+                        <div>{dog.age ? `${dog.age} years` : 'Not specified'}</div>
+                      </div>
+                      
+                      <div>
+                        <div className="text-sm font-medium text-gray-500">Weight</div>
+                        <div>{dog.weight ? `${dog.weight} kg` : 'Not specified'}</div>
+                      </div>
+                      
+                      {dog.birthdate && (
+                        <div>
+                          <div className="text-sm font-medium text-gray-500">Birth Date</div>
+                          <div>{format(new Date(dog.birthdate), 'MMMM d, yyyy')}</div>
+                        </div>
+                      )}
+                      
+                      <div>
+                        <div className="text-sm font-medium text-gray-500">Last Updated</div>
+                        <div>{dog.updatedAt ? format(new Date(dog.updatedAt), 'MMMM d, yyyy') : 'Never'}</div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="health">
+              <div className="grid grid-cols-1 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Health Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Allergies</div>
+                      <div>{dog.allergies || 'None known'}</div>
+                    </div>
+                    
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Medications</div>
+                      <div>{dog.medications || 'None'}</div>
+                    </div>
+                    
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Veterinarian</div>
+                      <div>{dog.veterinarianName || 'Not specified'}</div>
+                    </div>
+                    
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Veterinarian Phone</div>
+                      <div>{dog.veterinarianPhone || 'Not specified'}</div>
+                    </div>
+                    
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Last Vet Visit</div>
+                      <div>
+                        {dog.lastVetVisit 
+                          ? format(new Date(dog.lastVetVisit), 'MMMM d, yyyy') 
+                          : 'Not recorded'
+                        }
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Vaccination Status</div>
+                      <div>{dog.vaccinationStatus || 'Unknown'}</div>
+                    </div>
+                    
+                    <div>
+                      <div className="text-sm font-medium text-gray-500">Special Needs</div>
+                      <div>{dog.specialNeeds || 'None'}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="behavior">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Behavior & Training</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Temperament</div>
+                    <div>{dog.temperament || 'Not specified'}</div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Energy Level</div>
+                    <div>{dog.energyLevel || 'Not specified'}</div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Good with Children</div>
+                    <div>{dog.goodWithChildren ? 'Yes' : dog.goodWithChildren === false ? 'No' : 'Unknown'}</div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Good with Dogs</div>
+                    <div>{dog.goodWithDogs ? 'Yes' : dog.goodWithDogs === false ? 'No' : 'Unknown'}</div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Training Status</div>
+                    <div>{dog.trainingStatus || 'Not specified'}</div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Walking Style</div>
+                    <div>{dog.walkingStyle || 'Not specified'}</div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">Behavioral Notes</div>
+                    <div className="whitespace-pre-line">{dog.behavioralNotes || 'No notes'}</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        )}
+      </div>
     </RouteGuard>
   );
 } 

@@ -61,7 +61,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     
     // Don't attempt to fetch data if user isn't available yet
     if (!user || !user.id) {
-      console.log('Skipping data fetch - user not available yet');
+      console.log('DataContext - Skipping data fetch - user not available yet:', user);
       return false;
     }
     
@@ -77,11 +77,230 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         'user-profile-id': user.profileId || ''
       };
       
-      console.log('Fetching data with auth headers:', {
+      console.log('DataContext - Fetching data with auth headers:', {
         userId: user.id,
         userRole: user.role,
         profileId: user.profileId
       });
+      
+      // TROUBLESHOOTING: Add owner profile check and ensure upfront
+      if (user.role === 'owner' && !user.profileId) {
+        console.log('DataContext - Attempting to ensure owner profile exists before fetching data');
+        try {
+          const ensureRes = await fetch('/api/data/owners/ensure', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'user-id': user.id,
+              'user-role': user.role
+            },
+            body: JSON.stringify({
+              userId: user.id,
+              name: user.name || 'Dog Owner',
+              email: user.email
+            })
+          });
+          
+          if (ensureRes.ok) {
+            const ensuredOwner = await ensureRes.json();
+            console.log('DataContext - Created/found owner profile:', ensuredOwner);
+            
+            // Update headers with the new profileId
+            headers['user-profile-id'] = ensuredOwner.id;
+            
+            // Update user in localStorage to avoid repeating this step
+            try {
+              const storedUser = JSON.parse(localStorage.getItem('wanderpaws_user') || '{}');
+              storedUser.profileId = ensuredOwner.id;
+              localStorage.setItem('wanderpaws_user', JSON.stringify(storedUser));
+              console.log('DataContext - Updated user in localStorage with profileId');
+            } catch (e) {
+              console.error('DataContext - Error updating localStorage:', e);
+            }
+          } else {
+            console.error('DataContext - Failed to ensure owner profile:', await ensureRes.text());
+          }
+        } catch (error) {
+          console.error('DataContext - Error ensuring owner profile:', error);
+        }
+      }
+      
+      // Fetch owners first to ensure we have the owner profile
+      if (!failedEndpoints.has('/api/data/owners')) {
+        try {
+          console.log('DataContext - Fetching owners...');
+          const ownersRes = await fetch('/api/data/owners', { headers });
+          if (ownersRes.ok) {
+            const ownersData = await ownersRes.json();
+            console.log('DataContext - Owners data:', ownersData);
+            setOwners(ownersData);
+            
+            // If user is an owner, ensure we have their profile
+            if (user.role === 'owner' && (!user.profileId || !ownersData.some((o: Owner) => o.id === user.profileId))) {
+              console.log('DataContext - Owner profile not found, ensuring profile...');
+              const ensureRes = await fetch('/api/data/owners/ensure', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  userId: user.id,
+                  name: user.name || 'Dog Owner',
+                  email: user.email
+                })
+              });
+              
+              if (ensureRes.ok) {
+                const ensuredOwner = await ensureRes.json();
+                console.log('DataContext - Ensured owner profile:', ensuredOwner);
+                setOwners(prev => [...prev, ensuredOwner]);
+              } else {
+                console.error('DataContext - Failed to ensure owner profile:', await ensureRes.text());
+              }
+            }
+          } else {
+            console.error('DataContext - Failed to fetch owners:', ownersRes.status, await ownersRes.text());
+            failedEndpoints.add('/api/data/owners');
+          }
+        } catch (error) {
+          console.error('DataContext - Error fetching owners:', error);
+          failedEndpoints.add('/api/data/owners');
+        }
+      }
+      
+      // IMPROVED: Update dog fetching logic to be more resilient
+      if (!failedEndpoints.has('/api/data/dogs')) {
+        try {
+          console.log('DataContext - Fetching dogs...');
+          let dogsResponse: Response | undefined;
+          let dogsData: Dog[] = [];
+          let skipFetching = false;
+          
+          if (user.role === 'walker' && user.profileId) {
+            // For walkers, use the walker-specific endpoint
+            dogsResponse = await fetch(`/api/walkers/${user.profileId}/dogs`, { headers });
+          } else if (user.role === 'owner') {
+            // For owners, first check if they have a profile
+            const ownerProfile = owners.find((owner: Owner) => owner.userId === user.id);
+            
+            if (!ownerProfile) {
+              console.log('DataContext - Owner profile not found in data, trying direct query');
+              
+              // Try to fetch owner profile directly - more reliable
+              try {
+                const ownerRes = await fetch('/api/data/owners/byUserId/' + user.id, { 
+                  headers 
+                });
+                
+                if (ownerRes.ok) {
+                  const fetchedOwner = await ownerRes.json();
+                  console.log('DataContext - Found owner profile via direct query:', fetchedOwner);
+                  
+                  if (fetchedOwner && fetchedOwner.id) {
+                    // Try to fetch dogs with this owner ID
+                    const ownerDogsRes = await fetch(`/api/data/owners/${fetchedOwner.id}/dogs`, { 
+                      headers 
+                    });
+                    
+                    if (ownerDogsRes.ok) {
+                      dogsData = await ownerDogsRes.json();
+                      console.log('DataContext - Successfully fetched dogs via owner ID:', 
+                        dogsData.length, dogsData.map(d => d.name));
+                      
+                      setDogs(dogsData);
+                      skipFetching = true;
+                    } else {
+                      console.error('Failed to fetch dogs via owner endpoint:', 
+                        await ownerDogsRes.text());
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error('Error in direct owner profile query:', e);
+              }
+              
+              // If we still don't have dogs, return empty array
+              if (!dogsData.length) {
+                console.log('DataContext - Owner profile not found, returning empty dogs array');
+                setDogs([]);
+                // Skip remaining dog fetching since we know there's no owner profile
+                failedEndpoints.add('/api/data/dogs');
+                skipFetching = true;
+              }
+            } else {
+              console.log('DataContext - Using owner profile to fetch dogs:', ownerProfile.id);
+              // Try owner-specific endpoint first for more reliable results
+              try {
+                const specificRes = await fetch(`/api/data/owners/${ownerProfile.id}/dogs`, { 
+                  headers 
+                });
+                
+                if (specificRes.ok) {
+                  dogsData = await specificRes.json();
+                  console.log('DataContext - Successfully fetched dogs via owner endpoint:', 
+                    dogsData.length, dogsData.map(d => d.name));
+                  
+                  setDogs(dogsData);
+                  skipFetching = true;
+                } else {
+                  // Fallback to main endpoint if owner-specific fails
+                  console.log('DataContext - Owner endpoint failed, falling back to main dogs endpoint');
+                  dogsResponse = await fetch('/api/data/dogs', { headers });
+                }
+              } catch (e) {
+                console.error('Error fetching from owner endpoint:', e);
+                // Fallback to main endpoint
+                dogsResponse = await fetch('/api/data/dogs', { headers });
+              }
+            }
+          } else {
+            // For admins, use the main dogs endpoint
+            dogsResponse = await fetch('/api/data/dogs', { headers });
+          }
+          
+          // Only process response if we didn't skip due to missing owner profile
+          if (!skipFetching && !failedEndpoints.has('/api/data/dogs') && dogsResponse) {
+            if (dogsResponse.ok) {
+              const dogsData = await dogsResponse.json();
+              console.log('DataContext - Dogs data:', dogsData);
+              
+              // Log detailed information about the dogs
+              if (Array.isArray(dogsData)) {
+                console.log('DataContext - Number of dogs:', dogsData.length);
+                console.log('DataContext - Dogs by owner:', 
+                  dogsData.reduce((acc: any, dog: Dog) => {
+                    acc[dog.ownerId] = acc[dog.ownerId] || [];
+                    acc[dog.ownerId].push({
+                      id: dog.id,
+                      name: dog.name,
+                      ownerId: dog.ownerId
+                    });
+                    return acc;
+                  }, {})
+                );
+              }
+              
+              setDogs(dogsData);
+            } else {
+              // If error is specifically about missing owner profile, handle gracefully
+              if (dogsResponse.status === 404) {
+                const errorText = await dogsResponse.text();
+                if (errorText.includes('Owner profile not found')) {
+                  console.log('DataContext - Owner profile not found error, returning empty dogs array');
+                  setDogs([]);
+                } else {
+                  console.error('DataContext - Failed to fetch dogs:', dogsResponse.status, errorText);
+                  failedEndpoints.add('/api/data/dogs');
+                }
+              } else {
+                console.error('DataContext - Failed to fetch dogs:', dogsResponse.status, await dogsResponse.text());
+                failedEndpoints.add('/api/data/dogs');
+              }
+            }
+          }
+        } catch (error) {
+          console.error('DataContext - Error fetching dogs:', error);
+          failedEndpoints.add('/api/data/dogs');
+        }
+      }
       
       // Fetch users
       if (!failedEndpoints.has('/api/data/users')) {
@@ -100,23 +319,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
       
-      // Fetch owners
-      if (!failedEndpoints.has('/api/data/owners')) {
-        try {
-          const ownersRes = await fetch('/api/data/owners', { headers });
-          if (ownersRes.ok) {
-            const ownersData = await ownersRes.json();
-            setOwners(ownersData);
-          } else {
-            console.error('Failed to fetch owners:', ownersRes.status, await ownersRes.text());
-            failedEndpoints.add('/api/data/owners');
-          }
-        } catch (error) {
-          console.error('Error fetching owners:', error);
-          failedEndpoints.add('/api/data/owners');
-        }
-      }
-      
       // Fetch walkers
       if (!failedEndpoints.has('/api/data/walkers')) {
         try {
@@ -131,67 +333,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } catch (error) {
           console.error('Error fetching walkers:', error);
           failedEndpoints.add('/api/data/walkers');
-        }
-      }
-      
-      // Fetch dogs
-      if (!failedEndpoints.has('/api/data/dogs')) {
-        try {
-          const dogsRes = await fetch('/api/data/dogs', { headers });
-          if (dogsRes.ok) {
-            const dogsData = await dogsRes.json();
-            console.log('DataContext: Dogs data fetched:', dogsData);
-            
-            if (user && user.id) {
-              console.log('DataContext: Current user:', user);
-              
-              // Identify user's dogs for debugging
-              const userDogsById = dogsData.filter((dog: Dog) => dog.ownerId === user.id);
-              const profileId = user.profileId || '';
-              const userDogsByProfileId = profileId ? dogsData.filter((dog: Dog) => dog.ownerId === profileId) : [];
-              
-              console.log('DataContext: Dogs by user.id:', userDogsById);
-              console.log('DataContext: Dogs by user.profileId:', userDogsByProfileId);
-              
-              // Also try string versions (in case of type mismatches)
-              const userDogsByIdStr = dogsData.filter((dog: Dog) => dog.ownerId === user.id.toString());
-              const userDogsByProfileIdStr = profileId ? dogsData.filter((dog: Dog) => dog.ownerId === profileId.toString()) : [];
-              
-              console.log('DataContext: User dogs by ID breakdown:');
-              console.log('- By user.id:', userDogsById.length, userDogsById.map((d: Dog) => d.name));
-              console.log('- By profileId:', userDogsByProfileId.length, userDogsByProfileId.map((d: Dog) => d.name));
-              console.log('- By user.id string:', userDogsByIdStr.length, userDogsByIdStr.map((d: Dog) => d.name));
-              console.log('- By profileId string:', userDogsByProfileIdStr.length, userDogsByProfileIdStr.map((d: Dog) => d.name));
-            }
-            
-            // Log when dog data is loaded
-            console.log('DataContext: Dog data loaded, count:', dogsData?.length);
-            if (dogsData && dogsData.length > 0) {
-              console.log('DataContext: First dog name:', dogsData[0].name);
-              // Log dog owner IDs to help debug ownership issues
-              console.log('DataContext: Dog owner IDs:', dogsData.map((dog: Dog) => dog.ownerId));
-              
-              // Log the full first dog object to verify structure
-              console.log('DataContext: First dog full object:', JSON.stringify(dogsData[0]));
-            } else {
-              console.warn('DataContext: No dogs data available or empty array');
-            }
-            
-            try {
-              setDogs(dogsData);
-              console.log('DataContext: Successfully set dogs data in context');
-            } catch (error) {
-              console.error('DataContext: Error setting dog data in context:', error);
-              // Attempt to set empty array as a fallback
-              setDogs([]);
-            }
-          } else {
-            console.error('Failed to fetch dogs:', dogsRes.status, await dogsRes.text());
-            failedEndpoints.add('/api/data/dogs');
-          }
-        } catch (error) {
-          console.error('Error setting dog data in context:', error);
-          setDogs([]);
         }
       }
       
@@ -250,6 +391,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (!failedEndpoints.has('/api/subscriptions/users')) {
         try {
           console.log('Fetching user subscriptions in DataContext');
+          // First try the official API endpoint
           const subscriptionsRes = await fetch('/api/subscriptions/users', { 
             headers: {
               ...headers,
@@ -261,34 +403,65 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           if (subscriptionsRes.ok) {
             const subscriptionsData = await subscriptionsRes.json();
             console.log('User subscriptions loaded:', subscriptionsData);
-            if (subscriptionsData.subscriptions && Array.isArray(subscriptionsData.subscriptions)) {
-              setUserSubscriptions(subscriptionsData.subscriptions);
-            }
-          } else {
-            console.warn('Failed to fetch subscriptions from primary endpoint:', await subscriptionsRes.text());
-            failedEndpoints.add('/api/subscriptions/users');
             
-            // Fallback to the data API
-            if (!failedEndpoints.has('/api/data/subscriptions')) {
-              try {
-                const fallbackRes = await fetch('/api/data/subscriptions', { headers });
-                if (fallbackRes.ok) {
-                  const fallbackData = await fallbackRes.json();
-                  console.log('Fallback subscriptions loaded:', fallbackData);
-                  setUserSubscriptions(fallbackData);
-                } else {
-                  console.error('Failed to fetch subscriptions from fallback:', fallbackRes.status, await fallbackRes.text());
-                  failedEndpoints.add('/api/data/subscriptions');
-                }
-              } catch (error) {
-                console.error('Error fetching fallback subscriptions:', error);
-                failedEndpoints.add('/api/data/subscriptions');
+            // Normalize subscription data structure
+            const normalizedSubscriptions = subscriptionsData.subscriptions.map((sub: any) => ({
+              id: sub.id,
+              userId: sub.userId,
+              ownerId: sub.ownerId || sub.userId, // Fallback to userId if ownerId not present
+              planId: sub.planId,
+              planName: sub.planName || sub.plan?.name, // Fallback to plan.name if planName not present
+              status: sub.status,
+              startDate: sub.startDate,
+              endDate: sub.endDate,
+              creditsRemaining: sub.creditsRemaining,
+              walkCredits: sub.walkCredits || sub.totalCredits, // Handle both field names
+              walkDuration: sub.walkDuration,
+              purchaseAmount: sub.purchaseAmount,
+              purchaseDate: sub.purchaseDate
+            }));
+            
+            console.log('Normalized subscriptions:', normalizedSubscriptions);
+            setUserSubscriptions(normalizedSubscriptions);
+          } else {
+            console.warn('Failed to fetch from official API endpoint:', await subscriptionsRes.text());
+            
+            // Try the data API as fallback
+            try {
+              console.log('Trying data API fallback...');
+              const dataRes = await fetch(`/api/data/subscriptions?userId=${user.id}`, { 
+                headers 
+              });
+              
+              if (dataRes.ok) {
+                const dataSubsData = await dataRes.json();
+                console.log('Data API subscriptions:', dataSubsData);
+                
+                // Normalize subscription data structure
+                const normalizedSubscriptions = dataSubsData.map((sub: any) => ({
+                  id: sub.id,
+                  userId: sub.userId,
+                  ownerId: sub.ownerId || sub.userId,
+                  planId: sub.planId,
+                  planName: sub.planName,
+                  status: sub.status,
+                  startDate: sub.startDate,
+                  endDate: sub.endDate,
+                  creditsRemaining: sub.creditsRemaining,
+                  walkCredits: sub.walkCredits,
+                  walkDuration: sub.walkDuration,
+                  purchaseAmount: sub.purchaseAmount,
+                  purchaseDate: sub.purchaseDate
+                }));
+                
+                setUserSubscriptions(normalizedSubscriptions);
               }
+            } catch (dataErr) {
+              console.warn('Data API fallback failed:', dataErr);
             }
           }
         } catch (err) {
-          console.error('Error fetching subscriptions:', err);
-          failedEndpoints.add('/api/subscriptions/users');
+          console.error('Error fetching subscriptions during refresh:', err);
         }
       }
       
@@ -337,14 +510,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       return true;
-    } catch (err) {
-      console.error('Error fetching data:', err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      return false;
-    } finally {
+    } catch (error) {
+      console.error('DataContext - Error fetching data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch data');
       setIsLoading(false);
+      return false;
     }
-  }, [isLoading, user]);
+  }, [user, isLoading]);
 
   // Fetch data on mount and when user changes
   useEffect(() => {
@@ -448,24 +620,18 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   // Add a ref to track last refresh time instead of property on function
   const lastRefreshTimeRef = React.useRef<number>(0);
   
-  // Modify refreshData to prevent frequent calls
+  // Modify refreshData to ensure it updates all necessary data
   const refreshData = useCallback(async () => {
     // Add debounce - don't refresh if we've refreshed in the last 2 seconds
     const now = Date.now();
     if (lastRefreshTimeRef.current && now - lastRefreshTimeRef.current < 2000) {
       console.log('Skipping refresh - too soon since last refresh');
-      return true; // Return success to prevent caller from retrying immediately
+      return true;
     }
     
-    // Track that we're currently trying to refresh
-    const isRefreshing = true;
-    console.log('Starting data refresh');
-    
-    // Set last refresh time
     lastRefreshTimeRef.current = now;
     
     try {
-      // Don't attempt to fetch data if user isn't available yet
       if (!user || !user.id) {
         console.log('Skipping data refresh - user not available yet');
         return false;
@@ -474,144 +640,139 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setIsLoading(true);
       setError(null);
       
-      // Force direct API calls to get the most up-to-date data, bypassing cache
+      const headers = {
+        'Cache-Control': 'no-cache',
+        'user-id': user.id,
+        'user-role': user.role || '',
+        'user-profile-id': user.profileId || ''
+      };
+      
+      // Fetch dogs with proper role-based endpoint
       try {
-        // Set authentication headers for API requests
-        const headers = {
-          'Cache-Control': 'no-cache', 
-          'user-id': user.id,
-          'user-role': user.role || '',
-          'user-profile-id': user.profileId || ''
-        };
+        let dogsResponse;
         
-        console.log('Refreshing data with auth headers:', {
-          userId: user.id,
-          userRole: user.role,
-          profileId: user.profileId
+        if (user.role === 'walker' && user.profileId) {
+          dogsResponse = await fetch(`/api/walkers/${user.profileId}/dogs`, { 
+            cache: 'no-store',
+            headers 
+          });
+        } else {
+          dogsResponse = await fetch('/api/data/dogs', { 
+            cache: 'no-store',
+            headers 
+          });
+        }
+
+        if (dogsResponse.ok) {
+          const dogsData = await dogsResponse.json();
+          console.log('DataContext: Refreshed dogs data:', dogsData);
+          setDogs(dogsData);
+        } else {
+          console.error('Failed to refresh dogs:', dogsResponse.status);
+        }
+      } catch (error) {
+        console.error('Error refreshing dogs:', error);
+      }
+
+      // Fetch user subscriptions with proper authentication
+      try {
+        console.log('Fetching user subscriptions in refreshData');
+        // First try the official API endpoint
+        const subscriptionsRes = await fetch('/api/subscriptions/users', { 
+          cache: 'no-store',
+          headers
         });
         
-        // Fetch user subscriptions with proper authentication
-        try {
-          console.log('Fetching user subscriptions in refreshData');
-          // First try the official API endpoint
-          const subscriptionsRes = await fetch('/api/subscriptions/users', { 
-            cache: 'no-store',
-            headers
-          });
-          
-          if (subscriptionsRes.ok) {
-            const subscriptionsData = await subscriptionsRes.json();
-            console.log('User subscriptions loaded in refresh:', subscriptionsData);
-            if (subscriptionsData.subscriptions && Array.isArray(subscriptionsData.subscriptions)) {
-              setUserSubscriptions(subscriptionsData.subscriptions);
-              
-              // Log each subscription for debugging
-              subscriptionsData.subscriptions.forEach((sub: any, idx: number) => {
-                console.log(`Subscription ${idx+1}:`, {
-                  id: sub.id,
-                  userId: sub.userId,
-                  status: sub.status,
-                  startDate: sub.startDate,
-                  endDate: sub.endDate,
-                  planId: sub.planId
-                });
-              });
-            }
-          } else {
-            console.warn('Failed to fetch from official API endpoint:', await subscriptionsRes.text());
+        if (subscriptionsRes.ok) {
+          const subscriptionsData = await subscriptionsRes.json();
+          console.log('User subscriptions loaded in refresh:', subscriptionsData);
+          if (subscriptionsData.subscriptions && Array.isArray(subscriptionsData.subscriptions)) {
+            setUserSubscriptions(subscriptionsData.subscriptions);
             
-            // Try the admin endpoint with admin-specific headers as a fallback
-            console.log('Trying admin endpoint as fallback...');
-            try {
-              const adminRes = await fetch('/api/admin/subscriptions/users', {
-                cache: 'no-store',
-                headers: {
-                  ...headers,
-                  'admin-access': 'true'
-                }
+            // Log each subscription for debugging
+            subscriptionsData.subscriptions.forEach((sub: any, idx: number) => {
+              console.log(`Subscription ${idx+1}:`, {
+                id: sub.id,
+                userId: sub.userId,
+                status: sub.status,
+                startDate: sub.startDate,
+                endDate: sub.endDate,
+                planId: sub.planId
               });
-              
-              if (adminRes.ok) {
-                const adminData = await adminRes.json();
-                console.log('Admin subscription data:', adminData);
-                if (adminData.subscriptions && Array.isArray(adminData.subscriptions)) {
-                  setUserSubscriptions(adminData.subscriptions);
-                }
+            });
+          }
+        } else {
+          console.warn('Failed to fetch from official API endpoint:', await subscriptionsRes.text());
+          
+          // Try the admin endpoint with admin-specific headers as a fallback
+          console.log('Trying admin endpoint as fallback...');
+          try {
+            const adminRes = await fetch('/api/admin/subscriptions/users', {
+              cache: 'no-store',
+              headers: {
+                ...headers,
+                'admin-access': 'true'
               }
-            } catch (adminErr) {
-              console.warn('Admin fallback failed:', adminErr);
-            }
+            });
             
-            // Try data API as second fallback
-            try {
-              console.log('Trying data API fallback...');
-              const dataRes = await fetch(`/api/data/subscriptions?userId=${user.id}`, { 
-                cache: 'no-store',
-                headers 
-              });
-              
-              if (dataRes.ok) {
-                const dataSubsData = await dataRes.json();
-                console.log('Data API subscriptions:', dataSubsData);
-                if (Array.isArray(dataSubsData)) {
-                  setUserSubscriptions(dataSubsData);
-                }
+            if (adminRes.ok) {
+              const adminData = await adminRes.json();
+              console.log('Admin subscription data:', adminData);
+              if (adminData.subscriptions && Array.isArray(adminData.subscriptions)) {
+                setUserSubscriptions(adminData.subscriptions);
               }
-            } catch (dataErr) {
-              console.warn('Data API fallback failed:', dataErr);
             }
+          } catch (adminErr) {
+            console.warn('Admin fallback failed:', adminErr);
           }
-        } catch (err) {
-          console.error('Error fetching subscriptions during refresh:', err);
-        }
-        
-        // Fetch dogs data
-        try {
-          const dogsResponse = await fetch('/api/data/dogs', { 
-            cache: 'no-store', 
-            headers 
-          });
           
-          if (dogsResponse.ok) {
-            const freshDogs = await dogsResponse.json();
-            setDogs(freshDogs);
-          } else {
-            console.warn('Failed to fetch dogs data:', await dogsResponse.text());
+          // Try data API as second fallback
+          try {
+            console.log('Trying data API fallback...');
+            const dataRes = await fetch(`/api/data/subscriptions?userId=${user.id}`, { 
+              cache: 'no-store',
+              headers 
+            });
+            
+            if (dataRes.ok) {
+              const dataSubsData = await dataRes.json();
+              console.log('Data API subscriptions:', dataSubsData);
+              if (Array.isArray(dataSubsData)) {
+                setUserSubscriptions(dataSubsData);
+              }
+            }
+          } catch (dataErr) {
+            console.warn('Data API fallback failed:', dataErr);
           }
-        } catch (dogsErr) {
-          console.warn('Error fetching dogs data:', dogsErr);
         }
-        
-        // Fetch assessments data - only if needed
-        try {
-          const assessmentsResponse = await fetch('/api/data/assessments', { 
-            cache: 'no-store', 
-            headers 
-          });
-          
-          if (assessmentsResponse.ok) {
-            const freshAssessments = await assessmentsResponse.json();
-            setAssessments(freshAssessments);
-          } else {
-            console.warn('Failed to fetch assessments data:', await assessmentsResponse.text());
-          }
-        } catch (assessmentsErr) {
-          console.warn('Error fetching assessments data:', assessmentsErr);
-        }
-        
-        return true;
-      } catch (apiError) {
-        console.error('Error during direct API refresh:', apiError);
-        // Don't fall back to general fetchData to avoid infinite refreshes
-        return false;
+      } catch (err) {
+        console.error('Error fetching subscriptions during refresh:', err);
       }
+      
+      // Fetch assessments data - only if needed
+      try {
+        const assessmentsResponse = await fetch('/api/data/assessments', { 
+          cache: 'no-store', 
+          headers 
+        });
+        
+        if (assessmentsResponse.ok) {
+          const freshAssessments = await assessmentsResponse.json();
+          setAssessments(freshAssessments);
+        } else {
+          console.warn('Failed to fetch assessments data:', await assessmentsResponse.text());
+        }
+      } catch (assessmentsErr) {
+        console.warn('Error fetching assessments data:', assessmentsErr);
+      }
+      
+      return true;
     } catch (err) {
       console.error('Error refreshing data:', err);
       setError(err instanceof Error ? err.message : 'An unknown error occurred');
       return false;
     } finally {
       setIsLoading(false);
-      console.log('Data refresh completed');
     }
   }, [user]);
 

@@ -18,6 +18,15 @@ export interface Dog {
   assessmentStatus?: 'pending' | 'approved' | 'denied' | 'not_required' | 'scheduled' | 'in_progress' | 'pending_review'; // Updated dog assessment status
   weight?: number; // Dog's weight in kg for health assessment
   behavioralIssues?: string[]; // Any behavioral issues the dog has
+  // Owner data when included from the API response
+  owner?: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string;
+    address: any;
+    userId?: string;
+  };
 }
 
 export interface Owner {
@@ -100,11 +109,65 @@ export interface Walk {
   walker?: Walker;
 }
 
+export interface AIRecommendationData {
+  // Walker recommendation data
+  walker?: {
+    id: string;
+    name: string;
+    compatibility: number;
+    reasons: string[];
+  };
+  
+  // Route recommendation data
+  route?: {
+    id: string;
+    name: string;
+    distance: number;
+    estimatedTime: number;
+    coordinates: [number, number][];
+    highlights: string[];
+  };
+  
+  // Schedule recommendation data
+  schedule?: {
+    suggestedTimes: {
+      day: string;
+      slots: string[];
+    }[];
+    reasons: string[];
+  };
+}
+
 export interface AIRecommendation {
   type: 'walker' | 'route' | 'schedule';
   reason: string;
   confidence: number; // 0-1 scale
-  data: any;
+  data: AIRecommendationData;
+}
+
+// Define specific data types for each recommendation type
+export interface AIRecommendationData {
+  // Common fields that might be in all recommendations
+  id?: string;
+  name?: string;
+  
+  // Walker recommendation specific fields
+  walkerId?: string;
+  walkerName?: string;
+  walkerRating?: number;
+  walkCount?: number;
+  
+  // Route recommendation specific fields
+  routeName?: string;
+  distance?: number;
+  estimatedDuration?: number;
+  coordinates?: [number, number][];
+  
+  // Schedule recommendation specific fields
+  suggestedDate?: string;
+  suggestedTime?: string;
+  timeSlot?: 'morning' | 'afternoon';
+  availability?: boolean;
 }
 
 // Role-based access control types
@@ -152,14 +215,18 @@ export interface SubscriptionPlan {
 export interface UserSubscription {
   id: string;
   userId: string;         // User who owns this subscription
-  ownerId: string;        // Owner profile ID
   planId: string;         // Reference to subscription plan
+  planName: string;       // Name of the subscription plan
+  walkCredits?: number;    // Total walk credits for this subscription - make optional to match SubscriptionPlan
+  walkDuration?: number;   // Duration of each walk in minutes - make optional to match SubscriptionPlan
+  creditsRemaining: number; // Number of walk credits remaining
   startDate: string;      // ISO date string
   endDate: string;        // ISO date string
-  creditsRemaining: number; // Number of walk credits remaining
   status: 'active' | 'expired' | 'cancelled';
   purchaseAmount: number; // Amount paid in GBP (pence)
   purchaseDate: string;   // ISO date string
+  createdAt: string;      // ISO date string
+  updatedAt: string;      // ISO date string
 }
 
 export interface SubscriptionTransaction {

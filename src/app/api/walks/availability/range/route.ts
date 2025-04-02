@@ -38,6 +38,20 @@ interface WalkerAvailability {
  */
 export async function GET(request: NextRequest) {
   try {
+    // Get authentication headers
+    const userId = request.headers.get('user-id');
+    const userRole = request.headers.get('user-role');
+    const userProfileId = request.headers.get('user-profile-id');
+
+    // Validate user authentication
+    if (!userId || !userRole) {
+      console.error('Missing authentication headers:', { userId, userRole });
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
@@ -45,6 +59,7 @@ export async function GET(request: NextRequest) {
     
     console.log('GET /api/walks/availability/range - Request received');
     console.log(`GET /api/walks/availability/range - Params: startDate=${startDate}, endDate=${endDate}, dogId=${dogId}`);
+    console.log(`GET /api/walks/availability/range - User: ${userId}, Role: ${userRole}, ProfileId: ${userProfileId}`);
     
     // Dates are required
     if (!startDate || !endDate) {
@@ -67,11 +82,27 @@ export async function GET(request: NextRequest) {
     
     // First, get the dog with its assessment details
     const dog = await prisma.dog.findUnique({
-      where: { id: dogId }
+      where: { id: dogId },
+      include: {
+        owner: true
+      }
     });
     
     if (!dog) {
       return NextResponse.json({ error: 'Dog not found' }, { status: 404 });
+    }
+    
+    // Verify dog ownership if user is an owner
+    if (userRole === 'owner' && dog.ownerId !== userProfileId) {
+      console.error('User does not own this dog:', {
+        userId,
+        userProfileId,
+        dogOwnerId: dog.ownerId
+      });
+      return NextResponse.json(
+        { error: 'You can only check availability for your own dogs' },
+        { status: 403 }
+      );
     }
     
     // Get the most recent completed assessment for this dog

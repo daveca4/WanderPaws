@@ -37,12 +37,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Ensure user has a profileId based on their role
   const ensureProfileId = async (user: User) => {
     if (user.profileId) {
-      console.log('User already has profileId:', user.profileId);
+      console.log('AuthContext - User already has profileId:', user.profileId);
       return user;
     }
 
     try {
-      console.log('Ensuring profile ID for user:', user.id, user.role);
+      console.log('AuthContext - Ensuring profile ID for user:', {
+        id: user.id,
+        role: user.role,
+        name: user.name,
+        email: user.email
+      });
       
       // Based on role, find the appropriate profile
       if (user.role === 'owner') {
@@ -63,15 +68,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         if (!response.ok) {
           const error = await response.json();
-          console.error('Failed to ensure owner profile:', error);
+          console.error('AuthContext - Failed to ensure owner profile:', error);
           throw new Error(error.message || 'Failed to ensure owner profile');
         }
 
         const data = await response.json();
-        console.log('Received owner profile:', data);
+        console.log('AuthContext - Received owner profile:', data);
         
         if (!data.id) {
-          console.error('No profile ID in response:', data);
+          console.error('AuthContext - No profile ID in response:', data);
           throw new Error('No profile ID returned from server');
         }
 
@@ -84,14 +89,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         // Update local storage
         localStorage.setItem('wanderpaws_user', JSON.stringify(updatedUser));
-        console.log('Updated user with profileId:', updatedUser);
+        console.log('AuthContext - Updated user with profileId:', updatedUser);
         return updatedUser;
       }
       
       // Could add similar logic for walker role if needed
       return user;
     } catch (error) {
-      console.error('Error ensuring profile ID:', error);
+      console.error('AuthContext - Error ensuring profile ID:', error);
       throw error; // Re-throw to handle in the calling function
     }
   };
@@ -105,13 +110,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         
         if (storedUser) {
           // Ensure the user has a profileId
-          storedUser = await ensureProfileId(storedUser);
-          console.log('AuthContext - User after ensuring profileId:', storedUser);
-          setUser(storedUser);
+          try {
+            storedUser = await ensureProfileId(storedUser);
+            console.log('AuthContext - User after ensuring profileId:', storedUser);
+            setUser(storedUser);
+          } catch (error) {
+            console.error('AuthContext - Error ensuring profile on load:', error);
+            // Still set the user even if profile ensure failed
+            setUser(storedUser);
+          }
         }
       } catch (error) {
-        console.error('Error loading user:', error);
-        // Don't set user if we couldn't ensure profile
+        console.error('AuthContext - Error loading user:', error);
+        // Clear any invalid user data
+        localStorage.removeItem('wanderpaws_user');
       } finally {
         setIsLoading(false);
       }
@@ -133,27 +145,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           console.log('AuthContext - User after login and ensuring profileId:', user);
           setUser(user);
         } catch (error) {
-          console.error('Error ensuring profile after login:', error);
-          // Still return the user even if profile ensure failed
+          console.error('AuthContext - Error ensuring profile after login:', error);
+          // Still set the user even if profile ensure failed
+          setUser(user);
         }
       }
       
       return user;
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('AuthContext - Login error:', error);
       return null;
     }
   };
 
   // Handle logout
   const handleLogout = async () => {
-    await logout();
-    setUser(null);
+    try {
+      await logout();
+      setUser(null);
+      localStorage.removeItem('wanderpaws_user');
+      console.log('AuthContext - User logged out successfully');
+    } catch (error) {
+      console.error('AuthContext - Error during logout:', error);
+      // Still clear the user state even if logout fails
+      setUser(null);
+      localStorage.removeItem('wanderpaws_user');
+    }
   };
 
   // Check permissions
   const checkPermission = (action: string, resource: string, resourceOwnerId?: string) => {
-    return hasPermission(user, action, resource, resourceOwnerId);
+    const hasAccess = hasPermission(user, action, resource, resourceOwnerId);
+    console.log('AuthContext - Checking permission:', {
+      action,
+      resource,
+      resourceOwnerId,
+      userId: user?.id,
+      userRole: user?.role,
+      hasAccess
+    });
+    return hasAccess;
   };
 
   return (
