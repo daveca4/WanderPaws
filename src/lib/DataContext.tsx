@@ -33,6 +33,7 @@ interface DataContextType {
   updateWalk: (id: string, data: Partial<Walk>) => Promise<Walk>;
   updateAssessment: (id: string, data: Partial<Assessment>) => Promise<Assessment>;
   deleteDog: (id: string) => Promise<boolean>;
+  createDog: (data: Omit<Dog, 'id'>) => Promise<Dog>;
 }
 
 // Create the context
@@ -582,6 +583,17 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return updatedDog;
   };
 
+  const createDog = async (data: Omit<Dog, 'id'>): Promise<Dog> => {
+    try {
+      const newDog = await DogAPI.create(data);
+      setDogs(prev => [...prev, newDog]);
+      return newDog;
+    } catch (error) {
+      console.error('Error creating dog:', error);
+      throw error;
+    }
+  };
+
   const updateOwner = async (id: string, data: Partial<Owner>): Promise<Owner> => {
     const updatedOwner = await OwnerAPI.update(id, data);
     setOwners(prev => prev.map(owner => owner.id === id ? updatedOwner : owner));
@@ -799,17 +811,12 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     getAssessmentById,
     getUserById,
     updateDog,
-    updateOwner: async (id: string, data: Partial<Owner>) => {
-      console.warn('updateOwner is not implemented');
-      return { id, ...data } as Owner;
-    },
-    updateWalker: async (id: string, data: Partial<Walker>) => {
-      console.warn('updateWalker is not implemented');
-      return { id, ...data } as Walker;
-    },
+    updateOwner,
+    updateWalker,
     updateAssessment,
     updateWalk,
-    deleteDog
+    deleteDog,
+    createDog
   };
   
   if (error) {

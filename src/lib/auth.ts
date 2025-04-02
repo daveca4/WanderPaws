@@ -92,6 +92,11 @@ export function hasPermission(user: User | null, action: string, resource: strin
     return true;
   }
   
+  // Special case for owners viewing owner_dashboard (with underscore)
+  if (user.role === 'owner' && action === 'view' && resource === 'owner_dashboard') {
+    return true;
+  }
+  
   // Special case for owners creating dogs
   if (user.role === 'owner' && action === 'create' && resource === 'dogs') {
     return true;

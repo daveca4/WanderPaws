@@ -10,18 +10,23 @@ type ApiResponse<T> = {
 
 // Main API client function
 export async function apiClient<T>(
-  endpoint: string, 
+  endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
-  const headers = {
+  // Create headers object with auth headers
+  const authHeaders = getAuthHeaders();
+  
+  const headerValues = {
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-    ...(options.headers || {})
+    ...authHeaders,
+    ...(options.headers instanceof Headers 
+      ? Object.fromEntries(Array.from(options.headers.entries())) 
+      : options.headers || {})
   };
 
   const config: RequestInit = {
     ...options,
-    headers
+    headers: headerValues
   };
 
   try {
@@ -104,4 +109,58 @@ export const api = {
   
   delete: <T>(endpoint: string, options?: RequestInit) =>
     apiClient<T>(endpoint, { ...options, method: 'DELETE' }),
+};
+
+/**
+ * API client utilities
+ */
+
+// Generic API request function with error handling
+export const apiRequest = async <T>(
+  url: string, 
+  options: RequestInit = {}
+): Promise<T> => {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...getAuthHeaders(),
+    ...options.headers
+  };
+
+  const response = await fetch(url, {
+    ...options,
+    headers
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => null);
+    const errorMessage = errorData?.message || `API request failed with status ${response.status}`;
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+};
+
+// Specialized API request functions
+export const get = <T>(url: string): Promise<T> => {
+  return apiRequest<T>(url);
+};
+
+export const post = <T>(url: string, data: any): Promise<T> => {
+  return apiRequest<T>(url, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+};
+
+export const put = <T>(url: string, data: any): Promise<T> => {
+  return apiRequest<T>(url, {
+    method: 'PUT',
+    body: JSON.stringify(data)
+  });
+};
+
+export const del = <T>(url: string): Promise<T> => {
+  return apiRequest<T>(url, {
+    method: 'DELETE'
+  });
 }; 

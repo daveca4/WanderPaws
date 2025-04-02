@@ -15,10 +15,16 @@ const api = axios.create({
 api.interceptors.request.use((config) => {
   const user = getCurrentUser();
   console.log('API Request - Current User:', user); // Debug output
+  console.log('API Request URL:', config.url);
   
   if (user) {
     config.headers['user-id'] = user.id;
     config.headers['user-role'] = user.role;
+    console.log('Setting auth headers:', { 
+      userId: user.id, 
+      userRole: user.role 
+    });
+    
     if (user.profileId) {
       config.headers['user-profile-id'] = user.profileId;
       console.log('Setting profile ID header:', user.profileId); // Debug output
@@ -26,7 +32,7 @@ api.interceptors.request.use((config) => {
       console.log('No profile ID available for user:', user.id); // Debug output
     }
   } else {
-    console.log('No user found for API request'); // Debug output
+    console.log('No user found for API request - auth will fail'); // Debug output
   }
   
   return config;

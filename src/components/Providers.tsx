@@ -1,13 +1,17 @@
 'use client';
 
-import { ReactNode, useState, useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from 'react-query';
-import { ReactQueryDevtools } from 'react-query/devtools';
+import { ReactNode, useState, useEffect, Suspense, lazy } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/lib/AuthContext';
 import { MessageProvider } from '@/lib/MessageContext';
 import { DataProvider } from '@/lib/DataContext';
 import { LandingLayout } from '@/components/LandingLayout';
 import { setupMonitoring } from '@/lib/monitoring';
+
+// Conditionally import devtools to avoid build issues
+const ReactQueryDevtools = process.env.NODE_ENV === 'development'
+  ? lazy(() => import('@tanstack/react-query-devtools').then(mod => ({ default: mod.ReactQueryDevtools })))
+  : () => null;
 
 export function Providers({ children }: { children: ReactNode }) {
   // Create a client for each session to avoid sharing state between users
@@ -17,6 +21,7 @@ export function Providers({ children }: { children: ReactNode }) {
         refetchOnWindowFocus: process.env.NODE_ENV === 'production',
         retry: 1,
         staleTime: 30000, // 30 seconds
+        gcTime: 1000 * 60 * 10, // 10 minutes
       },
     },
   }));
@@ -39,7 +44,11 @@ export function Providers({ children }: { children: ReactNode }) {
           </MessageProvider>
         </DataProvider>
       </AuthProvider>
-      {process.env.NODE_ENV === 'development' && <ReactQueryDevtools initialIsOpen={false} />}
+      {process.env.NODE_ENV === 'development' && (
+        <Suspense fallback={null}>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </Suspense>
+      )}
     </QueryClientProvider>
   );
 } 

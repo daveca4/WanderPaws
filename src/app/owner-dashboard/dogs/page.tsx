@@ -16,7 +16,7 @@ export default function DogsPage() {
   // Use React Query hook for data fetching
   const { 
     data: dogs = [], 
-    isLoading, 
+    isPending, 
     error: fetchError,
     refetch
   } = useOwnerDogs();
@@ -24,7 +24,7 @@ export default function DogsPage() {
   // Owner profile creation mutation
   const {
     mutate: ensureOwnerProfile,
-    isLoading: isCreatingProfile,
+    isPending: isCreatingProfile,
     isSuccess: profileCreated,
     error: profileError
   } = useEnsureOwnerProfile();
@@ -50,7 +50,7 @@ export default function DogsPage() {
     ensureOwnerProfile({});
   };
 
-  if (isLoading || !user) {
+  if (isPending || !user) {
     return (
       <div className="flex justify-center py-12">
         <LoadingSpinner />
@@ -95,6 +95,10 @@ export default function DogsPage() {
     );
   }
 
+  // Check if we have any dogs
+  const dogsArray = Array.isArray(dogs) ? dogs : dogs?.data || [];
+  const hasDogs = dogsArray.length > 0;
+
   return (
     <RouteGuard requiredPermission={{ action: 'read', resource: 'dogs' }}>
       <div className="space-y-6">
@@ -108,7 +112,13 @@ export default function DogsPage() {
           </Link>
         </div>
 
-        {dogs.length === 0 ? (
+        {hasDogs ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {dogsArray.map((dog) => (
+              <DogCard key={dog.id} dog={dog} />
+            ))}
+          </div>
+        ) : (
           <div className="bg-white shadow rounded-lg p-6 text-center">
             <h2 className="text-lg font-medium text-gray-900 mb-2">No Dogs Added Yet</h2>
             <p className="text-gray-500 mb-4">Add your first dog to get started with scheduling walks!</p>
@@ -118,12 +128,6 @@ export default function DogsPage() {
             >
               Add Your First Dog
             </Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {dogs.map((dog: Dog) => (
-              <DogCard key={dog.id} dog={dog} />
-            ))}
           </div>
         )}
       </div>

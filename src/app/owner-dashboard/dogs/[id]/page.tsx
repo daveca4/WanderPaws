@@ -122,7 +122,7 @@ export default function DogDetailsPage() {
   // Fetch dog data using React Query hook
   const { 
     data: dogData, 
-    isLoading, 
+    isPending, 
     error, 
     refetch 
   } = useDog(dogId);
@@ -130,15 +130,15 @@ export default function DogDetailsPage() {
   // Cast the dog data to our extended type
   const dog = dogData as ExtendedDog | undefined;
   
-  // Mutations for updating and deleting dog
+  // Get mutations
   const { 
-    mutate: updateDog,
-    isLoading: isUpdating
+    mutate: updateDog, 
+    isPending: isUpdating 
   } = useUpdateDog();
   
-  const {
-    mutate: deleteDog,
-    isLoading: isDeleting
+  const { 
+    mutate: deleteDog, 
+    isPending: isDeleting 
   } = useDeleteDog();
 
   // State for managing forms and UI
@@ -177,7 +177,7 @@ export default function DogDetailsPage() {
     try {
       // Call the update mutation
       updateDog(
-        { id: dogId, data: formData },
+        { id: dogId, ...formData },
         {
           onSuccess: () => {
             setEditMode(false);
@@ -216,7 +216,7 @@ export default function DogDetailsPage() {
     setConfirmDelete(false);
   };
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>

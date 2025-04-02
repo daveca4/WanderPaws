@@ -1,11 +1,25 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import { getUpcomingWalks, getPastWalks, getDogById, getWalkerById, formatDate, formatTime } from '@/utils/helpers';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useData } from '@/lib/DataContext';
+import RouteGuard from '@/components/RouteGuard';
+import { Walk } from '@/lib/types';
 
 export default function SchedulePage() {
-  const upcomingWalks = getUpcomingWalks();
-  const pastWalks = getPastWalks(undefined, 5);
-  
+  const { walks, dogs, walkers } = useData();
+  const [upcomingWalks, setUpcomingWalks] = useState<Walk[]>([]);
+  const [pastWalks, setPastWalks] = useState<Walk[]>([]);
+
+  useEffect(() => {
+    if (walks) {
+      setUpcomingWalks(getUpcomingWalks(walks, 5));
+      setPastWalks(getPastWalks(walks, 5));
+    }
+  }, [walks]);
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -36,8 +50,8 @@ export default function SchedulePage() {
             </div>
           ) : (
             upcomingWalks.map((walk) => {
-              const dog = getDogById(walk.dogId);
-              const walker = getWalkerById(walk.walkerId);
+              const dog = getDogById(dogs, walk.dogId);
+              const walker = getWalkerById(walkers, walk.walkerId);
               
               if (!dog || !walker) return null;
               
@@ -118,8 +132,8 @@ export default function SchedulePage() {
             </div>
           ) : (
             pastWalks.map((walk) => {
-              const dog = getDogById(walk.dogId);
-              const walker = getWalkerById(walk.walkerId);
+              const dog = getDogById(dogs, walk.dogId);
+              const walker = getWalkerById(walkers, walk.walkerId);
               
               if (!dog || !walker) return null;
               
@@ -160,7 +174,10 @@ export default function SchedulePage() {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                             </svg>
-                            <span>{walk.metrics.distanceCovered.toFixed(1)} km · {walk.metrics.totalTime} minutes</span>
+                            <span>
+                              {walk.metrics.distanceCovered ? walk.metrics.distanceCovered.toFixed(1) : '0'} km · 
+                              {walk.metrics.totalTime ? walk.metrics.totalTime : '0'} minutes
+                            </span>
                           </div>
                         )}
                       </div>

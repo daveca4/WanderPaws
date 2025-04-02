@@ -15,7 +15,7 @@ export default function EditDogPage() {
   const { user } = useAuth();
   
   // Use React Query hooks for data fetching
-  const { data: dog, isLoading, error: fetchError } = useDog(dogId);
+  const { data: dog, isPending, error: fetchError } = useDog(dogId);
   const updateDogMutation = useUpdateDog();
   
   const [saving, setSaving] = useState(false);
@@ -160,7 +160,7 @@ export default function EditDogPage() {
     }
   };
   
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="flex justify-center py-12">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -450,10 +450,10 @@ export default function EditDogPage() {
               </Link>
               <button
                 type="submit"
-                disabled={saving || updateDogMutation.isLoading}
+                disabled={saving || updateDogMutation.isPending}
                 className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
               >
-                {saving || updateDogMutation.isLoading ? 'Saving...' : 'Save Changes'}
+                {saving || updateDogMutation.isPending ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </form>

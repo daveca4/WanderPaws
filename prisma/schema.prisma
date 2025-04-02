@@ -139,6 +139,7 @@ model Walk {
   id                String   @id @default(cuid())
   dogId             String
   walkerId          String
+  ownerId           String?
   date              DateTime
   startTime         String
   timeSlot          String

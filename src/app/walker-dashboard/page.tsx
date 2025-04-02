@@ -3,24 +3,29 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
-import { useData } from '@/lib/DataContext';
 import { DashboardSummary } from '@/components/DashboardSummary';
 import { UpcomingWalks } from '@/components/UpcomingWalks';
 import { DogList } from '@/components/DogList';
 import { RecentActivities } from '@/components/RecentActivities';
 import { AssessmentList } from '@/components/AssessmentList';
-import { getPastWalks } from '@/utils/helpers';
 import Link from 'next/link';
 import Image from 'next/image';
+import { 
+  useWalkerProfile, 
+  useWalkerCompletedWalks, 
+  useWalkerUpcomingWalks, 
+  useWalkerPendingAssessments 
+} from '@/lib/hooks/useWalkerHooks';
+import { format } from 'date-fns';
+import { Walk } from '@/lib/types';
 
 function PendingFeedback() {
   const { user } = useAuth();
-  const { walks } = useData();
   
-  if (!user?.profileId) return null;
+  // Use React Query to fetch completed walks
+  const { data: completedWalks = [] } = useWalkerCompletedWalks();
   
-  // Get completed walks without feedback
-  const completedWalks = getPastWalks(walks, undefined, user.profileId);
+  // Filter for walks without feedback
   const pendingFeedback = completedWalks.filter(walk => !walk.feedback);
   
   if (pendingFeedback.length === 0) return null;
@@ -50,8 +55,8 @@ function PendingFeedback() {
           <div key={walk.id} className="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm">
             <div className="flex items-center">
               <div className="mr-3">
-                <p className="font-medium">{new Date(walk.date).toLocaleDateString()}</p>
-                <p className="text-sm text-gray-500">{walk.dogId}</p>
+                <p className="font-medium">{format(new Date(walk.date), 'MMM d, yyyy')}</p>
+                <p className="text-sm text-gray-500">{walk.dogName || walk.dog?.name || 'Dog'}</p>
               </div>
             </div>
             
@@ -66,7 +71,7 @@ function PendingFeedback() {
         
         {pendingFeedback.length > 3 && (
           <Link 
-            href="/walker-dashboard/walks"
+            href="/walker-dashboard/walks?tab=needs-feedback"
             className="block text-center text-sm text-amber-700 hover:text-amber-800 mt-2"
           >
             View all {pendingFeedback.length} walks needing feedback
@@ -80,21 +85,15 @@ function PendingFeedback() {
 // New component to display upcoming group walks
 function UpcomingGroupWalks() {
   const { user } = useAuth();
-  const { walks } = useData();
   
-  if (!user?.profileId) return null;
-  
-  // Find upcoming walks that are part of group walks (multiple dogs in same time slot)
-  const upcomingWalks = walks.filter(walk => 
-    walk.walkerId === user.profileId && 
-    walk.status === 'scheduled'
-  );
+  // Use React Query for upcoming walks
+  const { data: upcomingWalks = [] } = useWalkerUpcomingWalks();
   
   // Group by date and time slot
-  const walksByTimeSlot: Record<string, typeof upcomingWalks> = {};
+  const walksByTimeSlot: Record<string, Walk[]> = {};
   
   upcomingWalks.forEach(walk => {
-    const key = `${walk.date}_${walk.startTime}_${walk.timeSlot}`;
+    const key = `${walk.date}_${walk.timeSlot}`;
     if (!walksByTimeSlot[key]) {
       walksByTimeSlot[key] = [];
     }
@@ -105,9 +104,8 @@ function UpcomingGroupWalks() {
   const groupWalks = Object.entries(walksByTimeSlot)
     .filter(([_, walks]) => walks.length > 1)
     .map(([key, walks]) => {
-      const [date, timeRaw] = key.split('_');
-      const time = timeRaw.split('_')[0]; // Extract just the time part
-      return { date, time, count: walks.length };
+      const [date, timeSlot] = key.split('_');
+      return { date, timeSlot, count: walks.length };
     })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .slice(0, 3); // Show only the next 3 group walks
@@ -135,12 +133,12 @@ function UpcomingGroupWalks() {
         {groupWalks.map((group, index) => (
           <div key={index} className="flex justify-between items-center bg-white p-3 rounded-lg shadow-sm">
             <div>
-              <p className="font-medium text-gray-900">{new Date(group.date).toLocaleDateString()} at {group.time}</p>
+              <p className="font-medium text-gray-900">{format(new Date(group.date), 'MMM d, yyyy')} ({group.timeSlot})</p>
               <p className="text-sm text-gray-500">{group.count} dogs in this group</p>
             </div>
             
             <Link 
-              href={`/walker-dashboard/walks/group?date=${group.date}&time=${group.time}&slot=AM`}
+              href={`/walker-dashboard/walks/group?date=${group.date}&timeSlot=${group.timeSlot}`}
               className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
             >
               Manage Group
@@ -161,8 +159,23 @@ function UpcomingGroupWalks() {
 
 export default function WalkerDashboard() {
   const { user, loading } = useAuth();
-  const { walks } = useData();
   const router = useRouter();
+
+  // Use React Query hooks
+  const { 
+    data: profile, 
+    isLoading: isLoadingProfile 
+  } = useWalkerProfile();
+
+  const { 
+    data: completedWalks = [], 
+    isLoading: isLoadingWalks 
+  } = useWalkerCompletedWalks();
+
+  const { 
+    data: pendingAssessments = [], 
+    isLoading: isLoadingAssessments 
+  } = useWalkerPendingAssessments();
 
   // Redirect if not a walker or admin
   useEffect(() => {
@@ -171,18 +184,18 @@ export default function WalkerDashboard() {
     }
   }, [user, loading, router]);
 
+  // Calculate if any walks need feedback
+  const needsFeedbackCount = completedWalks.filter(walk => !walk.feedback).length;
+
   // If loading or not walker/admin, show loading state
-  if (loading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
+  const isLoading = loading || isLoadingProfile || isLoadingWalks || isLoadingAssessments;
+  if (isLoading || !user || (user.role !== 'walker' && user.role !== 'admin')) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
       </div>
     );
   }
-  
-  // Get completed walks without feedback
-  const completedWalks = getPastWalks(walks, undefined, user.profileId);
-  const needsFeedbackCount = completedWalks.filter(walk => !walk.feedback).length;
 
   return (
     <div className="space-y-6">

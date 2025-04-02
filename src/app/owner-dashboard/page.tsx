@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
 import { useOwnerDogs, useOwnerByUserId, useUserSubscriptions } from '@/lib/hooks/useDataHooks';
+import { useUpcomingWalks } from '@/lib/hooks/useBookingHooks';
 import { format } from 'date-fns';
 import { Dog, Owner, UserSubscription, Walk } from '@/lib/types';
 import { api } from '@/lib/api/client';
@@ -150,61 +151,50 @@ export default function OwnerDashboardPage() {
     isLoading: isLoadingSubscriptions,
     error: subscriptionsError
   } = useUserSubscriptions();
+  
+  const {
+    data: upcomingWalks = [],
+    isLoading: isLoadingWalks,
+    error: walksError
+  } = useUpcomingWalks();
 
   // Local state for managing UI
-  const [upcomingWalks, setUpcomingWalks] = useState<Walk[]>([]);
-  const [isLoadingWalks, setIsLoadingWalks] = useState(true);
-  const [walksError, setWalksError] = useState<string | null>(null);
   const [activeSubscription, setActiveSubscription] = useState<UserSubscription | null>(null);
   
   // Debug state
   const [showDebugPanel, setShowDebugPanel] = useState(false);
 
-  // Fetch upcoming walks
-  useEffect(() => {
-    const fetchUpcomingWalks = async () => {
-      if (!user) return;
-      
-      setIsLoadingWalks(true);
-      setWalksError(null);
-      
-      try {
-        console.log('Fetching upcoming walks for user:', user.id);
-        const response = await api.get<{ walks: Walk[] }>('/api/walks/upcoming');
-        
-        if (!response.ok) {
-          throw new Error(response.error || 'Failed to fetch upcoming walks');
-        }
-        
-        const walks = response.data.walks || [];
-        console.log(`Found ${walks.length} upcoming walks`);
-        
-        setUpcomingWalks(walks);
-        setIsLoadingWalks(false);
-      } catch (error) {
-        console.error('Error fetching upcoming walks:', error);
-        setWalksError(error instanceof Error ? error.message : 'Failed to fetch upcoming walks');
-        setIsLoadingWalks(false);
-      }
-    };
-
-    fetchUpcomingWalks();
-  }, [user]);
-
   // Process subscriptions to find active one
   useEffect(() => {
-    if (!subscriptions || subscriptions.length === 0) {
+    // Check if subscriptions is an array or has a subscriptions property
+    const subscriptionList = Array.isArray(subscriptions) 
+      ? subscriptions 
+      : (subscriptions as any)?.subscriptions || [];
+    
+    if (subscriptionList.length === 0) {
       setActiveSubscription(null);
       return;
     }
     
     // Find active subscription
-    const active = subscriptions.find(sub => 
+    const active = subscriptionList.find((sub: UserSubscription) => 
       sub.status === 'active' && new Date(sub.endDate) > new Date()
     );
     
     setActiveSubscription(active || null);
   }, [subscriptions]);
+
+  // Process dogs data
+  const dogsList = Array.isArray(dogs) ? dogs : (dogs as any)?.data || [];
+
+  // Check if owner has no dogs yet
+  const hasDogs = dogsList && dogsList.length > 0;
+  
+  // Check if owner has active subscription
+  const hasActiveSubscription = activeSubscription !== null;
+  
+  // Check if owner has upcoming walks
+  const hasUpcomingWalks = upcomingWalks && upcomingWalks.length > 0;
 
   // Debug info logging
   useEffect(() => {
@@ -218,17 +208,8 @@ export default function OwnerDashboardPage() {
   // Determine loading state
   const isLoading = isLoadingDogs || isLoadingOwner || isLoadingSubscriptions || isLoadingWalks;
 
-  // Check if owner has no dogs yet
-  const hasDogs = dogs && dogs.length > 0;
-  
-  // Check if owner has active subscription
-  const hasActiveSubscription = activeSubscription !== null;
-  
-  // Check if owner has upcoming walks
-  const hasUpcomingWalks = upcomingWalks && upcomingWalks.length > 0;
-
   return (
-    <RouteGuard requiredPermission={{ action: 'view', resource: 'owner_dashboard' }}>
+    <RouteGuard requiredPermission={{ action: 'access', resource: 'owner-dashboard' }}>
       <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {/* Debug Panel */}
         {showDebugPanel && (
@@ -256,13 +237,13 @@ export default function OwnerDashboardPage() {
                 </pre>
               </div>
               <div>
-                <h3 className="text-xs font-semibold mb-1">Dogs ({dogs.length})</h3>
+                <h3 className="text-xs font-semibold mb-1">Dogs ({dogsList.length})</h3>
                 <pre className="text-xs bg-white p-2 rounded overflow-auto max-h-32">
-                  {JSON.stringify(dogs.map(d => ({ id: d.id, name: d.name, ownerId: d.ownerId })), null, 2)}
+                  {JSON.stringify(dogsList.map((d: Dog) => ({ id: d.id, name: d.name, ownerId: d.ownerId })), null, 2)}
                 </pre>
               </div>
               <div>
-                <h3 className="text-xs font-semibold mb-1">Subscriptions ({subscriptions.length})</h3>
+                <h3 className="text-xs font-semibold mb-1">Subscriptions ({Array.isArray(subscriptions) ? subscriptions.length : 0})</h3>
                 <pre className="text-xs bg-white p-2 rounded overflow-auto max-h-32">
                   {JSON.stringify(subscriptions, null, 2)}
                 </pre>
@@ -287,7 +268,7 @@ export default function OwnerDashboardPage() {
         
         {/* Welcome Section */}
         <WelcomeCard 
-          name={ownerProfile?.name || user?.name || 'Pet Owner'} 
+          name={(ownerProfile as Owner)?.name || (ownerProfile as Owner)?.email || user?.name || 'Pet Owner'} 
           isLoading={isLoadingOwner}
         />
         
@@ -306,7 +287,8 @@ export default function OwnerDashboardPage() {
                     {dogsError instanceof Error ? dogsError.message : 
                      ownerError instanceof Error ? ownerError.message : 
                      subscriptionsError instanceof Error ? subscriptionsError.message : 
-                     walksError}
+                     walksError instanceof Error ? walksError.message : 
+                     'An error occurred while loading dashboard data'}
                   </p>
                   <button
                     onClick={() => window.location.reload()}
@@ -336,7 +318,7 @@ export default function OwnerDashboardPage() {
                   <div className="p-4 sm:p-6">
                     {hasDogs ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {dogs.slice(0, 4).map((dog) => (
+                        {dogsList.slice(0, 4).map((dog: Dog) => (
                           <DogCard key={dog.id} dog={dog} />
                         ))}
                       </div>

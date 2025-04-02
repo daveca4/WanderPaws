@@ -76,37 +76,60 @@ export interface TimeSlot {
 
 export interface Walk {
   id: string;
+  date: string;
+  timeSlot: string;
+  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled' | 'pending' | 'confirmed';
+  // Timing properties
+  startTime: string;
+  duration: number;
+  // Optional relationship fields
   dogId: string;
   walkerId: string;
-  date: string; // ISO date string
-  startTime: string; // In 24-hour format, e.g., "14:30"
-  timeSlot: 'AM' | 'PM'; // Morning or afternoon time slot
-  duration: number; // In minutes
-  status: 'scheduled' | 'completed' | 'cancelled';
-  notes?: string;
-  route?: {
+  ownerId?: string;
+  // Optional display names
+  dogName?: string;
+  walkerName?: string;
+  // Optional nested objects
+  dog?: {
+    id: string;
     name: string;
-    coordinates: [number, number][]; // Array of [longitude, latitude] coordinates
+    breed?: string;
+    profileImage?: string;
   };
+  walker?: {
+    id: string;
+    name: string;
+    profileImage?: string;
+  };
+  // Route information
+  route?: {
+    id: string;
+    name: string;
+    distance: number;
+    coordinates: [number, number][];
+  };
+  // Notes for the walk
+  notes?: string;
+  // Feedback properties
   feedback?: {
-    rating: number;
-    comment: string;
-    timestamp: string; // ISO date string
+    rating?: number;
+    comment?: string;
+    createdAt?: string;
+    timestamp?: string;
   };
+  // Metrics for completed walks
   metrics?: {
-    distanceCovered: number; // In kilometers
-    totalTime: number; // In minutes (may differ from scheduled duration)
-    poopCount: number;
-    peeCount: number;
-    moodRating: 1 | 2 | 3 | 4 | 5;
-    behaviorsObserved: string[];
+    distance?: number;
+    duration?: number;
+    steps?: number;
+    // Enhanced metrics
+    distanceCovered?: number;
+    totalTime?: number;
+    poopCount?: number;
+    peeCount?: number;
+    moodRating?: number;
+    behaviorsObserved?: string[];
   };
-  // Track if this walk is part of a subscription
-  subscriptionId?: string;
-  
-  // Include optional nested related objects when included from API
-  dog?: Dog;
-  walker?: Walker;
 }
 
 export interface AIRecommendationData {
@@ -176,15 +199,13 @@ export type Role = 'admin' | 'walker' | 'owner';
 export interface User {
   id: string;
   email: string;
-  name?: string;         // User's name
-  passwordHash: string; // In a real app, we would never expose this
-  role: Role;
-  emailVerified: boolean;
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
-  lastLogin?: string; // ISO date string
-  profileId?: string; // ID of the related profile (owner or walker)
-  image?: string;     // User's profile image URL
+  name?: string;
+  role: 'owner' | 'walker' | 'admin';
+  profileId?: string;
+  createdAt?: string;
+  profileImage?: string;
+  emailVerified?: boolean;
+  image?: string;
 }
 
 export interface Permission {
@@ -256,18 +277,37 @@ export type AssessmentStatus =
 
 export interface Assessment {
   id: string;
-  dogId: string;
+  // References
+  walkerId: string;
+  dogId: string; 
   ownerId: string;
-  createdDate: string;
-  scheduledDate: string;
   assignedWalkerId?: string;
-  status: AssessmentStatus;
-  result?: 'approved' | 'denied' | null;
+  // Properties
+  dogTypes: string[];
+  experience: number;
+  notes?: string;
   adminNotes?: string;
-  resultNotes?: string;
-  feedback?: AssessmentFeedback;
+  // Dates
   createdAt: string;
-  updatedAt: string;
+  scheduledDate?: string;
+  createdDate?: string; // For backward compatibility, use createdAt instead
+  // Status and results
+  status: 'pending' | 'approved' | 'denied' | 'scheduled' | 'completed' | 'feedback_submitted' | 'ready_for_review';
+  result?: 'approved' | 'denied';
+  // Feedback details
+  feedback?: {
+    id: string;
+    strengths: string[];
+    concerns: string[];
+    recommendations?: string;
+    submittedDate?: string;
+  };
+  // Relationships
+  walker?: {
+    id: string;
+    name: string;
+    profileImage?: string;
+  };
 }
 
 export interface AssessmentFeedback {
@@ -399,4 +439,26 @@ export interface HolidayRequest {
   reason: string;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface Location {
+  id: string;
+  walkId: string;
+  latitude: number;
+  longitude: number;
+  timestamp: string;
+}
+
+// Add DogWalkStatus interface used in group walks
+export interface DogWalkStatus {
+  id: string;
+  dogId: string;
+  walkerId: string;
+  date: string;
+  startTime: string;
+  timeSlot: 'AM' | 'PM';
+  duration: number;
+  dog: Dog;
+  walkStatus: 'pending' | 'picked_up' | 'dropped_off' | 'absent';
+  notes?: string;
 } 

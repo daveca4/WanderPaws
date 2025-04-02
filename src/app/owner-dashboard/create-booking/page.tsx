@@ -7,6 +7,12 @@ import { format, addDays, isBefore, parseISO, differenceInDays } from 'date-fns'
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
 import { useOwnerDogs, useEnsureOwnerProfile, useOwnerByUserId, useUserSubscriptions } from '@/lib/hooks/useDataHooks';
+import { 
+  useDogAvailability, 
+  useDogAvailabilityRange, 
+  useCreateBooking,
+  DateRange
+} from '@/lib/hooks/useBookingHooks';
 import { Dog, Owner } from '@/lib/types';
 import { api } from '@/lib/api/client';
 
@@ -33,51 +39,47 @@ export default function CreateBookingPage() {
   // Use React Query hooks for data
   const { 
     data: dogs = [], 
-    isLoading: isLoadingDogs, 
+    isPending: isLoadingDogs, 
     error: dogsError,
     refetch: refetchDogs
   } = useOwnerDogs();
   
   const {
     data: userSubscriptions = [],
-    isLoading: isLoadingSubscriptions
+    isPending: isLoadingSubscriptions
   } = useUserSubscriptions();
   
   const {
     data: ownerProfile,
-    isLoading: isLoadingOwner,
+    isPending: isLoadingOwner,
     error: ownerError
   } = useOwnerByUserId();
   
   const {
     mutate: ensureOwnerProfile,
-    isLoading: isCreatingProfile
+    isPending: isCreatingProfile,
+    isSuccess: isProfileCreated
   } = useEnsureOwnerProfile();
 
   // Print on component mount
   useEffect(() => {
     console.log('🔵 BOOKING PAGE MOUNTED');
-    setIsLoading(true); // Start loading state
   }, []);
 
   // Basic state management
   const [selectedDog, setSelectedDog] = useState<Dog | null>(null);
   const [walkerName, setWalkerName] = useState('');
   
-  const [availableDates, setAvailableDates] = useState<DateAvailability[]>([]);
   const [selectedDate, setSelectedDate] = useState('');
-  
   const [timeSlot, setTimeSlot] = useState(''); // 'morning' or 'afternoon'
   const [notes, setNotes] = useState('');
   
   // Recurring booking options
   const [isRecurring, setIsRecurring] = useState(false);
-  const [frequency, setFrequency] = useState('weekly');
+  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly'>('weekly');
   const [endDate, setEndDate] = useState('');
   
   // UI state
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   
@@ -86,6 +88,62 @@ export default function CreateBookingPage() {
   const [remainingCredits, setRemainingCredits] = useState(0);
 
   const [showAdvancedDebug, setShowAdvancedDebug] = useState(false);
+
+  // Create date range for availability
+  const startDate = format(new Date(), 'yyyy-MM-dd');
+  const rangeEndDate = format(addDays(new Date(), 30), 'yyyy-MM-dd');
+  const dateRange: DateRange = { startDate, endDate: rangeEndDate };
+
+  // Use React Query for availability data
+  const {
+    data: availabilityData,
+    isPending: isLoadingAvailability,
+  } = useDogAvailabilityRange(selectedDog?.id || '', dateRange);
+
+  // Process availability data
+  const availableDates = React.useMemo(() => {
+    if (!availabilityData?.availability) return [];
+    return processAvailabilityData(availabilityData.availability);
+  }, [availabilityData]);
+
+  // Set walker name when availability data changes
+  useEffect(() => {
+    if (availabilityData?.walkerName) {
+      setWalkerName(availabilityData.walkerName);
+    }
+  }, [availabilityData]);
+
+  // Use the booking mutation
+  const { 
+    mutate: createBooking, 
+    isPending: isSubmitting, 
+    isSuccess: isBookingSuccess,
+    error: bookingError
+  } = useCreateBooking();
+
+  // Handle profile creation success
+  useEffect(() => {
+    if (isProfileCreated) {
+      refetchDogs();
+    }
+  }, [isProfileCreated, refetchDogs]);
+
+  // Handle booking success
+  useEffect(() => {
+    if (isBookingSuccess) {
+      setSuccessMessage('Your walk has been booked successfully!');
+      setTimeout(() => {
+        router.push('/owner-dashboard/bookings');
+      }, 2000);
+    }
+  }, [isBookingSuccess, router]);
+
+  // Set error message when booking fails
+  useEffect(() => {
+    if (bookingError) {
+      setError(bookingError instanceof Error ? bookingError.message : 'Failed to create booking');
+    }
+  }, [bookingError]);
 
   // Debug logging
   useEffect(() => {
@@ -100,61 +158,14 @@ export default function CreateBookingPage() {
   const handleDogChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const dogId = event.target.value;
     console.log('CreateBooking - Dog selected:', dogId);
-    const selectedDog = dogs.find(dog => dog.id === dogId) || null;
+    
+    // Add type handling for dogs data
+    const dogsArray = Array.isArray(dogs) ? dogs : dogs?.data || [];
+    const selectedDog = dogsArray.find(dog => dog.id === dogId) || null;
     setSelectedDog(selectedDog);
     setSelectedDate('');
     setTimeSlot('');
-    setAvailableDates([]);
   };
-
-  // When dog is selected, fetch available dates
-  useEffect(() => {
-    const fetchAvailableDates = async () => {
-      if (!selectedDog) {
-        console.log('CreateBooking - No dog selected, skipping availability fetch');
-        return;
-      }
-      
-      setIsLoading(true);
-      try {
-        console.log('CreateBooking - Fetching availability for dog:', selectedDog.id);
-        
-        // Get a 30-day range for availability
-        const startDate = format(new Date(), 'yyyy-MM-dd');
-        const endDate = format(addDays(new Date(), 30), 'yyyy-MM-dd');
-        
-        const response = await api.get<any>(
-          `/api/walks/availability/range?dogId=${selectedDog.id}&startDate=${startDate}&endDate=${endDate}`
-        );
-        
-        if (!response.ok) {
-          throw new Error(response.error || 'Failed to fetch availability');
-        }
-        
-        const data = response.data;
-        console.log('CreateBooking - Availability data:', data);
-        
-        // Extract available dates from the API response
-        const dates = processAvailabilityData(data.availability || {});
-        setAvailableDates(dates);
-        
-        // Set walker name if available
-        if (data.walkerName) {
-          setWalkerName(data.walkerName);
-        }
-        
-        setIsLoading(false);
-      } catch (error) {
-        console.error('CreateBooking - Error fetching availability:', error);
-        setError('Could not load available dates. Please try again later.');
-        setIsLoading(false);
-      }
-    };
-
-    if (selectedDog) {
-      fetchAvailableDates();
-    }
-  }, [selectedDog, user]);
 
   // Load user's subscription and credits
   useEffect(() => {
@@ -274,41 +285,20 @@ export default function CreateBookingPage() {
       return;
     }
     
-    setIsSubmitting(true);
     setError('');
     
-    try {
-      // Prepare booking data
-      const bookingData = {
-        dogId: selectedDog.id,
-        date: selectedDate,
-        timeSlot: timeSlot,
-        notes: notes,
-        isRecurring: isRecurring,
-        frequency: isRecurring ? frequency : undefined,
-        endDate: isRecurring ? endDate : undefined
-      };
-      
-      // Call the API to create the booking
-      const response = await api.post<any>('/api/walks', bookingData);
-      
-      if (!response.ok) {
-        throw new Error(response.error || 'Failed to create booking');
-      }
-      
-      console.log('Booking created successfully:', response.data);
-      
-      // Show success message and reset form or redirect
-      setSuccessMessage('Your walk has been booked successfully!');
-      setTimeout(() => {
-        router.push('/owner-dashboard/bookings');
-      }, 2000);
-    } catch (error) {
-      console.error('Error creating booking:', error);
-      setError(error instanceof Error ? error.message : 'Failed to create booking');
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Prepare booking data and use React Query mutation
+    const bookingData = {
+      dogId: selectedDog.id,
+      date: selectedDate,
+      timeSlot: timeSlot,
+      notes: notes,
+      isRecurring: isRecurring,
+      frequency: isRecurring ? frequency : undefined,
+      endDate: isRecurring ? endDate : undefined
+    };
+    
+    createBooking(bookingData);
   };
 
   // Handle ensuring user has owner profile
@@ -367,16 +357,15 @@ export default function CreateBookingPage() {
         </div>
         
         <div>
-          <h4 className="font-semibold mb-1">Dogs ({dogs.length})</h4>
+          <h4 className="font-semibold mb-1">Dogs ({Array.isArray(dogs) ? dogs.length : (dogs?.data?.length || 0)})</h4>
           <pre className="bg-white rounded border p-2 overflow-auto max-h-36">
             {JSON.stringify(
-              dogs.map(dog => ({
+              (Array.isArray(dogs) ? dogs : dogs?.data || []).map((dog: any) => ({
                 id: dog.id,
                 name: dog.name,
                 ownerId: dog.ownerId
-              })),
-              null, 2
-            )}
+              }))
+            , null, 2)}
           </pre>
         </div>
         
@@ -461,7 +450,7 @@ export default function CreateBookingPage() {
                     {isCreatingProfile ? 'Creating Profile...' : 'Set Up Profile'}
                   </button>
                 </div>
-              ) : dogs.length === 0 ? (
+              ) : Array.isArray(dogs) ? dogs.length : (dogs?.data?.length || 0) === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-gray-600 mb-4">You haven't added any dogs yet.</p>
                   <Link
@@ -484,7 +473,7 @@ export default function CreateBookingPage() {
                     required
                   >
                     <option value="">Select a dog</option>
-                    {dogs.map(dog => (
+                    {(Array.isArray(dogs) ? dogs : dogs?.data || []).map(dog => (
                       <option key={dog.id} value={dog.id}>
                         {dog.name}
                       </option>
@@ -506,7 +495,7 @@ export default function CreateBookingPage() {
               
               {!selectedDog ? (
                 <p className="text-sm text-gray-500">Please select a dog first</p>
-              ) : isLoading ? (
+              ) : isLoadingAvailability ? (
                 <div className="text-center py-4">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
                   <p className="mt-2 text-sm text-gray-500">Loading available dates...</p>
@@ -628,7 +617,7 @@ export default function CreateBookingPage() {
                         <select
                           id="frequencySelect"
                           value={frequency}
-                          onChange={(e) => setFrequency(e.target.value)}
+                          onChange={(e) => setFrequency(e.target.value as 'daily' | 'weekly' | 'biweekly' | 'monthly')}
                           className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                           required={isRecurring}
                         >

@@ -1,81 +1,134 @@
-import { QueryClient } from 'react-query';
-import { getCurrentUser } from './auth';
+import { QueryClient } from '@tanstack/react-query';
 
-// Predefined query keys to maintain consistency
+// Helper for auth headers to standardize auth for all API calls
+export function getAuthHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') {
+    return {};
+  }
+  
+  // Get user from localStorage
+  try {
+    const storedUser = localStorage.getItem('wanderpaws_user');
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      const headers: Record<string, string> = {};
+      
+      if (user.id) headers['user-id'] = user.id;
+      if (user.role) headers['user-role'] = user.role;
+      if (user.profileId) headers['user-profile-id'] = user.profileId;
+      
+      return headers;
+    }
+    
+    // Fallback to 'user' key
+    const userJson = localStorage.getItem('user');
+    if (!userJson) {
+      return {};
+    }
+
+    const user = JSON.parse(userJson);
+    if (!user || !user.token) {
+      return {};
+    }
+
+    return {
+      'Authorization': `Bearer ${user.token}`
+    };
+  } catch (e) {
+    console.error('Error getting auth headers:', e);
+    return {};
+  }
+}
+
+// Define standard query keys for cache management
 export const queryKeys = {
+  // Dog-related queries
   dogs: {
     all: () => ['dogs'],
-    byOwner: (ownerId: string) => [...queryKeys.dogs.all(), 'owner', ownerId],
-    byId: (id: string) => [...queryKeys.dogs.all(), id],
-    list: (filters?: any) => [...queryKeys.dogs.all(), 'list', filters]
+    byId: (id: string) => ['dogs', id],
+    byWalker: (walkerId: string) => ['dogs', 'walker', walkerId],
+    list: (params?: Record<string, any>) => ['dogs', 'list', params],
   },
+  
+  // Owner-related queries
   owners: {
     all: () => ['owners'],
-    byUser: (userId: string) => [...queryKeys.owners.all(), 'user', userId],
-    byId: (id: string) => [...queryKeys.owners.all(), id],
-    profile: () => [...queryKeys.owners.all(), 'profile']
+    byId: (id: string) => ['owners', 'id', id],
+    byUser: (userId: string) => ['owners', 'user', userId],
   },
+  
+  // Walker-related queries
   walkers: {
     all: () => ['walkers'],
-    byId: (id: string) => [...queryKeys.walkers.all(), id]
+    byId: (id: string) => ['walkers', 'id', id],
+    byUser: (userId: string) => ['walkers', 'user', userId],
+    nearby: (lat: number, lng: number) => ['walkers', 'nearby', lat, lng],
   },
+  
+  // Walk-related queries
   walks: {
     all: () => ['walks'],
-    byDog: (dogId: string) => [...queryKeys.walks.all(), 'dog', dogId],
-    byWalker: (walkerId: string) => [...queryKeys.walks.all(), 'walker', walkerId]
+    byId: (id: string) => ['walks', id],
+    byDog: (dogId: string) => ['walks', 'dog', dogId],
+    byWalker: (walkerId: string) => ['walks', 'walker', walkerId],
+    upcoming: (profileId?: string) => ['walks', 'upcoming', profileId],
+    completed: (profileId?: string) => ['walks', 'completed', profileId],
+    availability: (dogId: string, date: string) => ['walks', 'availability', dogId, date],
+    locations: (walkId: string) => ['walks', walkId, 'locations'],
   },
+  
+  // Assessment-related queries
   assessments: {
     all: () => ['assessments'],
-    byDog: (dogId: string) => [...queryKeys.assessments.all(), 'dog', dogId]
+    byDog: (dogId: string) => ['assessments', 'dog', dogId],
+    byId: (id: string) => ['assessments', 'id', id],
+    byWalker: (walkerId?: string) => walkerId 
+      ? ['assessments', 'walker', walkerId]
+      : ['assessments', 'walker'],
+    pending: () => ['assessments', 'pending'],
   },
+  
+  // Subscription-related queries
   subscriptions: {
     plans: () => ['subscriptions', 'plans'],
-    userSubscriptions: () => ['subscriptions', 'user']
-  }
+    userSubscriptions: () => ['subscriptions', 'user'],
+  },
+  
+  // User-related queries
+  users: {
+    all: () => ['users'],
+    byId: (id: string) => ['users', 'id', id],
+    current: () => ['users', 'current'],
+  },
+  
+  // Admin-specific queries
+  admin: {
+    analytics: () => ['admin', 'analytics'],
+    dashboard: () => ['admin', 'dashboard'],
+    users: (filters?: Record<string, any>) => ['admin', 'users', filters],
+    walkers: (filters?: Record<string, any>) => ['admin', 'walkers', filters],
+    owners: (filters?: Record<string, any>) => ['admin', 'owners', filters],
+    walks: (filters?: Record<string, any>) => ['admin', 'walks', filters],
+    pendingAssessments: () => ['admin', 'pendingAssessments'],
+    subscriptions: (filters?: Record<string, any>) => ['admin', 'subscriptions', filters],
+  },
 };
 
-// Helper function to get auth headers for queries
-export const getAuthHeaders = () => {
-  const user = getCurrentUser();
-  if (!user) return {};
-  
-  const headers: Record<string, string> = {
-    'user-id': user.id,
-    'user-role': user.role || '',
-  };
-  
-  if (user.profileId) {
-    headers['user-profile-id'] = user.profileId;
-  }
-  
-  return headers;
-};
-
-// Configure default QueryClient with error handling and retries
-export const createQueryClient = () => {
+// Create a queryClient with default options
+export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
+        staleTime: 30 * 1000, // 30 seconds
+        gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+        retry: 1,
         refetchOnWindowFocus: false,
-        retry: (failureCount, error: any) => {
-          // Don't retry on 401/403/404
-          if (error?.status === 401 || error?.status === 403 || error?.status === 404) {
-            return false;
-          }
-          // Retry other errors up to 2 times
-          return failureCount < 2;
-        },
-        staleTime: 30000, // 30 seconds before data is considered stale
-        cacheTime: 5 * 60 * 1000, // 5 minutes before unused data is garbage collected
-        onError: (error: any) => {
-          console.error('Query error:', error);
-        }
+        throwOnError: false,
       },
       mutations: {
-        onError: (error: any) => {
-          console.error('Mutation error:', error);
-        }
-      }
-    }
+        throwOnError: false,
+        retry: 0,
+      },
+    },
   });
-}; 
+} 

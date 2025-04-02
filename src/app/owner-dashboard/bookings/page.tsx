@@ -1,74 +1,38 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import RouteGuard from '@/components/RouteGuard';
 import { useAuth } from '@/lib/AuthContext';
-import { useData } from '@/lib/DataContext';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { Walk as BaseWalk } from '@/lib/types';
-
-// Extended Walk interface with the properties we need
-interface ExtendedWalk {
-  id: string;
-  dogId: string;
-  walkerId: string;
-  date: string; // ISO date string
-  startTime: string; // In 24-hour format, e.g., "14:30"
-  timeSlot: 'AM' | 'PM'; // Morning or afternoon time slot
-  duration: number; // In minutes
-  status: 'scheduled' | 'completed' | 'cancelled' | 'pending' | 'confirmed' | 'in_progress';
-  notes?: string;
-  route?: {
-    name: string;
-    coordinates: [number, number][]; // Array of [longitude, latitude] coordinates
-  };
-  feedback?: {
-    rating: number;
-    comment: string;
-    timestamp: string; // ISO date string
-  };
-  metrics?: {
-    distanceCovered: number; // In kilometers
-    totalTime: number; // In minutes (may differ from scheduled duration)
-    poopCount: number;
-    peeCount: number;
-    moodRating: 1 | 2 | 3 | 4 | 5;
-    behaviorsObserved: string[];
-  };
-  subscriptionId?: string;
-  // Additional fields needed for UI
-  dogs?: Array<{
-    id: string;
-    name: string;
-    profileImage?: string;
-    ownerId?: string;
-  }>;
-  walkerName?: string;
-  ownerId?: string;
-}
+import { Walk } from '@/lib/types';
+import { useUpcomingWalks, useCancelWalk } from '@/lib/hooks/useBookingHooks';
 
 export default function BookingsPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const { walks, refreshData } = useData();
-  const [isLoading, setIsLoading] = useState(true);
-  const [userWalks, setUserWalks] = useState<ExtendedWalk[]>([]);
-
-  // Filter walks by user when data is available
-  useEffect(() => {
-    setIsLoading(true);
-    if (user && walks && walks.length > 0) {
-      const filteredWalks = walks.filter((walk: ExtendedWalk) => 
-        walk.ownerId === user.profileId || 
-        walk.dogs?.some((dog) => dog.ownerId === user.profileId)
-      );
-      setUserWalks(filteredWalks);
-    }
-    setIsLoading(false);
-  }, [user, walks]);
+  
+  // Use React Query hooks
+  const { 
+    data: walks = [], 
+    isPending, 
+    error, 
+    refetch 
+  } = useUpcomingWalks();
+  
+  // Convert error to string for display
+  const errorMessage = error 
+    ? error instanceof Error 
+      ? error.message 
+      : 'Failed to load walks'
+    : '';
+  
+  const {
+    mutate: cancelWalk,
+    isPending: isCancelling
+  } = useCancelWalk();
 
   // Function to format date
   const formatDate = (dateString: string): string => {
@@ -107,6 +71,13 @@ export default function BookingsPage() {
         return 'bg-gray-100 text-gray-800';
     }
   };
+  
+  // Handle cancellation
+  const handleCancelWalk = (walkId: string) => {
+    if (window.confirm('Are you sure you want to cancel this walk?')) {
+      cancelWalk({ walkId });
+    }
+  };
 
   return (
     <RouteGuard requiredPermission={{ action: 'read', resource: 'walks' }}>
@@ -124,52 +95,54 @@ export default function BookingsPage() {
           </Link>
         </div>
 
-        {isLoading ? (
+        {errorMessage && (
+          <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-md">
+            {errorMessage}
+          </div>
+        )}
+
+        {isPending ? (
           <div className="flex justify-center py-12">
             <LoadingSpinner />
           </div>
-        ) : userWalks.length > 0 ? (
+        ) : walks.length > 0 ? (
           <div className="bg-white shadow overflow-hidden sm:rounded-md">
             <ul className="divide-y divide-gray-200">
-              {userWalks.map((walk) => (
+              {walks.map((walk) => (
                 <li key={walk.id}>
                   <div className="px-4 py-4 sm:px-6">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
-                          {walk.dogs && walk.dogs[0]?.profileImage ? (
-                            <Image
-                              src={walk.dogs[0].profileImage}
-                              alt={walk.dogs[0].name}
-                              width={40}
-                              height={40}
-                              className="rounded-full"
-                            />
+                        <div className="flex-shrink-0 w-10 h-10 bg-cover bg-center rounded-full overflow-hidden border border-gray-200">
+                          {walk.dog?.profileImage ? (
+                            <img src={walk.dog.profileImage} alt={walk.dog.name} className="w-full h-full object-cover" />
                           ) : (
-                            <svg className="h-6 w-6 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                            </svg>
+                            <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                              </svg>
+                            </div>
                           )}
                         </div>
                         <div className="ml-4">
                           <h2 className="text-sm font-medium text-gray-900">
-                            {walk.dogs ? walk.dogs.map(dog => dog.name).join(', ') : 'Unknown Dog'}
+                            {walk.dogName || walk.dog?.name || 'Unknown Dog'}
                           </h2>
                           <div className="flex items-center mt-1">
                             <svg className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                               <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
                             </svg>
                             <p className="text-xs text-gray-500">
-                              {walk.date ? formatDate(walk.date) : 'Date not set'} at {walk.startTime ? formatTime(walk.startTime) : 'Time not set'}
+                              {walk.date ? formatDate(walk.date) : 'Date not set'} {walk.timeSlot && `(${walk.timeSlot})`}
                             </p>
                           </div>
-                          {walk.walkerName && (
+                          {(walk.walkerName || walk.walker?.name) && (
                             <div className="flex items-center mt-1">
                               <svg className="flex-shrink-0 mr-1.5 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
                               </svg>
                               <p className="text-xs text-gray-500">
-                                Walker: {walk.walkerName}
+                                Walker: {walk.walkerName || walk.walker?.name}
                               </p>
                             </div>
                           )}
@@ -180,13 +153,22 @@ export default function BookingsPage() {
                           {walk.status === 'in_progress' ? 'In Progress' : 
                            walk.status.charAt(0).toUpperCase() + walk.status.slice(1).replace('_', ' ')}
                         </span>
-                        <div className="mt-2">
+                        <div className="mt-2 flex space-x-2">
                           <Link
-                            href={`/owner-dashboard/dogs/${walk.dogs?.[0]?.id}/walks/${walk.id}`}
+                            href={`/owner-dashboard/dogs/${walk.dogId}/walks/${walk.id}`}
                             className="text-xs text-primary-600 hover:text-primary-900"
                           >
                             View details
                           </Link>
+                          {(walk.status === 'pending' || walk.status === 'confirmed' || walk.status === 'scheduled') && (
+                            <button
+                              onClick={() => handleCancelWalk(walk.id)}
+                              disabled={isCancelling}
+                              className="text-xs text-red-600 hover:text-red-900 disabled:opacity-50"
+                            >
+                              Cancel
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -219,6 +201,4 @@ export default function BookingsPage() {
       </div>
     </RouteGuard>
   );
-}
-
-
+} 

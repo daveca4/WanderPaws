@@ -16,8 +16,7 @@ export default function MessagesPage() {
   const { 
     conversations, 
     currentConversation, 
-    setCurrentConversation, 
-    isLoading 
+    setCurrentConversation 
   } = useMessages();
 
   // Set the current conversation based on the URL parameter
@@ -53,7 +52,6 @@ export default function MessagesPage() {
             <ConversationList
               conversations={conversations}
               currentConversationId={currentConversation?.id}
-              isLoading={isLoading}
             />
           </div>
 

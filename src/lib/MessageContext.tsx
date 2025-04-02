@@ -11,6 +11,9 @@ interface MessageContextType {
   unreadCount: number;
   activeConversationId: string | null;
   setActiveConversationId: (id: string | null) => void;
+  currentConversation: Conversation | null;
+  setCurrentConversation: (conversation: Conversation | null) => void;
+  isLoading: boolean;
   sendMessage: (conversationId: string, content: string) => Promise<void>;
   markAsRead: (messageIds: string[]) => Promise<void>;
   createConversation: (participants: string[], initialMessage?: string) => Promise<string>;
@@ -24,10 +27,14 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [messages, setMessages] = useState<Message[]>([]);
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [currentConversation, setCurrentConversation] = useState<Conversation | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   
   // Load messages and conversations directly from API instead of via DataContext
   useEffect(() => {
     if (!user) return;
+    
+    setIsLoading(true);
     
     // Fetch conversations
     const fetchConversations = async () => {
@@ -39,6 +46,8 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children })
         }
       } catch (error) {
         console.error('Error fetching conversations:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -199,6 +208,9 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({ children })
         unreadCount,
         activeConversationId,
         setActiveConversationId,
+        currentConversation,
+        setCurrentConversation,
+        isLoading,
         sendMessage,
         markAsRead,
         createConversation,

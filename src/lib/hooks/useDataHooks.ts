@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client';
-import { queryKeys } from '../queryClient';
+import { queryKeys, getAuthHeaders } from '@/lib/queryClient';
 import { Dog, Owner, Walker, Walk, Assessment, UserSubscription, SubscriptionPlan } from '../types';
 import { useAuth } from '../AuthContext';
 
@@ -15,158 +15,113 @@ type UserSubscriptionsResponse = { subscriptions: UserSubscription[] };
 
 // Hook for fetching all dogs
 export function useDogs() {
-  return useQuery<DogsResponse, Error>(
-    queryKeys.dogs.all(),
-    async () => {
+  return useQuery({
+    queryKey: queryKeys.dogs.all(),
+    queryFn: async () => {
       const response = await api.get<DogsResponse>('/api/data/dogs');
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch dogs');
       }
       return response.data;
     },
-    {
-      staleTime: 1 * 60 * 1000, // 1 minute
-    }
-  );
+    staleTime: 1 * 60 * 1000, // 1 minute
+  });
 }
 
 // Hook for fetching dogs by owner ID
-export function useOwnerDogs(ownerId?: string) {
+export const useOwnerDogs = () => {
   const { user } = useAuth();
   
-  return useQuery<DogsResponse, Error>(
-    queryKeys.dogs.byOwner(ownerId || 'current'),
-    async () => {
-      // If no ownerId provided, but user has profileId, use that
-      const effectiveOwnerId = ownerId || user?.profileId;
-      
-      if (!effectiveOwnerId) {
-        console.log('No owner ID available for dog fetch');
+  return useQuery({
+    queryKey: queryKeys.dogs.list({ ownerId: user?.profileId }),
+    queryFn: async () => {
+      if (!user?.profileId) {
         return [];
       }
-      
-      const response = await api.get<DogsResponse>(`/api/data/owners/${effectiveOwnerId}/dogs`);
-      
-      if (!response.ok) {
-        // If we get a 404, just return an empty array rather than error
-        if (response.status === 404) {
-          console.log('Owner not found, returning empty dogs array');
-          return [];
-        }
-        throw new Error(response.error || `Failed to fetch dogs for owner ${effectiveOwnerId}`);
-      }
-      
-      return response.data;
+      const result = await api.get<{data: Dog[]}>(`/api/owners/${user.profileId}/dogs`);
+      return result.data || [];
     },
-    {
-      // Only run query if we have a user or ownerId
-      enabled: !!(ownerId || user?.profileId),
-      
-      // Keep previous data while loading new data
-      keepPreviousData: true,
-      
-      // Log details about the response
-      onSuccess: (data) => {
-        console.log(`Found ${data.length} dogs for owner ${ownerId || user?.profileId}`);
-      }
-    }
-  );
-}
+    enabled: !!user?.profileId,
+  });
+};
 
 // Hook for fetching a single dog
 export function useDog(id?: string) {
-  return useQuery<Dog, Error>(
-    queryKeys.dogs.byId(id || ''),
-    async () => {
+  return useQuery({
+    queryKey: queryKeys.dogs.byId(id || ''),
+    queryFn: async () => {
       const response = await api.get<Dog>(`/api/data/dogs/${id}`);
       if (!response.ok) {
         throw new Error(response.error || `Failed to fetch dog ${id}`);
       }
       return response.data;
     },
-    {
-      enabled: !!id,
-    }
-  );
+    enabled: !!id,
+  });
 }
 
 // Hook for creating a dog
 export function useCreateDog() {
   const queryClient = useQueryClient();
   
-  return useMutation<Dog, Error, Omit<Dog, 'id'>>(
-    async (newDog) => {
+  return useMutation({
+    mutationFn: async (newDog: Omit<Dog, 'id'>) => {
       const response = await api.post<Dog>('/api/data/dogs', newDog);
       if (!response.ok) {
         throw new Error(response.error || 'Failed to create dog');
       }
       return response.data;
     },
-    {
-      onSuccess: (data, variables, context) => {
-        // Invalidate all dog queries to refetch
-        queryClient.invalidateQueries(queryKeys.dogs.all());
-        
-        // If we know this dog's owner, invalidate that specific owner's dogs
-        if (data.ownerId) {
-          queryClient.invalidateQueries(queryKeys.dogs.byOwner(data.ownerId));
-        }
+    onSuccess: (data: Dog) => {
+      // Invalidate all dog queries to refetch
+      queryClient.invalidateQueries({ queryKey: queryKeys.dogs.all() });
+      
+      // If we know this dog's owner, invalidate that specific owner's dogs
+      if (data.ownerId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.dogs.list({ ownerId: data.ownerId }) });
       }
     }
-  );
+  });
 }
 
 // Hook for updating a dog
-export function useUpdateDog() {
+export const useUpdateDog = () => {
   const queryClient = useQueryClient();
   
-  return useMutation<
-    Dog,
-    Error,
-    { id: string; data: Partial<Dog> }
-  >(
-    async ({ id, data }) => {
-      const response = await api.patch<Dog>(`/api/data/dogs/${id}`, data);
-      if (!response.ok) {
-        throw new Error(response.error || `Failed to update dog ${id}`);
-      }
-      return response.data;
+  return useMutation({
+    mutationFn: async (updatedDog: Partial<Dog> & { id: string }) => {
+      const result = await api.put<{data: Dog}>(`/api/dogs/${updatedDog.id}`, updatedDog);
+      return result.data.data;
     },
-    {
-      onSuccess: (data) => {
-        // Update cache for this specific dog
-        queryClient.setQueryData(queryKeys.dogs.byId(data.id), data);
-        
-        // Invalidate any dog lists that might include this dog
-        queryClient.invalidateQueries(queryKeys.dogs.all());
-        queryClient.invalidateQueries(queryKeys.dogs.byOwner(data.ownerId));
-      }
-    }
-  );
-}
+    onSuccess: (data: Dog, variables: Partial<Dog> & { id: string }) => {
+      // Invalidate and refetch
+      queryClient.invalidateQueries({ queryKey: queryKeys.dogs.byId(variables.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dogs.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.dogs.list({ ownerId: data.ownerId }) });
+    },
+  });
+};
 
 // Hook for deleting a dog
 export function useDeleteDog() {
   const queryClient = useQueryClient();
   
-  return useMutation<boolean, Error, string>(
-    async (id) => {
+  return useMutation({
+    mutationFn: async (id: string) => {
       const response = await api.delete<{ success: boolean }>(`/api/data/dogs/${id}`);
       if (!response.ok) {
         throw new Error(response.error || `Failed to delete dog ${id}`);
       }
       return response.data.success;
     },
-    {
-      onSuccess: (_, id) => {
-        // Remove the dog from the cache
-        queryClient.removeQueries(queryKeys.dogs.byId(id));
-        
-        // Invalidate all dog lists
-        queryClient.invalidateQueries(queryKeys.dogs.all());
-      }
+    onSuccess: (_: boolean, id: string) => {
+      // Remove the dog from the cache
+      queryClient.removeQueries({ queryKey: queryKeys.dogs.byId(id) });
+      
+      // Invalidate all dog lists
+      queryClient.invalidateQueries({ queryKey: queryKeys.dogs.all() });
     }
-  );
+  });
 }
 
 // ==================== OWNER HOOKS ====================
@@ -175,16 +130,16 @@ export function useDeleteDog() {
 export function useOwnerByUserId(userId?: string) {
   const { user } = useAuth();
   
-  return useQuery<OwnerResponse, Error>(
-    queryKeys.owners.byUser(userId || user?.id || ''),
-    async () => {
+  return useQuery({
+    queryKey: queryKeys.owners.byUser(userId || user?.id || ''),
+    queryFn: async () => {
       const effectiveUserId = userId || user?.id;
       
       if (!effectiveUserId) {
         throw new Error('No user ID available');
       }
       
-      const response = await api.get<OwnerResponse>(`/api/data/owners/byUserId/${effectiveUserId}`);
+      const response = await api.get<Owner>(`/api/data/owners/byUserId/${effectiveUserId}`);
       if (!response.ok) {
         // Handle gracefully if owner not found
         if (response.status === 404) {
@@ -194,18 +149,16 @@ export function useOwnerByUserId(userId?: string) {
       }
       return response.data;
     },
-    {
-      enabled: !!(userId || user?.id),
-      staleTime: 5 * 60 * 1000, // 5 minutes - owner data changes infrequently
-      retry: (failureCount, error) => {
-        // Don't retry if the owner profile doesn't exist
-        if (error.message === 'No owner profile found for this user') {
-          return false;
-        }
-        return failureCount < 2;
+    enabled: !!(userId || user?.id),
+    staleTime: 5 * 60 * 1000, // 5 minutes - owner data changes infrequently
+    retry: (failureCount: number, error: Error) => {
+      // Don't retry if the owner profile doesn't exist
+      if (error.message === 'No owner profile found for this user') {
+        return false;
       }
+      return failureCount < 2;
     }
-  );
+  });
 }
 
 // Hook for ensuring owner profile exists
@@ -213,8 +166,8 @@ export function useEnsureOwnerProfile() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   
-  return useMutation<Owner, Error, { name?: string; email?: string }>(
-    async (ownerData) => {
+  return useMutation({
+    mutationFn: async (ownerData: { name?: string; email?: string }) => {
       if (!user?.id) {
         throw new Error('No user ID available');
       }
@@ -242,45 +195,41 @@ export function useEnsureOwnerProfile() {
       
       return response.data;
     },
-    {
-      onSuccess: (data) => {
-        // Update all owner queries
-        queryClient.invalidateQueries(queryKeys.owners.all());
-        queryClient.invalidateQueries(queryKeys.owners.byUser(user?.id || ''));
-        
-        // Set this specific owner's data
-        queryClient.setQueryData(queryKeys.owners.byId(data.id), data);
-      }
+    onSuccess: (data: Owner) => {
+      // Update all owner queries
+      queryClient.invalidateQueries({ queryKey: queryKeys.owners.all() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.owners.byUser(user?.id || '') });
+      
+      // Set this specific owner's data
+      queryClient.setQueryData(queryKeys.owners.byId(data.id), data);
     }
-  );
+  });
 }
 
 // ==================== SUBSCRIPTION HOOKS ====================
 
 // Hook for fetching subscription plans
 export function useSubscriptionPlans() {
-  return useQuery<SubscriptionPlan[], Error>(
-    queryKeys.subscriptions.plans(),
-    async () => {
+  return useQuery({
+    queryKey: queryKeys.subscriptions.plans(),
+    queryFn: async () => {
       const response = await api.get<SubscriptionPlansResponse>('/api/subscriptions/plans');
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch subscription plans');
       }
       return response.data.plans || [];
     },
-    {
-      staleTime: 60 * 60 * 1000, // 1 hour - plans change infrequently
-    }
-  );
+    staleTime: 60 * 60 * 1000, // 1 hour - plans change infrequently
+  });
 }
 
 // Hook for fetching user subscriptions
 export function useUserSubscriptions() {
   const { user } = useAuth();
   
-  return useQuery<UserSubscription[], Error>(
-    queryKeys.subscriptions.userSubscriptions(),
-    async () => {
+  return useQuery({
+    queryKey: queryKeys.subscriptions.userSubscriptions(),
+    queryFn: async () => {
       if (!user?.id) {
         return [];
       }
@@ -297,23 +246,17 @@ export function useUserSubscriptions() {
         sub.userId === user.profileId
       );
     },
-    {
-      enabled: !!user?.id,
-      staleTime: 2 * 60 * 1000, // 2 minutes
-    }
-  );
+    enabled: !!user?.id,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
 }
 
 // Hook for creating a subscription
 export function useCreateSubscription() {
   const queryClient = useQueryClient();
   
-  return useMutation<
-    UserSubscription, 
-    Error,
-    { planId: string }
-  >(
-    async ({ planId }) => {
+  return useMutation({
+    mutationFn: async ({ planId }: { planId: string }) => {
       const response = await api.post<UserSubscription>(
         '/api/subscriptions/users',
         { planId }
@@ -325,11 +268,53 @@ export function useCreateSubscription() {
       
       return response.data;
     },
-    {
-      onSuccess: () => {
-        // Invalidate subscription queries
-        queryClient.invalidateQueries(queryKeys.subscriptions.userSubscriptions());
-      }
+    onSuccess: () => {
+      // Invalidate subscription queries
+      queryClient.invalidateQueries({ queryKey: queryKeys.subscriptions.userSubscriptions() });
     }
-  );
-} 
+  });
+}
+
+// Submits feedback for a completed walk
+export const useSubmitWalkFeedback = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      walkId, 
+      feedback 
+    }: { 
+      walkId: string; 
+      feedback: { 
+        rating: number; 
+        comment: string 
+      } 
+    }) => {
+      const headers = getAuthHeaders();
+      const response = await fetch(`/api/walks/${walkId}/feedback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...headers
+        },
+        body: JSON.stringify(feedback),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || 'Failed to submit walk feedback');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (_data, variables) => {
+      // Invalidate relevant queries
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.walks.byId(variables.walkId)
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.walks.all()
+      });
+    },
+  });
+}; 
