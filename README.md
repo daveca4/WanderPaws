@@ -107,3 +107,5 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 ---
 
 WanderPaws - Making dog walking more intelligent, efficient, and insightful.
+
+##
