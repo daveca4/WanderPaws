@@ -45,31 +45,31 @@ export function useOwnerDogs() {
         return [];
       }
       
-      console.log('Fetching dogs for owner with profile ID:', user.profileId);
+      console.log('🐕 Fetching dogs for owner with profile ID:', user.profileId);
       
       try {
-        // First try the dogs API endpoint
+        // First try the dogs API endpoint - the general endpoint that returns dogs for current user
         try {
-          console.log('Trying /data/dogs API endpoint...');
+          console.log('🔍 Trying general /data/dogs API endpoint...');
           const dogsResult = await apiClient.get('/data/dogs');
-          console.log('Response from /data/dogs:', dogsResult);
+          console.log('✅ Response from /data/dogs:', dogsResult);
           
           if (dogsResult.ok) {
             const dogs = dogsResult.data || [];
-            console.log('Found dogs via dogs API:', dogs.length);
+            console.log('✅ Found dogs via dogs API:', dogs.length);
             return dogs;
           }
         } catch (dogsError) {
-          console.warn('Error fetching from /data/dogs:', dogsError);
+          console.warn('❌ Error fetching from /data/dogs:', dogsError);
         }
         
         // Then try the owner-specific endpoint
-        console.log('Trying owner-specific endpoint...');
+        console.log('🔍 Trying owner-specific endpoint...');
         const result = await apiClient.get(`/data/owners/${user.profileId}/dogs`);
-        console.log('API Response from owner-specific endpoint:', result);
+        console.log('✅ API Response from owner-specific endpoint:', result);
         
         if (!result.ok) {
-          console.error('Error response from dogs API:', result.error);
+          console.error('❌ Error response from dogs API:', result.error);
           throw new Error(result.error || 'Failed to fetch dogs');
         }
         
@@ -78,15 +78,19 @@ export function useOwnerDogs() {
         if (Array.isArray(result.data)) {
           dogs = result.data;
         } else if (result.data && typeof result.data === 'object') {
-          dogs = result.data.data || result.data;
+          if (result.data.data && Array.isArray(result.data.data)) {
+            dogs = result.data.data;
+          } else {
+            dogs = result.data;
+          }
         } else {
           dogs = [];
         }
         
-        console.log('Final parsed dogs data:', dogs);
+        console.log('✅ Final parsed dogs data:', dogs);
         return dogs;
       } catch (error) {
-        console.error('Error fetching owner dogs:', error);
+        console.error('❌ Error fetching owner dogs:', error);
         // Return empty array instead of throwing to avoid breaking the UI
         return [];
       }

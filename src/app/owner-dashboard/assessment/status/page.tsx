@@ -4,66 +4,49 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import S3Image from '@/components/S3Image';
 import RouteGuard from '@/components/RouteGuard';
-import { useAuth } from '@/lib/AuthContext';
-import { useData } from '@/lib/DataContext';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { useOwnerAssessments } from '@/lib/hooks/useAssessmentHooks';
+import { useOwnerDogs } from '@/lib/hooks/useDataHooks';
 import { Assessment, Dog } from '@/lib/types';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 export default function AssessmentStatusPage() {
   const { user } = useAuth();
-  const { dogs, assessments, refreshData } = useData();
   const router = useRouter();
   
-  const [loading, setLoading] = useState(true);
-  const [userAssessments, setUserAssessments] = useState<Assessment[]>([]);
-  const [userDogs, setUserDogs] = useState<Dog[]>([]);
   const [error, setError] = useState<string | null>(null);
-
-  const loadAssessments = async () => {
-    if (!user || !user.profileId) return;
-    
-    try {
-      setLoading(true);
-      
-      // Make sure to refresh data to get the latest assessment status
-      await refreshData();
-      
-      // Filter assessments by owner ID
-      const ownerAssessments = assessments.filter(assessment => 
-        assessment.ownerId === user.profileId
-      );
-      
-      // Filter dogs by owner ID
-      const ownerDogs = dogs.filter(dog => 
-        dog.ownerId === user.profileId
-      );
-      
-      setUserAssessments(ownerAssessments);
-      setUserDogs(ownerDogs);
-    } catch (err) {
-      console.error('Error fetching assessments:', err);
-      setError('Failed to load your assessments. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (user) {
-      loadAssessments();
-    }
-  }, [user]);
   
-  // Function to manually refresh data
-  const handleRefresh = async () => {
-    setError(null);
-    await loadAssessments();
-  };
+  // Use React Query hooks for data
+  const { 
+    data: assessments = [], 
+    isPending: isLoadingAssessments, 
+    error: assessmentsError,
+    refetch: refetchAssessments
+  } = useOwnerAssessments();
+  
+  const { 
+    data: dogs = [], 
+    isPending: isLoadingDogs,
+    error: dogsError 
+  } = useOwnerDogs();
+  
+  // Handle errors from React Query
+  useEffect(() => {
+    if (assessmentsError) {
+      console.error('Error fetching assessments:', assessmentsError);
+      setError('Failed to load your assessments. Please try again later.');
+    }
+    
+    if (dogsError) {
+      console.error('Error fetching dogs:', dogsError);
+      setError('Failed to load your dogs. Please try again later.');
+    }
+  }, [assessmentsError, dogsError]);
   
   // Get dog by ID
   const getDogById = (dogId: string): Dog | undefined => {
-    return userDogs.find(dog => dog.id === dogId);
+    return dogs.find((dog: Dog) => dog.id === dogId);
   };
   
   // Format assessment status for display
@@ -99,7 +82,8 @@ export default function AssessmentStatusPage() {
   // Handle requesting admin review
   const handleRequestAdminReview = async (assessmentId: string) => {
     try {
-      setLoading(true);
+      setError(null);
+      
       const response = await fetch(`/api/data/assessments/${assessmentId}`, {
         method: 'PATCH',
         headers: {
@@ -120,21 +104,28 @@ export default function AssessmentStatusPage() {
       }
 
       // Refresh data to update UI
-      await refreshData();
-      await loadAssessments();
+      await refetchAssessments();
       
     } catch (err) {
       console.error('Error requesting admin review:', err);
       setError('Failed to request admin review. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
   
-  if (loading) {
+  // Debug logging
+  useEffect(() => {
+    console.log('AssessmentStatusPage - Current user:', user);
+    console.log('AssessmentStatusPage - Assessments:', assessments);
+    console.log('AssessmentStatusPage - Dogs:', dogs);
+  }, [user, assessments, dogs]);
+  
+  // Determine if we're loading
+  const isLoading = isLoadingAssessments || isLoadingDogs;
+  
+  if (isLoading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -146,11 +137,11 @@ export default function AssessmentStatusPage() {
           <h1 className="text-2xl font-bold text-gray-900">Assessment Status</h1>
           <div className="flex space-x-3">
             <button
-              onClick={handleRefresh}
+              onClick={() => refetchAssessments()}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-              disabled={loading}
+              disabled={isLoading}
             >
-              {loading ? (
+              {isLoading ? (
                 <span className="flex items-center">
                   <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -191,7 +182,7 @@ export default function AssessmentStatusPage() {
           </div>
         )}
         
-        {userAssessments.length === 0 ? (
+        {assessments.length === 0 ? (
           <div className="bg-white shadow rounded-lg p-6 text-center">
             <h2 className="text-lg font-medium text-gray-900 mb-2">No Assessments Found</h2>
             <p className="text-gray-500 mb-4">You haven't requested any dog assessments yet.</p>
@@ -213,142 +204,116 @@ export default function AssessmentStatusPage() {
               </p>
             </div>
             
-            <div className="divide-y divide-gray-200">
-              {userAssessments.map((assessment) => {
+            <ul className="divide-y divide-gray-200">
+              {assessments.map((assessment: Assessment) => {
                 const dog = getDogById(assessment.dogId);
-                const statusInfo = formatStatus(assessment.status);
+                const status = formatStatus(assessment.status);
                 
                 return (
-                  <div key={assessment.id} className="p-6">
-                    <div className="flex items-start">
-                      {dog && (
-                        <div className="flex-shrink-0 h-16 w-16 relative rounded-full overflow-hidden mr-4">
-                          {dog.imageUrl ? (
-                            <S3Image
-                              src={dog.imageUrl}
-                              alt={dog.name}
-                              fill
-                              className="object-cover"
-                              defaultImage="/images/default-dog.png"
-                            />
+                  <li key={assessment.id} className="px-4 py-4 sm:px-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-12 w-12 bg-gray-200 rounded-full overflow-hidden">
+                          {dog?.imageUrl ? (
+                            <img src={dog.imageUrl} alt={dog.name} className="h-12 w-12 object-cover" />
                           ) : (
-                            <div className="h-16 w-16 rounded-full bg-primary-100 flex items-center justify-center">
-                              <span className="text-2xl text-primary-600">
-                                {dog.name.charAt(0).toUpperCase()}
-                              </span>
+                            <div className="h-12 w-12 flex items-center justify-center bg-primary-100 text-primary-600">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                              </svg>
                             </div>
                           )}
                         </div>
-                      )}
-                      
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <div>
-                            <h3 className="text-xl font-medium text-gray-900">
-                              {dog ? dog.name : 'Unknown Dog'}
-                            </h3>
-                            {dog && (
-                              <p className="text-gray-500">
-                                {dog.breed}, {dog.age} {dog.age === 1 ? 'year' : 'years'} old
-                              </p>
-                            )}
-                          </div>
-                          <div>
-                            <span className={`px-2 py-1 text-xs rounded-full ${statusInfo.color}`}>
-                              {statusInfo.label}
-                            </span>
-                            <p className="text-xs text-gray-400 mt-1 text-right">
-                              Status: {assessment.status}
-                            </p>
-                          </div>
+                        <div className="ml-4">
+                          <h3 className="text-lg font-medium text-gray-900">
+                            {dog ? dog.name : 'Unknown Dog'}
+                          </h3>
+                          <p className="text-sm text-gray-500">
+                            {dog ? `${dog.breed || 'Unknown breed'}, ${dog.age || '?'} years` : 'Dog details not available'}
+                          </p>
                         </div>
-                        
-                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-sm text-gray-500">Requested:</p>
-                            <p className="font-medium">
-                              {format(new Date(assessment.createdDate), 'PPP')}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Scheduled for:</p>
-                            <p className="font-medium">
-                              {format(new Date(assessment.scheduledDate), 'PPP')}
-                            </p>
-                          </div>
+                      </div>
+                      <div>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
+                          {status.label}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 sm:flex sm:justify-between">
+                      <div className="sm:flex">
+                        <div className="flex items-center text-sm text-gray-500">
+                          <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                          </svg>
+                          <span>
+                            {assessment.scheduledDate ? format(new Date(assessment.scheduledDate), 'MMM d, yyyy') : 'Not scheduled'}
+                          </span>
                         </div>
-                        
-                        {assessment.result && (
-                          <div className="mt-2">
-                            <p className="text-sm text-gray-500">Result:</p>
-                            <p className={`font-medium ${
-                              assessment.result === 'approved' ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                              {assessment.result.charAt(0).toUpperCase() + assessment.result.slice(1)}
-                            </p>
-                          </div>
-                        )}
-                        
-                        {assessment.resultNotes && (
-                          <div className="mt-3 p-3 bg-gray-50 rounded-md">
-                            <p className="text-sm text-gray-500">Notes:</p>
-                            <p className="text-gray-700">{assessment.resultNotes}</p>
-                          </div>
-                        )}
-                        
-                        {assessment.status === 'completed' && assessment.result === 'approved' && (
-                          <div className="mt-4">
-                            <Link
-                              href="/owner-dashboard/subscriptions"
-                              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-                            >
-                              Choose a Subscription
-                            </Link>
-                          </div>
-                        )}
-
-                        {assessment.status === 'feedback_submitted' && (
-                          <div className="mt-4">
-                            <button
-                              onClick={() => handleRequestAdminReview(assessment.id)}
-                              disabled={loading}
-                              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                            >
-                              {loading ? 'Processing...' : 'Notify Admin for Review'}
-                            </button>
-                            <p className="text-xs text-gray-500 mt-2">
-                              Your walker has submitted feedback. Click the button above to notify our admin team to review the assessment.
-                            </p>
+                        {/* Use type casting for assessmentType access */}
+                        {((assessment as any).assessmentType) && (
+                          <div className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                            <svg className="flex-shrink-0 mr-1.5 h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                              <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                              <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+                            </svg>
+                            <span>{(assessment as any).assessmentType}</span>
                           </div>
                         )}
                       </div>
+                      <div className="mt-4 flex items-center justify-end sm:mt-0">
+                        {assessment.status === 'feedback_submitted' && (
+                          <button
+                            onClick={() => handleRequestAdminReview(assessment.id)}
+                            className="mr-4 inline-flex items-center px-3 py-1.5 border border-transparent rounded-md shadow-sm text-xs font-medium text-white bg-primary-600 hover:bg-primary-700"
+                          >
+                            Request Review
+                          </button>
+                        )}
+                        <Link
+                          href={`/owner-dashboard/assessment/details/${assessment.id}`}
+                          className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
+                        >
+                          View Details
+                        </Link>
+                      </div>
                     </div>
-                  </div>
+                    
+                    {assessment.result && (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">Result:</p>
+                        <p className={`font-medium ${
+                          assessment.result === 'approved' ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {assessment.result.charAt(0).toUpperCase() + assessment.result.slice(1)}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Use type casting for accessing properties that might not be in the type */}
+                    {(assessment.adminNotes || (assessment as any).resultNotes) && (
+                      <div className="mt-3 p-3 bg-gray-50 rounded-md">
+                        <p className="text-sm text-gray-500">Notes:</p>
+                        <p className="text-gray-700">{(assessment as any).resultNotes || assessment.adminNotes}</p>
+                      </div>
+                    )}
+                    
+                    {assessment.status === 'completed' && assessment.result === 'approved' && (
+                      <div className="mt-4">
+                        <Link
+                          href="/owner-dashboard/subscriptions"
+                          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+                        >
+                          Choose a Subscription
+                        </Link>
+                      </div>
+                    )}
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           </div>
         )}
-        
-        <div className="bg-blue-50 border-l-4 border-blue-400 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">Assessment Information</h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p>
-                  After your assessment is approved, you'll be able to purchase a subscription plan
-                  and start booking walks for your dog. If you have any questions about the assessment
-                  process, please contact our support team.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </RouteGuard>
   );

@@ -38,6 +38,9 @@ export const permissions = {
   MANAGE_CONTENT: 'manage_content' as Permission,
   MANAGE_MARKETING: 'manage_marketing' as Permission,
   MANAGE_HOLIDAY_REQUESTS: 'manage_holiday_requests' as Permission,
+  
+  // Messaging permissions
+  ACCESS_MESSAGES: 'access_messages' as Permission,
 };
 
 // Map roles to permissions
@@ -54,6 +57,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     permissions.READ_SUBSCRIPTION_PLANS,
     permissions.READ_WALKS,
     permissions.CREATE_WALKS,
+    permissions.ACCESS_MESSAGES,
   ],
   walker: [
     permissions.MANAGE_WALKER_PROFILE,
@@ -61,6 +65,7 @@ export const rolePermissions: Record<Role, Permission[]> = {
     permissions.MANAGE_WALKS,
     permissions.UPLOAD_WALK_MEDIA,
     permissions.CREATE_ASSESSMENTS,
+    permissions.ACCESS_MESSAGES,
   ],
   admin: [
     // Admin has all permissions
@@ -140,6 +145,11 @@ export function hasPermission(user: User | null, action: string, resource: strin
   // Special case for walkers submitting assessment feedback
   if (user.role === 'walker' && action === 'submit' && resource === 'assessment_feedback') {
     return true;
+  }
+  
+  // Special case for accessing messages
+  if (action === 'access' && resource === 'messages') {
+    return true; // Allow all authenticated users to access messages
   }
   
   const permission = `${action}_${resource}` as Permission;

@@ -24,164 +24,43 @@ export async function GET(request: NextRequest) {
     const totalWalks = await prisma.walk.count();
     console.log(`📊 Total walks in database: ${totalWalks}`);
     
-    let walks = [];
+    // Explicitly type walks
+    let walks: any[] = [];
     
-    // Logic based on user role
+    // Fetch all walks with includes and filter in memory to avoid schema issues
+    walks = await prisma.walk.findMany({
+      where: {
+        date: {
+          gte: new Date(new Date().setHours(0, 0, 0, 0)) // Get today and future walks
+        }
+      },
+      include: {
+        dog: {
+          include: {
+            owner: true
+          }
+        },
+        walker: true
+      },
+      orderBy: {
+        date: 'asc'
+      }
+    });
+    
+    // Filter based on user role in memory
     if (userRole === 'owner') {
-      try {
-        // APPROACH 1: Find by owner directly
-        // This is a more direct approach that doesn't require finding dogs first
-        console.log('🔍 Trying owner-direct approach with ids:', { userId, profileId });
-        
-        walks = await prisma.walk.findMany({
-          where: {
-            OR: [
-              // Direct owner ID match from walk
-              { ownerId: userId },
-              { ownerId: profileId },
-              // Dog owner match 
-              {
-                dog: {
-                  OR: [
-                    { ownerId: userId },
-                    { ownerId: profileId }
-                  ]
-                }
-              }
-            ],
-            date: {
-              gte: new Date(new Date().setHours(0, 0, 0, 0)) // Get today and future walks
-            }
-          },
-          include: {
-            dog: true,
-            walker: true
-          },
-          orderBy: {
-            date: 'asc'
-          }
-        });
-        
-        console.log(`🚶 Found ${walks.length} upcoming walks using direct owner match`);
-        
-        // If no walks found, try the dog-based approach
-        if (walks.length === 0) {
-          // For owners, get walks that match their dogs
-          // First get the owner's dogs
-          const ownerDogs = await prisma.dog.findMany({
-            where: {
-              OR: [
-                { ownerId: userId },
-                { ownerId: profileId }
-              ]
-            }
-          });
-          
-          console.log(`🐕 Found ${ownerDogs.length} dogs for owner with IDs:`, ownerDogs.map((dog: any) => dog.id));
-          
-          if (ownerDogs.length > 0) {
-            // Get walks for these dogs
-            const dogIds = ownerDogs.map((dog: any) => dog.id);
-            walks = await prisma.walk.findMany({
-              where: {
-                dogId: { in: dogIds },
-                date: {
-                  gte: new Date(new Date().setHours(0, 0, 0, 0)) // Get today and future walks
-                }
-              },
-              include: {
-                dog: true,
-                walker: true
-              },
-              orderBy: {
-                date: 'asc'
-              }
-            });
-            
-            console.log(`🚶 Found ${walks.length} upcoming walks for these dogs`);
-          }
-        }
-        
-        // If we still don't have walks, try one more approach
-        if (walks.length === 0) {
-          console.log(`⚠️ No walks found with standard approaches, trying extended lookups`);
-          
-          // Try to find walks with includes only
-          walks = await prisma.walk.findMany({
-            include: {
-              dog: {
-                include: {
-                  owner: true
-                }
-              },
-              walker: true
-            },
-            orderBy: {
-              date: 'asc'
-            },
-            take: 10
-          });
-          
-          // Filter in memory for the current user
-          walks = walks.filter(walk => {
-            const dogOwnerId = walk.dog?.ownerId || '';
-            return dogOwnerId === userId || dogOwnerId === profileId;
-          });
-          
-          console.log(`🚶 Found ${walks.length} walks using extended approach`);
-        }
-      } catch (error) {
-        console.error('❌ Error fetching owner dogs or walks:', error);
-      }
+      walks = walks.filter(walk => {
+        const ownerIdFromDog = walk.dog?.owner?.id;
+        return ownerIdFromDog === profileId || ownerIdFromDog === userId;
+      });
+      console.log(`🚶 Filtered to ${walks.length} walks for owner`);
     } else if (userRole === 'walker') {
-      try {
-        // For walkers, get walks assigned to them
-        walks = await prisma.walk.findMany({
-          where: {
-            OR: [
-              { walkerId: userId },
-              { walkerId: profileId }
-            ],
-            date: {
-              gte: new Date(new Date().setHours(0, 0, 0, 0)) // Get today and future walks
-            }
-          },
-          include: {
-            dog: true,
-            walker: true
-          },
-          orderBy: {
-            date: 'asc'
-          }
-        });
-        
-        console.log(`🚶 Found ${walks.length} upcoming walks for walker`);
-      } catch (error) {
-        console.error('❌ Error fetching walker walks:', error);
-      }
-    } else if (userRole === 'admin') {
-      try {
-        // Admins can see all upcoming walks
-        walks = await prisma.walk.findMany({
-          where: {
-            date: {
-              gte: new Date(new Date().setHours(0, 0, 0, 0)) // Get today and future walks
-            }
-          },
-          include: {
-            dog: true,
-            walker: true
-          },
-          orderBy: {
-            date: 'asc'
-          }
-        });
-        
-        console.log(`🚶 Found ${walks.length} total upcoming walks for admin`);
-      } catch (error) {
-        console.error('❌ Error fetching admin walks:', error);
-      }
+      walks = walks.filter(walk => 
+        walk.walkerId === profileId || walk.walkerId === userId
+      );
+      console.log(`🚶 Filtered to ${walks.length} walks for walker`);
     }
+    // Admin gets all walks, no filtering needed
     
     // If still no walks, add a test walk for demonstration
     if (walks.length === 0 && totalWalks === 0) {
@@ -200,8 +79,7 @@ export async function GET(request: NextRequest) {
             data: {
               dogId: firstDog.id,
               walkerId: firstWalker.id,
-              ownerId: firstDog.ownerId,
-              date: tomorrow.toISOString().split('T')[0],
+              date: tomorrow.toISOString(),
               startTime: '09:00:00',
               timeSlot: 'AM',
               duration: 60,

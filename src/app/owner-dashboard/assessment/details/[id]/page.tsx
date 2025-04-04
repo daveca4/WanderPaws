@@ -6,16 +6,16 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import S3Image from '@/components/S3Image';
 import RouteGuard from '@/components/RouteGuard';
-import { useAuth } from '@/lib/AuthContext';
-import { useData } from '@/lib/DataContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { Dog, Assessment } from '@/lib/types';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import apiClient from '@/lib/api/client';
 
 export default function AssessmentDetailsPage() {
   const params = useParams();
   const assessmentId = params.id as string;
   const router = useRouter();
   const { user } = useAuth();
-  const { assessments, dogs } = useData();
   
   const [loading, setLoading] = useState(true);
   const [assessment, setAssessment] = useState<Assessment | null>(null);
@@ -25,19 +25,30 @@ export default function AssessmentDetailsPage() {
   useEffect(() => {
     if (!user || !assessmentId) return;
     
-    const loadAssessment = () => {
+    const loadAssessment = async () => {
       try {
-        // Find the assessment in the context
-        const foundAssessment = assessments.find(a => a.id === assessmentId);
+        console.log('Loading assessment details for ID:', assessmentId);
+        setLoading(true);
         
-        if (!foundAssessment) {
+        // First fetch the assessment
+        const assessmentResponse = await apiClient.get(`/data/assessments/${assessmentId}`, {
+          headers: {
+            'user-id': user?.id || '',
+            'user-role': user?.role || '',
+            'user-profile-id': user?.profileId || ''
+          }
+        });
+        
+        if (!assessmentResponse?.data) {
           setError('Assessment not found');
           setLoading(false);
           return;
         }
+
+        const foundAssessment = assessmentResponse.data;
         
-        // Verify the assessment belongs to the current user
-        if (foundAssessment.ownerId !== user.profileId) {
+        // Verify the assessment belongs to the current user if they're an owner
+        if (user.role === 'owner' && foundAssessment.ownerId !== user.profileId) {
           setError('You do not have permission to view this assessment');
           setLoading(false);
           return;
@@ -45,16 +56,21 @@ export default function AssessmentDetailsPage() {
         
         setAssessment(foundAssessment);
         
-        // Find the associated dog
-        const foundDog = dogs.find(d => d.id === foundAssessment.dogId);
+        // Get the dog information
+        const dogResponse = await apiClient.get(`/data/dogs/${foundAssessment.dogId}`, {
+          headers: {
+            'user-id': user?.id || '',
+            'user-role': user?.role || '',
+            'user-profile-id': user?.profileId || ''
+          }
+        });
         
-        if (!foundDog) {
+        if (!dogResponse?.data) {
           setError('Dog information not found');
-          setLoading(false);
-          return;
+        } else {
+          setDog(dogResponse.data);
         }
         
-        setDog(foundDog);
         setLoading(false);
       } catch (err) {
         console.error('Error loading assessment details:', err);
@@ -64,7 +80,7 @@ export default function AssessmentDetailsPage() {
     };
     
     loadAssessment();
-  }, [assessmentId, user, assessments, dogs]);
+  }, [assessmentId, user]);
   
   // Get status badge color
   const getStatusBadgeColor = (status: string) => {
@@ -75,7 +91,10 @@ export default function AssessmentDetailsPage() {
         return 'bg-blue-100 text-blue-800';
       case 'pending':
         return 'bg-yellow-100 text-yellow-800';
+      case 'feedback_submitted':
+        return 'bg-purple-100 text-purple-800';
       case 'cancelled':
+      case 'canceled':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -88,13 +107,37 @@ export default function AssessmentDetailsPage() {
       return assessment.result === 'approved' ? 'Approved' : 'Not Approved';
     }
     
-    return assessment.status.charAt(0).toUpperCase() + assessment.status.slice(1);
+    return assessment.status.charAt(0).toUpperCase() + assessment.status.slice(1).replace(/_/g, ' ');
+  };
+  
+  // Safe date format helper
+  const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString) return 'Not scheduled';
+    try {
+      return format(new Date(dateString), 'PPP');
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
+  };
+  
+  // This is used for TypeScript type compatibility with API responses
+  // that might include additional fields not in our type definition
+  type ExtendedAssessment = Assessment & {
+    resultNotes?: string;
+    cancelled?: boolean;
+  };
+
+  // Check if an assessment is cancelled - allows for both status="cancelled" 
+  // and cancelled=true in API responses
+  const isAssessmentCancelled = (assessment: ExtendedAssessment): boolean => {
+    return (assessment as any).status === 'cancelled' || Boolean(assessment.cancelled);
   };
   
   if (loading) {
     return (
       <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -182,7 +225,7 @@ export default function AssessmentDetailsPage() {
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-500">Requested On:</span>
                     <span className="text-sm font-medium text-gray-900">
-                      {format(new Date(assessment.createdDate), 'PPP')}
+                      {formatDate(assessment.createdDate)}
                     </span>
                   </div>
                   
@@ -192,7 +235,7 @@ export default function AssessmentDetailsPage() {
                         {assessment.status === 'scheduled' ? 'Scheduled For:' : 'Assessment Date:'}
                       </span>
                       <span className="text-sm font-medium text-gray-900">
-                        {format(new Date(assessment.scheduledDate), 'PPP')}
+                        {formatDate(assessment.scheduledDate)}
                       </span>
                     </div>
                   )}
@@ -232,7 +275,7 @@ export default function AssessmentDetailsPage() {
                     </>
                   )}
                   
-                  {assessment.status === 'scheduled' && (
+                  {assessment.status === 'scheduled' && assessment.scheduledDate && (
                     <>
                       <p className="text-sm text-gray-700 mb-4">
                         Your assessment is scheduled for {format(new Date(assessment.scheduledDate), 'PPPP')}. 
@@ -280,7 +323,7 @@ export default function AssessmentDetailsPage() {
                     </>
                   )}
                   
-                  {assessment.status === 'cancelled' && (
+                  {isAssessmentCancelled(assessment as ExtendedAssessment) && (
                     <>
                       <p className="text-sm text-gray-700 mb-4">
                         This assessment was cancelled. You can request a new assessment if you'd like to proceed.
@@ -297,11 +340,11 @@ export default function AssessmentDetailsPage() {
               </div>
             </div>
             
-            {assessment.resultNotes && (
+            {(assessment as ExtendedAssessment).resultNotes && (
               <div className="mt-6">
                 <h3 className="text-base font-medium text-gray-900 mb-3">Assessment Notes</h3>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-700 whitespace-pre-line">{assessment.resultNotes}</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-line">{(assessment as ExtendedAssessment).resultNotes}</p>
                 </div>
               </div>
             )}

@@ -19,6 +19,7 @@ export default function SubscriptionsPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionIdForCreation, setSessionIdForCreation] = useState<string | null>(null);
+  const [showAllPlans, setShowAllPlans] = useState(false);
   
   // Find active subscription
   const activeSubscription = userSubscriptions.find(sub => 
@@ -32,124 +33,40 @@ export default function SubscriptionsPage() {
       setError(null);
       
       try {
-        // Log user info for debugging
-        console.log('Current user:', user);
-        
-        let gotPlans = false;
-        
-        // Fetch subscription plans from real API endpoint
-        try {
-          const plansResponse = await fetch('/api/subscriptions/plans');
-          if (plansResponse.ok) {
-            const plansData = await plansResponse.json();
-            console.log('Subscription plans data:', plansData);
-            
-            // Map API response to our SubscriptionPlan type
-            const mappedPlans = plansData.plans.map((plan: any) => ({
-              ...plan,
-              validityPeriod: parseInt(plan.features?.[0]?.match(/\d+/)?.[0] || '30', 10) // Extract validity period from features
-            }));
-            
-            setSubscriptionPlans(mappedPlans || []);
-            gotPlans = true;
-          } else {
-            console.error('Failed to fetch plans:', await plansResponse.text());
-            // Fall back to direct API
-            const directPlansResponse = await fetch('/api/data/subscription-plans');
-            if (directPlansResponse.ok) {
-              const directPlansData = await directPlansResponse.json();
-              console.log('Direct subscription plans data:', directPlansData);
-              setSubscriptionPlans(directPlansData || []);
-              gotPlans = true;
-            }
-          }
-        } catch (plansErr) {
-          console.error('Error fetching subscription plans:', plansErr);
+        // Step 1: Fetch subscription plans
+        const plansResponse = await fetch('/api/subscriptions/plans');
+        if (plansResponse.ok) {
+          const plansData = await plansResponse.json();
+          
+          // Map API response to our SubscriptionPlan type
+          const mappedPlans = plansData.plans.map((plan: any) => ({
+            ...plan,
+            validityPeriod: parseInt(plan.features?.[0]?.match(/\d+/)?.[0] || '30', 10) // Extract validity period from features
+          }));
+          
+          setSubscriptionPlans(mappedPlans || []);
+        } else {
+          throw new Error('Could not fetch subscription plans');
         }
         
-        if (!gotPlans) {
-          throw new Error('Could not fetch subscription plans from any source');
-        }
+        // Step 2: Get user subscriptions - this is the critical part
+        // Use the EXACT SAME endpoint call that works on the dashboard
+        console.log('Fetching subscriptions from dashboard endpoint');
+        const subsResponse = await fetch('/api/subscriptions/users');
         
-        // Fetch user subscriptions if user is logged in - try with both user.id and profileId
-        let gotSubscriptions = false;
-        
-        if (user?.id) {
-          console.log('Fetching subscriptions for user ID:', user.id);
+        if (subsResponse.ok) {
+          const subsData = await subsResponse.json();
+          console.log('Subscription API response:', subsData);
           
-          try {
-            // Try user.id first (most likely to work)
-            const subsResponse = await fetch(`/api/subscriptions/users?userId=${user.id}`);
-            if (subsResponse.ok) {
-              const subsData = await subsResponse.json();
-              console.log('Subscription data via user.id:', subsData);
-              if (subsData.subscriptions && Array.isArray(subsData.subscriptions)) {
-                setUserSubscriptions(subsData.subscriptions || []);
-                gotSubscriptions = true;
-              }
-            } 
-          } catch (err) {
-            console.error('Error fetching user subscriptions with user.id:', err);
+          if (subsData && subsData.subscriptions && Array.isArray(subsData.subscriptions)) {
+            setUserSubscriptions(subsData.subscriptions);
+            console.log('Found subscriptions:', subsData.subscriptions);
+          } else if (Array.isArray(subsData)) {
+            setUserSubscriptions(subsData);
           }
-          
-          // Try with profileId if user.id didn't work
-          if (!gotSubscriptions && user?.profileId) {
-            try {
-              console.log('Trying with profileId instead:', user.profileId);
-              const profileResponse = await fetch(`/api/subscriptions/users?userId=${user.profileId}`);
-              if (profileResponse.ok) {
-                const profileData = await profileResponse.json();
-                console.log('Subscription data via profileId:', profileData);
-                if (profileData.subscriptions && Array.isArray(profileData.subscriptions)) {
-                  setUserSubscriptions(profileData.subscriptions || []);
-                  gotSubscriptions = true;
-                }
-              }
-            } catch (err) {
-              console.error('Error fetching user subscriptions with profileId:', err);
-            }
-          }
-          
-          // As a last resort, try the direct API
-          if (!gotSubscriptions) {
-            try {
-              console.log('Trying direct API as last resort');
-              const directResponse = await fetch(`/api/data/users/${user.id}/subscriptions`);
-              if (directResponse.ok) {
-                const directData = await directResponse.json();
-                console.log('Direct API subscription data:', directData);
-                if (Array.isArray(directData) && directData.length > 0) {
-                  setUserSubscriptions(directData);
-                  gotSubscriptions = true;
-                }
-              }
-            } catch (error) {
-              console.warn('Failed to fetch from direct API:', error);
-            }
-          }
-          
-          // Final attempt with the subscriptions data API
-          if (!gotSubscriptions) {
-            try {
-              console.log('Trying subscriptions data API');
-              const dataResponse = await fetch(`/api/data/subscriptions?userId=${user.id}`);
-              if (dataResponse.ok) {
-                const subscriptionsData = await dataResponse.json();
-                console.log('Subscriptions data API response:', subscriptionsData);
-                if (Array.isArray(subscriptionsData) && subscriptionsData.length > 0) {
-                  setUserSubscriptions(subscriptionsData);
-                  gotSubscriptions = true;
-                }
-              }
-            } catch (error) {
-              console.warn('Failed to fetch from subscriptions data API:', error);
-            }
-          }
-          
-          if (!gotSubscriptions) {
-            console.warn('Could not fetch user subscriptions from any source, but plans were loaded successfully');
-            // Don't throw an error here, we still want to show the plans even if no subscriptions
-          }
+        } else {
+          console.error('Failed to fetch subscriptions:', await subsResponse.text());
+          throw new Error('Could not fetch subscription data');
         }
       } catch (err) {
         console.error('Error loading subscription data:', err);
@@ -160,57 +77,36 @@ export default function SubscriptionsPage() {
     }
     
     loadData();
-  }, [user?.id, user?.profileId]);
+  }, [user?.id]);
   
   // Separate function to reload subscription data
   const reloadSubscriptionData = async () => {
-    if (!user?.id) return;
-    
     try {
-      console.log('Refreshing subscription data for user:', user.id);
+      console.log('Refreshing subscription data');
       
-      // First try fetching with profileId
-      let subsResponse = await fetch(`/api/subscriptions/users?userId=${user.id}`);
-      if (!subsResponse.ok) {
-        throw new Error('Failed to fetch user subscriptions');
-      }
+      // Use the exact same endpoint call that works on the dashboard
+      const subsResponse = await fetch('/api/subscriptions/users', {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      });
       
-      const subsData = await subsResponse.json();
-      console.log('Subscription data received:', subsData);
-      
-      // Update state with fresh data
-      if (subsData.subscriptions && Array.isArray(subsData.subscriptions)) {
-        setUserSubscriptions(subsData.subscriptions);
+      if (subsResponse.ok) {
+        const subsData = await subsResponse.json();
+        console.log('Subscription API response (reload):', subsData);
         
-        // Log if we found an active subscription
-        const active = subsData.subscriptions.find((sub: UserSubscription) => 
-          sub.status === 'active' && new Date(sub.endDate) > new Date()
-        );
-        
-        if (active) {
-          console.log('Found active subscription:', active);
-        } else {
-          console.log('No active subscription found in data');
-          
-          // As a backup, try fetching with the user's ID directly from the API
-          console.log('Trying direct API fetch...');
-          const directResponse = await fetch(`/api/data/users/${user.id}/subscriptions`);
-          
-          if (directResponse.ok) {
-            const directData = await directResponse.json();
-            console.log('Direct API subscription data:', directData);
-            
-            if (Array.isArray(directData) && directData.length > 0) {
-              setUserSubscriptions(directData);
-            }
-          }
+        if (subsData && subsData.subscriptions && Array.isArray(subsData.subscriptions)) {
+          setUserSubscriptions(subsData.subscriptions);
+          console.log('Found refreshed subscriptions:', subsData.subscriptions);
+        } else if (Array.isArray(subsData)) {
+          setUserSubscriptions(subsData);
         }
       } else {
-        console.warn('Unexpected subscription data format:', subsData);
+        console.error('Failed to refresh subscriptions:', await subsResponse.text());
+        setError('Failed to refresh subscription data');
       }
     } catch (err) {
-      console.error('Error loading subscription data:', err);
-      setError('Failed to load subscription data. Please try again later.');
+      console.error('Error refreshing subscription data:', err);
+      setError('Failed to refresh subscription data. Please try again.');
     }
   };
   
@@ -240,10 +136,8 @@ export default function SubscriptionsPage() {
       
       setSubscriptionPlans(mappedPlans || []);
       
-      // Now also reload subscription data with cache busting
-      if (user?.id) {
-        await reloadSubscriptionData();
-      }
+      // Now also reload subscription data
+      await reloadSubscriptionData();
       
     } catch (err) {
       console.error('Error during force refresh:', err);
@@ -316,6 +210,16 @@ export default function SubscriptionsPage() {
             if (userSubsResponse.ok) {
               const userData = await userSubsResponse.json();
               console.log('User subscription data:', userData);
+              
+              // Check if we have subscriptions in any format
+              if ((userData.subscriptions && userData.subscriptions.length > 0) || 
+                  (Array.isArray(userData) && userData.length > 0) ||
+                  (userData && userData.status === 'active') ||
+                  (userData && userData.data && Array.isArray(userData.data) && userData.data.length > 0) ||
+                  (userData && userData.count !== undefined && userData.subscriptions && Array.isArray(userData.subscriptions) && userData.subscriptions.length > 0)) {
+                console.log('✅ Found subscriptions in user data, no need for manual creation');
+                setSessionIdForCreation(null);
+              }
             }
           }
           
@@ -621,13 +525,20 @@ export default function SubscriptionsPage() {
                   </p>
                 </div>
                 <div className="mt-4">
-                  <div className="-mx-2 -my-1.5 flex">
+                  <div className="-mx-2 -my-1.5 flex space-x-4">
                     <Link
                       href="/owner-dashboard/create-booking"
-                      className="px-2 py-1.5 rounded-md text-sm font-medium text-green-800 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                      className="px-4 py-2 rounded-md text-sm font-medium bg-green-700 text-white hover:bg-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                     >
-                      Book a walk
+                      Book a Walk
                     </Link>
+                    
+                    <button
+                      onClick={() => setShowAllPlans(prev => !prev)}
+                      className="px-4 py-2 rounded-md text-sm font-medium border border-green-700 text-green-700 bg-white hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                    >
+                      {showAllPlans ? 'Hide Plans' : 'Change Plan'}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -635,124 +546,191 @@ export default function SubscriptionsPage() {
           </div>
         )}
 
-        {/* Subscription Plans */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {activePlans.map((plan) => {
-            const isPopular = plan.id === 'plan2'; // Mark the middle plan as popular
+        {/* Active Subscription Details Card */}
+        {activeSubscription && !showAllPlans && (
+          <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200 p-6 mt-6">
+            <h3 className="text-lg font-medium text-gray-900">Your Current Plan Details</h3>
             
-            return (
-              <div 
-                key={plan.id} 
-                className={`
-                  relative bg-white shadow-md rounded-lg overflow-hidden
-                  ${selectedPlanId === plan.id ? 'ring-2 ring-primary-500' : ''}
-                  ${isPopular ? 'border-2 border-primary-500 transform md:scale-105' : 'border border-gray-200'}
-                `}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Plan Name</h4>
+                <p className="mt-2 text-xl font-semibold text-gray-900">
+                  {subscriptionPlans.find(p => p.id === activeSubscription.planId)?.name || 'Standard Plan'}
+                </p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Status</h4>
+                <p className="mt-2">
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    Active
+                  </span>
+                </p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Walk Credits</h4>
+                <p className="mt-2 text-xl font-semibold text-gray-900">
+                  {activeSubscription.creditsRemaining} remaining
+                </p>
+                <p className="text-sm text-gray-500">
+                  of {activeSubscription.walkCredits} total
+                </p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Walk Duration</h4>
+                <p className="mt-2 text-xl font-semibold text-gray-900">
+                  {activeSubscription.walkDuration} minutes
+                </p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Valid Until</h4>
+                <p className="mt-2 text-xl font-semibold text-gray-900">
+                  {new Date(activeSubscription.endDate).toLocaleDateString()}
+                </p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-gray-500">Purchased On</h4>
+                <p className="mt-2 text-xl font-semibold text-gray-900">
+                  {new Date(activeSubscription.purchaseDate || activeSubscription.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => setShowAllPlans(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
               >
-                {isPopular && (
-                  <div className="absolute top-0 right-0 pt-2 pr-4">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-primary-100 text-primary-800">
-                      Most Popular
-                    </span>
-                  </div>
-                )}
-                
-                <div className="px-6 py-8">
-                  <h3 className="text-2xl font-bold text-gray-900 text-center">{plan.name}</h3>
-                  <div className="mt-4 flex justify-center">
-                    <span className="px-3 py-1 text-sm text-gray-500 rounded-full bg-gray-100">
-                      {plan.walkDuration} min
-                    </span>
-                  </div>
-                  <p className="mt-4 text-sm text-gray-500 text-center h-12">
-                    {plan.description}
-                  </p>
+                Change My Plan
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Subscription Plans Grid - Only show when no subscription or explicitly requested */}
+        {(!activeSubscription || showAllPlans) && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {activePlans.map((plan) => {
+              const isPopular = plan.id === 'plan2'; // Mark the middle plan as popular
+              
+              return (
+                <div 
+                  key={plan.id} 
+                  className={`
+                    relative bg-white shadow-md rounded-lg overflow-hidden
+                    ${selectedPlanId === plan.id ? 'ring-2 ring-primary-500' : ''}
+                    ${isPopular ? 'border-2 border-primary-500 transform md:scale-105' : 'border border-gray-200'}
+                  `}
+                >
+                  {isPopular && (
+                    <div className="absolute top-0 right-0 pt-2 pr-4">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-md text-sm font-medium bg-primary-100 text-primary-800">
+                        Most Popular
+                      </span>
+                    </div>
+                  )}
                   
-                  <div className="mt-6 text-center">
-                    <p className="text-4xl font-extrabold text-gray-900">{formatPrice(plan.price)}</p>
-                    <p className="mt-1 text-sm text-gray-500">
-                      for {plan.walkCredits} walks
+                  <div className="px-6 py-8">
+                    <h3 className="text-2xl font-bold text-gray-900 text-center">{plan.name}</h3>
+                    <div className="mt-4 flex justify-center">
+                      <span className="px-3 py-1 text-sm text-gray-500 rounded-full bg-gray-100">
+                        {plan.walkDuration} min
+                      </span>
+                    </div>
+                    <p className="mt-4 text-sm text-gray-500 text-center h-12">
+                      {plan.description}
                     </p>
-                    <p className="text-xs text-gray-400">
-                      Valid for {plan.validityPeriod} days
-                    </p>
-                  </div>
-                  
-                  <div className="mt-6">
-                    <ul className="space-y-4">
-                      <li className="flex">
-                        <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="ml-2 text-gray-700">
-                          {plan.walkCredits} walk credits
-                        </span>
-                      </li>
-                      <li className="flex">
-                        <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="ml-2 text-gray-700">
-                          {plan.walkDuration} min
-                        </span>
-                      </li>
-                      <li className="flex">
-                        <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="ml-2 text-gray-700">
-                          Valid for {plan.validityPeriod} days
-                        </span>
-                      </li>
-                      <li className="flex">
-                        <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="ml-2 text-gray-700">
-                          GPS tracking
-                        </span>
-                      </li>
-                      <li className="flex">
-                        <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="ml-2 text-gray-700">
-                          Photo updates
-                        </span>
-                      </li>
-                    </ul>
-                  </div>
-                  
-                  <div className="mt-8">
-                    {selectedPlanId === plan.id ? (
-                      <button
-                        type="button"
-                        onClick={() => handleSubscribe(plan.id)}
-                        disabled={isProcessing}
-                        className={`w-full flex items-center justify-center px-5 py-2 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 ${
-                          isProcessing ? 'opacity-75 cursor-not-allowed' : ''
-                        }`}
-                      >
-                        {isProcessing ? 'Processing...' : 'Subscribe Now'}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleSelectPlan(plan.id)}
-                        disabled={isProcessing}
-                        className={`w-full flex items-center justify-center px-5 py-2 border border-transparent text-base font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 ${
-                          isProcessing ? 'opacity-75 cursor-not-allowed' : ''
-                        }`}
-                      >
-                        Select Plan
-                      </button>
-                    )}
+                    
+                    <div className="mt-6 text-center">
+                      <p className="text-4xl font-extrabold text-gray-900">{formatPrice(plan.price)}</p>
+                      <p className="mt-1 text-sm text-gray-500">
+                        for {plan.walkCredits} walks
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Valid for {plan.validityPeriod} days
+                      </p>
+                    </div>
+                    
+                    <div className="mt-6">
+                      <ul className="space-y-4">
+                        <li className="flex">
+                          <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="ml-2 text-gray-700">
+                            {plan.walkCredits} walk credits
+                          </span>
+                        </li>
+                        <li className="flex">
+                          <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="ml-2 text-gray-700">
+                            {plan.walkDuration} min
+                          </span>
+                        </li>
+                        <li className="flex">
+                          <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="ml-2 text-gray-700">
+                            Valid for {plan.validityPeriod} days
+                          </span>
+                        </li>
+                        <li className="flex">
+                          <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="ml-2 text-gray-700">
+                            GPS tracking
+                          </span>
+                        </li>
+                        <li className="flex">
+                          <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="ml-2 text-gray-700">
+                            Photo updates
+                          </span>
+                        </li>
+                      </ul>
+                    </div>
+                    
+                    <div className="mt-8">
+                      {selectedPlanId === plan.id ? (
+                        <button
+                          type="button"
+                          onClick={() => handleSubscribe(plan.id)}
+                          disabled={isProcessing}
+                          className={`w-full flex items-center justify-center px-5 py-2 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 ${
+                            isProcessing ? 'opacity-75 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          {isProcessing ? 'Processing...' : 'Subscribe Now'}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleSelectPlan(plan.id)}
+                          disabled={isProcessing}
+                          className={`w-full flex items-center justify-center px-5 py-2 border border-transparent text-base font-medium rounded-md text-primary-700 bg-primary-100 hover:bg-primary-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 ${
+                            isProcessing ? 'opacity-75 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          Select Plan
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </RouteGuard>
   );

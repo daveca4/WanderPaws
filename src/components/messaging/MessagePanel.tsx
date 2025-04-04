@@ -12,7 +12,7 @@ interface MessagePanelProps {
 }
 
 export default function MessagePanel({ conversation }: MessagePanelProps) {
-  const { messages, sendMessage } = useMessages();
+  const { messages, sendMessage, markAsRead } = useMessages();
   const { user } = useAuth();
   const [newMessage, setNewMessage] = useState('');
   const [attachments, setAttachments] = useState<MessageAttachment[]>([]);
@@ -39,6 +39,21 @@ export default function MessagePanel({ conversation }: MessagePanelProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Mark unread messages as read when conversation is viewed
+  useEffect(() => {
+    if (!user || !conversation || conversationMessages.length === 0) return;
+    
+    // Find messages from others that are unread
+    const unreadMessageIds = conversationMessages
+      .filter(msg => msg.senderId !== user.id && msg.readStatus === 'unread')
+      .map(msg => msg.id);
+      
+    if (unreadMessageIds.length > 0) {
+      console.log('Marking messages as read:', unreadMessageIds);
+      markAsRead(unreadMessageIds);
+    }
+  }, [conversation, conversationMessages, user]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
