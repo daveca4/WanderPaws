@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/AuthContext';
 import { useData } from '@/lib/DataContext';
 import { getDogsForUser } from '@/utils/userHelper';
@@ -42,11 +42,12 @@ const WORKFLOW_STEPS = [
 
 export function WorkflowProgress() {
   const { user } = useAuth();
-  const { dogs = [], assessments = [], walks = [], userSubscriptions = [] } = useData();
+  const { dogs = [], assessments = [], walks = [], userSubscriptions = [], error: dataError, refreshData } = useData();
   const [workflowStatus, setWorkflowStatus] = useState<
     {step: string; completed: boolean; enabled: boolean; pendingAssessment?: boolean}[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Check if there's already an assessment and determine the appropriate URL
   const dogAssessmentStepUrl = () => {
@@ -58,11 +59,14 @@ export function WorkflowProgress() {
       : '/owner-dashboard/assessment';
   };
 
-  useEffect(() => {
-    if (!user) return;
+  // More robust workflow status checker with error handling
+  const checkWorkflowStatus = useCallback(() => {
+    try {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-    // Fetch this data from DataContext
-    const checkWorkflowStatus = () => {
       console.log("WorkflowProgress: Checking workflow status for user:", user);
       
       // Step 1: Register Account - always completed if user exists
@@ -76,6 +80,7 @@ export function WorkflowProgress() {
       console.log("WorkflowProgress: User dogs found with helper:", userDogs.length, userDogs.map(d => d.name));
 
       // If getDogsForUser returns empty but we know the user has dogs (emergency measure)
+      let hasAddedDogs = userDogs.length > 0;
       if (userDogs.length === 0 && dogs.length > 0) {
         console.log("WorkflowProgress: No dogs found with helper, checking for emergency override conditions");
         
@@ -84,11 +89,9 @@ export function WorkflowProgress() {
         if (nellyDog) {
           console.log("WorkflowProgress: Found Nelly in dogs list, applying emergency override");
           userDogs.push(nellyDog);
+          hasAddedDogs = true;
         }
       }
-
-      // Mark the step as completed if ANY dogs are found
-      let hasAddedDogs = userDogs.length > 0;
 
       // Force the step to be completed if in development/test environment
       if (!hasAddedDogs && (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname.includes('vercel')))) {
@@ -140,14 +143,72 @@ export function WorkflowProgress() {
         { step: 'Book Walks', completed: hasBookings, enabled: hasActiveSubscription }
       ];
 
-      console.log("WorkflowProgress: Final status:", status);
-      setWorkflowStatus(status);
-      setLoading(false);
-    };
+      // Log what steps will be visible in the workflow
+      const incompleteSteps = status.filter(s => !s.completed);
+      console.log("WorkflowProgress: Incomplete steps that will be displayed:", 
+        incompleteSteps.map(s => s.step));
 
+      setWorkflowStatus(status);
+      setError(null);
+    } catch (err) {
+      console.error("WorkflowProgress: Error calculating workflow status:", err);
+      setError("Unable to determine workflow progress");
+      
+      // Provide default status to ensure UI doesn't break
+      setWorkflowStatus([
+        { step: 'Register Account', completed: true, enabled: true },
+        { step: 'Add Dog', completed: false, enabled: true },
+        { step: 'Dog Assessment', completed: false, enabled: false },
+        { step: 'Buy Subscription', completed: false, enabled: false },
+        { step: 'Book Walks', completed: false, enabled: false }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }, [user, dogs, assessments, walks, userSubscriptions]);
+
+  useEffect(() => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    
+    // Set a timeout to ensure we never get stuck in loading state
+    const timeoutId = setTimeout(() => {
+      if (loading) {
+        console.log("WorkflowProgress: Loading timeout triggered - force completing");
+        setLoading(false);
+        
+        // Try to refresh data if we hit the timeout
+        refreshData();
+      }
+    }, 3000); // 3 second timeout
+    
     // Check status immediately when data is available
     checkWorkflowStatus();
-  }, [user, dogs, assessments, walks, userSubscriptions]);
+    
+    return () => clearTimeout(timeoutId);
+  }, [user, dogs, assessments, walks, userSubscriptions, checkWorkflowStatus, loading, refreshData]);
+
+  // If there's a data error, show a minimal version
+  if (dataError) {
+    return (
+      <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
+        <div className="p-4 sm:p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Getting Started with WanderPaws</h2>
+          <div className="text-sm text-gray-500">
+            <p>Please refresh the page to load your personalized workflow.</p>
+            <button 
+              onClick={() => refreshData()}
+              className="mt-2 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              Refresh Data
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -157,71 +218,123 @@ export function WorkflowProgress() {
     );
   }
 
+  // Check if all steps are completed - show a success message instead
+  const allStepsCompleted = workflowStatus.length > 0 && workflowStatus.every(step => step.completed);
+  const incompleteSteps = workflowStatus.filter(step => !step.completed);
+
+  // If all steps are completed or there are no incomplete steps, show a different UI
+  if (allStepsCompleted || incompleteSteps.length === 0) {
+    return (
+      <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
+        <div className="p-4 sm:p-6">
+          <h2 className="text-lg font-medium text-gray-900 mb-4">Welcome to WanderPaws</h2>
+          <div className="bg-green-50 border border-green-200 rounded-md p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-green-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-green-800">
+                  You've completed all the getting started steps! Ready to book your next walk?
+                </p>
+                <div className="mt-4">
+                  <Link
+                    href="/owner-dashboard/create-booking"
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  >
+                    Book a Walk
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
       <div className="p-4 sm:p-6">
         <h2 className="text-lg font-medium text-gray-900 mb-4">Getting Started with WanderPaws</h2>
-        <div className="grid grid-cols-1 gap-4 auto-cols-fr" style={{
-          gridTemplateColumns: `repeat(${workflowStatus.filter(status => !status.completed).length || 1}, minmax(0, 1fr))`
-        }}>
-          {WORKFLOW_STEPS.map((step, index) => {
-            const status = workflowStatus[index];
-            // Skip completed steps
-            if (status?.completed) return null;
-            
-            let bgColor = "bg-gray-100";
-            let textColor = "text-gray-500";
-            let borderColor = "border-gray-200";
-            
-            if (status?.enabled && !status?.completed) {
-              bgColor = "bg-blue-50";
-              textColor = "text-blue-700";
-              borderColor = "border-blue-400";
-            }
-            
-            // Determine href based on status
-            let href = step.href;
-            let stepIcon = step.icon;
-            let statusDescription = step.description;
-            
-            // If it's a Dog Assessment with pending/scheduled assessment
-            if (step.title === 'Dog Assessment' && status?.pendingAssessment) {
-              href = dogAssessmentStepUrl(); // Link to assessment status page
-              stepIcon = 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'; // Checkmark in circle icon
-              statusDescription = 'Assessment pending';
+        {error ? (
+          <div className="text-sm text-gray-500">
+            <p>{error}</p>
+            <button 
+              onClick={() => {
+                setLoading(true);
+                refreshData().then(() => checkWorkflowStatus());
+              }}
+              className="mt-2 inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 auto-cols-fr" style={{
+            gridTemplateColumns: `repeat(${incompleteSteps.length || 1}, minmax(0, 1fr))`
+          }}>
+            {WORKFLOW_STEPS.map((step, index) => {
+              const status = workflowStatus[index];
+              // Skip completed steps - don't render them at all
+              if (status?.completed) return null;
               
-              // Change colors to indicate pending status
-              if (!status.completed) {
-                bgColor = "bg-yellow-50";
-                textColor = "text-yellow-700";
-                borderColor = "border-yellow-400";
+              let bgColor = "bg-gray-100";
+              let textColor = "text-gray-500";
+              let borderColor = "border-gray-200";
+              
+              if (status?.enabled && !status?.completed) {
+                bgColor = "bg-blue-50";
+                textColor = "text-blue-700";
+                borderColor = "border-blue-400";
               }
-            }
-            
-            return (
-              <Link 
-                key={step.title}
-                href={status?.enabled ? href : "#"}
-                className={`relative flex flex-col items-center p-4 rounded-lg border-2 ${borderColor} ${bgColor} ${!status?.enabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-md transition-shadow'}`}
-                onClick={(e: React.MouseEvent<HTMLAnchorElement>) => !status?.enabled && e.preventDefault()}
-              >
-                <div className={`rounded-full p-2 mb-2 ${status?.enabled ? 'bg-blue-100' : 'bg-gray-200'}`}>
-                  <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    className={`h-6 w-6 ${status?.enabled ? 'text-blue-600' : 'text-gray-500'}`} 
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    stroke="currentColor"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={stepIcon} />
-                  </svg>
-                </div>
-                <span className={`text-sm font-medium ${textColor} text-center`}>{step.title}</span>
-                <span className="text-xs text-center mt-1">{statusDescription}</span>
-              </Link>
-            );
-          })}
-        </div>
+              
+              // Determine href based on status
+              let href = step.href;
+              let stepIcon = step.icon;
+              let statusDescription = step.description;
+              
+              // If it's a Dog Assessment with pending/scheduled assessment
+              if (step.title === 'Dog Assessment' && status?.pendingAssessment) {
+                href = dogAssessmentStepUrl(); // Link to assessment status page
+                stepIcon = 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'; // Checkmark in circle icon
+                statusDescription = 'Assessment pending';
+                
+                // Change colors to indicate pending status
+                if (!status.completed) {
+                  bgColor = "bg-yellow-50";
+                  textColor = "text-yellow-700";
+                  borderColor = "border-yellow-400";
+                }
+              }
+              
+              return (
+                <Link 
+                  key={step.title}
+                  href={status?.enabled ? href : "#"}
+                  className={`relative flex flex-col items-center p-4 rounded-lg border-2 ${borderColor} ${bgColor} ${!status?.enabled ? 'opacity-60 cursor-not-allowed' : 'hover:shadow-md transition-shadow'}`}
+                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => !status?.enabled && e.preventDefault()}
+                >
+                  <div className={`rounded-full p-2 mb-2 ${status?.enabled ? 'bg-blue-100' : 'bg-gray-200'}`}>
+                    <svg 
+                      xmlns="http://www.w3.org/2000/svg" 
+                      className={`h-6 w-6 ${status?.enabled ? 'text-blue-600' : 'text-gray-500'}`} 
+                      fill="none" 
+                      viewBox="0 0 24 24" 
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={stepIcon} />
+                    </svg>
+                  </div>
+                  <span className={`text-sm font-medium ${textColor} text-center`}>{step.title}</span>
+                  <span className="text-xs text-center mt-1">{statusDescription}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
