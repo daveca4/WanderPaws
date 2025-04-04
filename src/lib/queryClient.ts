@@ -111,6 +111,7 @@ export const queryKeys = {
     walkers: (filters?: Record<string, any>) => ['admin', 'walkers', filters],
     owners: (filters?: Record<string, any>) => ['admin', 'owners', filters],
     walks: (filters?: Record<string, any>) => ['admin', 'walks', filters],
+    dogs: (filters?: Record<string, any>) => ['admin', 'dogs', filters],
     pendingAssessments: () => ['admin', 'pendingAssessments'],
     subscriptions: (filters?: Record<string, any>) => ['admin', 'subscriptions', filters],
   },
@@ -118,7 +119,7 @@ export const queryKeys = {
 
 // Create a queryClient with default options
 export function createQueryClient() {
-  return new QueryClient({
+  const client = new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: 30 * 1000, // 30 seconds
@@ -133,4 +134,14 @@ export function createQueryClient() {
       },
     },
   });
+  
+  // Configure specific query options for admin dashboard stats
+  client.setQueryDefaults(['adminDashboardStats'], {
+    staleTime: 10 * 1000, // 10 seconds - more frequent refreshes for dashboard
+    refetchOnWindowFocus: true, // Refetch when window gets focus
+    refetchOnMount: true, // Always refetch on component mount
+    retry: 2, // Retry twice on failure
+  });
+  
+  return client;
 } 

@@ -9,6 +9,7 @@ export interface Dog {
   ownerId: string;
   imageUrl?: string;
   profileImage?: string; // Added for DogList component
+  status?: 'active' | 'pending' | 'inactive'; // Dog's status in the system
   address: {
     street: string;
     city: string;

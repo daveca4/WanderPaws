@@ -114,7 +114,8 @@ export async function POST(request: NextRequest) {
     const assessment = await prisma.assessment.findFirst({
       where: {
         dogId: dogId,
-        status: 'completed'
+        status: 'completed',
+        result: 'approved'
       },
       orderBy: {
         updatedAt: 'desc'
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
 
     if (!assessment || !assessment.assignedWalkerId) {
       return NextResponse.json(
-        { error: 'This dog does not have an assigned walker. Please complete an assessment first.' },
+        { error: 'This dog does not have a completed and approved assessment. Please complete an assessment first.' },
         { status: 400 }
       );
     }

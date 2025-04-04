@@ -89,16 +89,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch user data from API
   const fetchUserData = async (userId: string) => {
     try {
+      console.log('AuthContext - Fetching user data for ID:', userId);
+      
       // Instead of making an API call that doesn't exist, use localStorage
       const userJson = localStorage.getItem('wanderpaws_user');
       if (userJson) {
+        console.log('AuthContext - Found user data in localStorage');
         const userData = JSON.parse(userJson);
+        console.log('AuthContext - User data:', { 
+          id: userData.id, 
+          role: userData.role, 
+          profileId: userData.profileId 
+        });
         setUser(userData);
       } else {
+        console.error('AuthContext - No user data in localStorage');
         throw new Error('No user data in localStorage');
       }
     } catch (error) {
-      console.error('Failed to fetch user data:', error);
+      console.error('AuthContext - Failed to fetch user data:', error);
       clearSession();
     }
   };

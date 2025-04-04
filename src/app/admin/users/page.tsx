@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/AuthContext';
 import RouteGuard from '@/components/RouteGuard';
 import { format } from 'date-fns';
 import UserImageUploader from '@/components/UserImageUploader';
+import apiClient from '@/lib/api/client';
 
 interface UserData {
   id: string;
@@ -23,6 +24,7 @@ interface UserData {
 
 export default function AdminUsersPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,32 +51,40 @@ export default function AdminUsersPage() {
     image: '',
   });
   
-  // Fetch all users
+  // Function to fetch users data
   const fetchUsers = async () => {
+    if (!user || user.role !== 'admin') {
+      console.error('AdminUsers - Not authorized to access users page');
+      setError('Access denied. Only admin users can view this page.');
+      setLoading(false);
+      return;
+    }
+
     try {
-      setLoading(true);
-      const response = await fetch('/api/admin/users');
+      console.log('AdminUsers - Fetching users with auth:', {
+        userId: user.id,
+        role: user.role,
+        profileId: user.profileId
+      });
+
+      const headers: Record<string, string> = {};
+      if (user.id) headers['user-id'] = user.id;
+      if (user.role) headers['user-role'] = user.role;
+      if (user.profileId) headers['user-profile-id'] = user.profileId;
+
+      console.log('AdminUsers - Request headers:', headers);
       
+      const response = await apiClient.get('/admin/users', { headers });
+      console.log('AdminUsers - API response:', response);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch users');
+        throw new Error(response.error || 'Failed to fetch users');
       }
-      
-      const data = await response.json();
-      console.log('API response data:', data);
-      
-      // Ensure we're working with an array
-      if (Array.isArray(data)) {
-        setUsers(data);
-      } else {
-        console.error('API did not return an array:', data);
-        setUsers([]);
-        setError('Invalid data format received from server');
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      setUsers([]);
-      setError(error instanceof Error ? error.message : 'An error occurred loading users');
+
+      setUsers(response.data || []);
+    } catch (err) {
+      console.error('AdminUsers - Error fetching users:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load users');
     } finally {
       setLoading(false);
     }
@@ -82,7 +92,7 @@ export default function AdminUsersPage() {
   
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [user]);
   
   // Filter users based on selected filter
   const filteredUsers = users.filter(user => {
@@ -113,7 +123,7 @@ export default function AdminUsersPage() {
         throw new Error(errorData.error || 'Failed to update user');
       }
       
-      await fetchUsers(); // Refresh user list
+      fetchUsers(); // Refresh user list
       setSuccessMessage(`Email verification status updated for ${user.email}`);
       setTimeout(() => setSuccessMessage(null), 3000);
     } catch (error) {
@@ -176,7 +186,7 @@ export default function AdminUsersPage() {
         throw new Error(errorData.error || 'Failed to delete user');
       }
       
-      await fetchUsers(); // Refresh user list
+      fetchUsers(); // Refresh user list
       setIsDeleteModalOpen(false);
       setSelectedUser(null);
       setSuccessMessage(`User ${selectedUser.email} has been deleted`);
@@ -255,7 +265,7 @@ export default function AdminUsersPage() {
         throw new Error(errorData.error || 'Failed to update user');
       }
       
-      await fetchUsers(); // Refresh user list
+      fetchUsers(); // Refresh user list
       setIsEditModalOpen(false);
       setSelectedUser(null);
       setSuccessMessage(`User ${editFormData.email} has been updated`);
@@ -267,6 +277,32 @@ export default function AdminUsersPage() {
     }
   };
   
+  if (loading) {
+    return (
+      <div className="p-4">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600 mx-auto"></div>
+        <p className="text-center mt-2">Loading users...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-4">
+        <div className="bg-red-50 p-4 rounded-lg">
+          <h2 className="text-red-700 font-semibold">Error</h2>
+          <p>{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-3 px-4 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <RouteGuard requiredPermission={{ action: 'access', resource: 'admin-dashboard' }}>
       <div className="space-y-6">

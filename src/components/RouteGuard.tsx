@@ -30,13 +30,52 @@ export default function RouteGuard({
         router.push(`${redirectTo}?returnUrl=${encodeURIComponent(pathname)}`);
       } else if (
         requiredPermission &&
+        !hasSpecialPermission(user, requiredPermission, pathname) &&
         !hasPermission(requiredPermission.action, requiredPermission.resource)
       ) {
         // User doesn't have the required permission, redirect to unauthorized page
+        console.error(`Access denied to ${pathname}: Required permission ${requiredPermission.action}:${requiredPermission.resource} not granted for user role ${user.role}`);
         router.push('/unauthorized');
       }
     }
   }, [user, loading, requiredPermission, router, redirectTo, pathname, hasPermission]);
+
+  // Helper function to check for special path-based permissions
+  function hasSpecialPermission(user: any, permission: { action: string; resource: string }, path: string) {
+    console.log(`Checking special permission for path: ${path} with required permission: ${permission.action}:${permission.resource}`);
+    
+    // Allow access to any profile pages for all authenticated users
+    if (
+      path === '/profile' || 
+      path.includes('/profile') ||
+      path.includes('/owners/') ||
+      path.includes('/walkers/')
+    ) {
+      console.log('✅ Special access granted for profile-related path:', path);
+      return true;
+    }
+    
+    // Special case for owner dashboard access by owners
+    if (permission.resource === 'owner-dashboard' && user.role === 'owner') {
+      console.log('✅ Special access granted for owner to owner-dashboard');
+      return true;
+    }
+    
+    // Special case for walker dashboard access by walkers
+    if (permission.resource === 'walker-dashboard' && user.role === 'walker') {
+      console.log('✅ Special access granted for walker to walker-dashboard');
+      return true;
+    }
+    
+    // Special case for messages access by any authenticated user
+    if (permission.resource === 'messages') {
+      console.log('✅ Special access granted for messages');
+      return true;
+    }
+    
+    console.log('❌ No special permission applies for', path);
+    return false;
+  }
 
   // Show nothing while loading
   if (loading) {
@@ -52,9 +91,10 @@ export default function RouteGuard({
     return null;
   }
 
-  // If permission is required but not granted, don't render
+  // If permission is required but not granted, and no special permission applies
   if (
     requiredPermission &&
+    !hasSpecialPermission(user, requiredPermission, pathname) &&
     !hasPermission(requiredPermission.action, requiredPermission.resource)
   ) {
     return null;

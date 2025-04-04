@@ -64,7 +64,13 @@ export default function CreateBookingPage() {
   // Print on component mount
   useEffect(() => {
     console.log('🔵 BOOKING PAGE MOUNTED');
-  }, []);
+    
+    // Force refetch dogs data when component mounts
+    if (user && user.profileId) {
+      console.log('Booking page - Forcing refetch of dogs on mount');
+      refetchDogs();
+    }
+  }, [user, refetchDogs]);
 
   // Basic state management
   const [selectedDog, setSelectedDog] = useState<Dog | null>(null);
@@ -149,7 +155,23 @@ export default function CreateBookingPage() {
   useEffect(() => {
     console.log('=== Create Booking Page ===');
     console.log('Current user:', user);
-    console.log('Available dogs from context:', dogs);
+    
+    // Add detailed debugging for dogs data
+    console.log('Dogs data type:', typeof dogs);
+    console.log('Is dogs array?', Array.isArray(dogs));
+    console.log('Dogs raw data:', dogs);
+    
+    // Log processed dogs list
+    let dogsList: Dog[] = [];
+    if (Array.isArray(dogs)) {
+      dogsList = dogs;
+    } else if (dogs && typeof dogs === 'object') {
+      if ('data' in dogs && Array.isArray((dogs as any).data)) {
+        dogsList = (dogs as any).data;
+      }
+    }
+    console.log('Processed dogs list:', dogsList);
+    
     console.log('User subscriptions:', userSubscriptions);
     console.log('Owner profile:', ownerProfile);
   }, [user, dogs, userSubscriptions, ownerProfile]);
@@ -159,16 +181,21 @@ export default function CreateBookingPage() {
     const dogId = event.target.value;
     console.log('CreateBooking - Dog selected:', dogId);
     
-    // Add proper typing for dogs data
-    interface DogsResponse {
-      data?: Dog[];
+    // Process dog data consistently
+    let dogsList: Dog[] = [];
+    
+    if (Array.isArray(dogs)) {
+      dogsList = dogs;
+    } else if (dogs && typeof dogs === 'object') {
+      if ('data' in dogs && Array.isArray((dogs as any).data)) {
+        dogsList = (dogs as any).data;
+      }
     }
     
-    // Add type handling for dogs data
-    const dogsArray = Array.isArray(dogs) 
-      ? dogs 
-      : ((dogs as unknown as DogsResponse)?.data || []);
-    const selectedDog = dogsArray.find((dog: Dog) => dog.id === dogId) || null;
+    // Find the selected dog in our processed list
+    const selectedDog = dogsList.find(dog => dog.id === dogId) || null;
+    
+    console.log('Selected dog:', selectedDog);
     setSelectedDog(selectedDog);
     setSelectedDate('');
     setTimeSlot('');
@@ -413,6 +440,93 @@ export default function CreateBookingPage() {
   // Show loading state while setting up
   const isLoadingData = isLoadingDogs || isLoadingSubscriptions || isLoadingOwner;
 
+  // Add these helper functions near the other functions in the component
+  const getAssessmentStatusColor = (status?: string) => {
+    switch (status) {
+      case 'approved':
+        return 'bg-green-50 border-green-200 text-green-800';
+      case 'scheduled':
+      case 'pending':
+      case 'in_progress':
+      case 'pending_review':
+        return 'bg-amber-50 border-amber-200 text-amber-800';
+      case 'denied':
+        return 'bg-red-50 border-red-200 text-red-800';
+      default:
+        return 'bg-gray-50 border-gray-200 text-gray-800';
+    }
+  };
+
+  const getAssessmentStatusIcon = (status?: string) => {
+    switch (status) {
+      case 'approved':
+        return (
+          <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+        );
+      case 'scheduled':
+      case 'pending':
+      case 'in_progress':
+      case 'pending_review':
+        return (
+          <svg className="h-5 w-5 text-amber-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+        );
+      case 'denied':
+        return (
+          <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+        );
+      default:
+        return (
+          <svg className="h-5 w-5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+          </svg>
+        );
+    }
+  };
+
+  const getAssessmentStatusTitle = (status?: string) => {
+    switch (status) {
+      case 'approved':
+        return 'Assessment Approved';
+      case 'scheduled':
+        return 'Assessment Scheduled';
+      case 'pending':
+        return 'Assessment Pending';
+      case 'in_progress':
+        return 'Assessment In Progress';
+      case 'pending_review':
+        return 'Assessment Awaiting Review';
+      case 'denied':
+        return 'Assessment Denied';
+      default:
+        return 'Assessment Required';
+    }
+  };
+
+  const getAssessmentStatusMessage = (status?: string) => {
+    switch (status) {
+      case 'approved':
+        return 'This dog has been assessed and approved for walks. You can book walks for this dog.';
+      case 'scheduled':
+        return 'This dog has a scheduled assessment. You will be able to book walks once the assessment is completed and approved.';
+      case 'pending':
+        return 'This dog is waiting for an assessment to be scheduled. You will be able to book walks after a successful assessment.';
+      case 'in_progress':
+        return 'This dog\'s assessment is currently in progress. You will be able to book walks once it is completed and approved.';
+      case 'pending_review':
+        return 'This dog\'s assessment is awaiting review. You will be able to book walks once it is approved.';
+      case 'denied':
+        return 'This dog\'s assessment was not approved. Please contact support for more information.';
+      default:
+        return 'This dog requires an assessment before booking walks. Please schedule an assessment first.';
+    }
+  };
+
   return (
     <RouteGuard requiredPermission={{ action: 'create', resource: 'walks' }}>
       <div className="max-w-3xl mx-auto py-8 px-4">
@@ -462,16 +576,6 @@ export default function CreateBookingPage() {
                     {isCreatingProfile ? 'Creating Profile...' : 'Set Up Profile'}
                   </button>
                 </div>
-              ) : Array.isArray(dogs) ? dogs.length : ((dogs as unknown as { data?: Dog[] })?.data?.length || 0) === 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-gray-600 mb-4">You haven't added any dogs yet.</p>
-                  <Link
-                    href="/owner-dashboard/dogs/add"
-                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-                  >
-                    Add a Dog
-                  </Link>
-                </div>
               ) : (
                 <div className="space-y-2">
                   <label htmlFor="dogSelect" className="block text-sm font-medium text-gray-700">
@@ -485,14 +589,94 @@ export default function CreateBookingPage() {
                     required
                   >
                     <option value="">Select a dog</option>
-                    {(Array.isArray(dogs) 
-                      ? dogs 
-                      : ((dogs as unknown as { data?: Dog[] })?.data || [])).map((dog: Dog) => (
+                    {(() => {
+                      // Process dog data from any possible API response format
+                      let dogsList: Dog[] = [];
+                      
+                      if (Array.isArray(dogs)) {
+                        dogsList = dogs;
+                      } else if (dogs && typeof dogs === 'object') {
+                        if ('data' in dogs && Array.isArray((dogs as any).data)) {
+                          dogsList = (dogs as any).data;
+                        }
+                      }
+                      
+                      // Check if we have dogs to display
+                      if (dogsList.length === 0) {
+                        return (
+                          <option disabled value="">No dogs found. Please add a dog first.</option>
+                        );
+                      }
+                      
+                      // Display each dog in the dropdown
+                      return dogsList.map((dog: Dog) => (
                         <option key={dog.id} value={dog.id}>
-                          {dog.name}
+                          {dog.name} {dog.breed ? `(${dog.breed})` : ''}
                         </option>
-                      ))}
+                      ));
+                    })()}
                   </select>
+                  
+                  {/* Dog count indicator for debugging */}
+                  <div className="text-xs text-gray-500 mt-1">
+                    {Array.isArray(dogs) ? dogs.length : 
+                      ((dogs as any)?.data?.length || 0)} dogs found
+                  </div>
+                  
+                  {/* Add dog link when no dogs are found */}
+                  {(() => {
+                    let dogsList: Dog[] = [];
+                    if (Array.isArray(dogs)) {
+                      dogsList = dogs;
+                    } else if (dogs && typeof dogs === 'object') {
+                      if ('data' in dogs && Array.isArray((dogs as any).data)) {
+                        dogsList = (dogs as any).data;
+                      }
+                    }
+                    
+                    if (dogsList.length === 0) {
+                      return (
+                        <div className="mt-4 text-center py-4 bg-blue-50 border border-blue-200 rounded-md">
+                          <p className="text-blue-700 mb-3">You need to add a dog before booking walks</p>
+                          <Link
+                            href="/owner-dashboard/dogs/add"
+                            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+                          >
+                            Add Your First Dog
+                          </Link>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Assessment Status Information */}
+                  {selectedDog && (
+                    <div className={`border rounded-md p-4 ${getAssessmentStatusColor(selectedDog.assessmentStatus)}`}>
+                      <div className="flex items-start">
+                        <div className="flex-shrink-0">
+                          {getAssessmentStatusIcon(selectedDog.assessmentStatus)}
+                        </div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium">{getAssessmentStatusTitle(selectedDog.assessmentStatus)}</h3>
+                          <div className="mt-2 text-sm">
+                            <p>{getAssessmentStatusMessage(selectedDog.assessmentStatus)}</p>
+                            
+                            {selectedDog.assessmentStatus !== 'approved' && (
+                              <div className="mt-2">
+                                <Link
+                                  href="/owner-dashboard/assessment/status"
+                                  className="text-sm font-medium underline hover:text-primary-600"
+                                >
+                                  View Assessment Status
+                                </Link>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {walkerName && (
                     <p className="mt-2 text-sm text-gray-600">
@@ -704,9 +888,16 @@ export default function CreateBookingPage() {
                 !selectedDog || 
                 !selectedDate || 
                 !timeSlot ||
-                (isRecurring && (!endDate || requiredCredits > remainingCredits))
+                (isRecurring && (!endDate || requiredCredits > remainingCredits)) ||
+                selectedDog?.assessmentStatus === 'scheduled' ||
+                selectedDog?.assessmentStatus === 'pending' ||
+                selectedDog?.assessmentStatus === 'in_progress' ||
+                selectedDog?.assessmentStatus === 'pending_review' ||
+                selectedDog?.assessmentStatus !== 'approved'
               }
               className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              title={selectedDog && selectedDog.assessmentStatus !== 'approved' ? 
+                "This dog requires a completed and approved assessment before booking" : ""}
             >
               {isSubmitting ? "Booking..." : "Book Walk"}
             </button>

@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthContext';
 import apiClient from '../api/client';
 import { queryKeys } from '../queryClient';
 import { Walker, Dog, Walk, Assessment } from '../types';
+import { processApiResponseData, logApiResponse } from '../utils/dataUtils';
 
 // Walker profile hooks
 export function useWalkerProfile() {
@@ -31,24 +32,70 @@ export function useWalkerProfile() {
 // Walker's assigned dogs
 export function useWalkerDogs() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   
   return useQuery({
     queryKey: queryKeys.dogs.byWalker(user?.profileId || ''),
     queryFn: async () => {
       if (!user?.profileId) {
+        console.error('Unauthorized: No walker profile ID available');
         return [];
       }
       
-      const response = await apiClient.get<Dog[]>(`/api/walkers/${user.profileId}/dogs`);
-      if (!response.ok) {
-        throw new Error(response.error || 'Failed to fetch assigned dogs');
-      }
+      console.log('🐕 Fetching dogs for walker with profile ID:', user.profileId);
       
-      console.log(`Found ${response.data.length} dogs assigned to walker ${user.profileId}`);
-      return response.data;
+      try {
+        // First try the general dogs API endpoint
+        try {
+          console.log('🔍 Trying general /data/dogs API endpoint...');
+          const dogsResult = await apiClient.get('/data/dogs');
+          logApiResponse('useWalkerDogs', '/data/dogs', dogsResult.data);
+          
+          if (dogsResult.ok) {
+            const dogs = processApiResponseData<Dog>(dogsResult.data);
+            console.log('✅ Found dogs via general dogs API:', dogs.length);
+            return dogs;
+          }
+        } catch (dogsError) {
+          console.warn('❌ Error fetching from /data/dogs:', dogsError);
+        }
+        
+        // Then try the walker-specific endpoint
+        console.log('🔍 Trying walker-specific endpoint...');
+        const result = await apiClient.get(`/api/data/walkers/${user.profileId}/dogs`);
+        logApiResponse('useWalkerDogs', `/api/data/walkers/${user.profileId}/dogs`, result.data);
+        
+        if (!result.ok) {
+          // Try legacy endpoint as fallback
+          console.log('🔍 Trying legacy walker endpoint...');
+          const legacyResult = await apiClient.get(`/api/walkers/${user.profileId}/dogs`);
+          logApiResponse('useWalkerDogs', `/api/walkers/${user.profileId}/dogs`, legacyResult.data);
+          
+          if (!legacyResult.ok) {
+            console.error('❌ Error response from both walker dogs APIs');
+            throw new Error(result.error || legacyResult.error || 'Failed to fetch assigned dogs');
+          }
+          
+          const dogs = processApiResponseData<Dog>(legacyResult.data);
+          console.log('✅ Found dogs via legacy endpoint:', dogs.length);
+          return dogs;
+        }
+        
+        // Process response data using the utility function
+        const dogs = processApiResponseData<Dog>(result.data);
+        console.log('✅ Final parsed dogs data:', dogs.length);
+        return dogs;
+      } catch (error) {
+        console.error('❌ Error fetching walker dogs:', error);
+        // Return empty array instead of throwing to avoid breaking the UI
+        return [];
+      }
     },
     enabled: !!user?.profileId,
-    placeholderData: []
+    staleTime: 10 * 1000, // 10 seconds
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    retry: 2,
   });
 }
 
@@ -60,18 +107,51 @@ export function useWalkerUpcomingWalks() {
     queryKey: queryKeys.walks.upcoming(user?.profileId || ''),
     queryFn: async () => {
       if (!user?.profileId) {
+        console.error('Unauthorized: No walker profile ID available');
         return [];
       }
       
-      const response = await apiClient.get<{ walks: Walk[] }>(`/api/walkers/${user.profileId}/walks/upcoming`);
-      if (!response.ok) {
-        throw new Error(response.error || 'Failed to fetch upcoming walks');
-      }
+      console.log('🚶 Fetching upcoming walks for walker with profile ID:', user.profileId);
       
-      return response.data.walks || [];
+      try {
+        // Try the new data API endpoint first
+        try {
+          console.log('🔍 Trying data API endpoint...');
+          const response = await apiClient.get(`/api/data/walkers/${user.profileId}/walks/upcoming`);
+          logApiResponse('useWalkerUpcomingWalks', `/api/data/walkers/${user.profileId}/walks/upcoming`, response.data);
+          
+          if (response.ok) {
+            const walks = processApiResponseData<Walk>(response.data, 'walks');
+            console.log('✅ Found upcoming walks via data API:', walks.length);
+            return walks;
+          }
+        } catch (dataApiError) {
+          console.warn('❌ Error fetching from data API:', dataApiError);
+        }
+        
+        // Fall back to the legacy API endpoint
+        console.log('🔍 Trying legacy API endpoint...');
+        const legacyResponse = await apiClient.get(`/api/walkers/${user.profileId}/walks/upcoming`);
+        logApiResponse('useWalkerUpcomingWalks', `/api/walkers/${user.profileId}/walks/upcoming`, legacyResponse.data);
+        
+        if (!legacyResponse.ok) {
+          throw new Error(legacyResponse.error || 'Failed to fetch upcoming walks');
+        }
+        
+        const walks = processApiResponseData<Walk>(legacyResponse.data, 'walks');
+        console.log('✅ Found upcoming walks via legacy API:', walks.length);
+        return walks;
+      } catch (error) {
+        console.error('❌ Error fetching walker upcoming walks:', error);
+        // Return empty array instead of throwing to avoid breaking the UI
+        return [];
+      }
     },
     enabled: !!user?.profileId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
     refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
 }
 
@@ -83,40 +163,121 @@ export function useWalkerCompletedWalks() {
     queryKey: queryKeys.walks.completed(user?.profileId || ''),
     queryFn: async () => {
       if (!user?.profileId) {
+        console.error('Unauthorized: No walker profile ID available');
         return [];
       }
       
-      const response = await apiClient.get<{ walks: Walk[] }>(`/api/walkers/${user.profileId}/walks/completed`);
-      if (!response.ok) {
-        throw new Error(response.error || 'Failed to fetch completed walks');
-      }
+      console.log('🚶 Fetching completed walks for walker with profile ID:', user.profileId);
       
-      return response.data.walks || [];
+      try {
+        // Try the new data API endpoint first
+        try {
+          console.log('🔍 Trying data API endpoint...');
+          const response = await apiClient.get(`/api/data/walkers/${user.profileId}/walks/completed`);
+          logApiResponse('useWalkerCompletedWalks', `/api/data/walkers/${user.profileId}/walks/completed`, response.data);
+          
+          if (response.ok) {
+            const walks = processApiResponseData<Walk>(response.data, 'walks');
+            console.log('✅ Found completed walks via data API:', walks.length);
+            return walks;
+          }
+        } catch (dataApiError) {
+          console.warn('❌ Error fetching from data API:', dataApiError);
+        }
+        
+        // Fall back to the legacy API endpoint
+        console.log('🔍 Trying legacy API endpoint...');
+        const legacyResponse = await apiClient.get(`/api/walkers/${user.profileId}/walks/completed`);
+        logApiResponse('useWalkerCompletedWalks', `/api/walkers/${user.profileId}/walks/completed`, legacyResponse.data);
+        
+        if (!legacyResponse.ok) {
+          throw new Error(legacyResponse.error || 'Failed to fetch completed walks');
+        }
+        
+        const walks = processApiResponseData<Walk>(legacyResponse.data, 'walks');
+        console.log('✅ Found completed walks via legacy API:', walks.length);
+        return walks;
+      } catch (error) {
+        console.error('❌ Error fetching walker completed walks:', error);
+        // Return empty array instead of throwing to avoid breaking the UI
+        return [];
+      }
     },
     enabled: !!user?.profileId,
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
 }
 
-// Fetch pending assessments
+// Fetch walker's pending assessments
 export function useWalkerPendingAssessments() {
   const { user } = useAuth();
   
   return useQuery({
-    queryKey: queryKeys.assessments.byWalker(user?.profileId || ''),
+    queryKey: queryKeys.assessments.byWalker(user?.profileId),
     queryFn: async () => {
       if (!user?.profileId) {
+        console.error('Unauthorized: No walker profile ID available');
         return [];
       }
       
-      const response = await apiClient.get<Assessment[]>(`/api/walkers/${user.profileId}/assessments/pending`);
-      if (!response.ok) {
-        throw new Error(response.error || 'Failed to fetch pending assessments');
-      }
+      console.log('🔍 Fetching pending assessments for walker with profile ID:', user.profileId);
       
-      return response.data;
+      try {
+        // Try the new data API endpoint first
+        try {
+          console.log('🔍 Trying data API endpoint for assessments...');
+          const response = await apiClient.get(`/api/data/walkers/${user.profileId}/assessments`);
+          logApiResponse('useWalkerPendingAssessments', `/api/data/walkers/${user.profileId}/assessments`, response.data);
+          
+          if (response.ok) {
+            const assessments = processApiResponseData<Assessment>(response.data, 'assessments');
+            console.log('✅ Found assessments via data API:', assessments.length);
+            return assessments;
+          }
+        } catch (dataApiError) {
+          console.warn('❌ Error fetching from data API:', dataApiError);
+        }
+        
+        // Try assessments endpoint with ready_for_review status
+        try {
+          console.log('🔍 Trying assessments with ready_for_review status...');
+          const readyResponse = await apiClient.get(`/api/assessments?status=ready_for_review&walkerId=${user.profileId}`);
+          logApiResponse('useWalkerPendingAssessments', `/api/assessments?status=ready_for_review&walkerId=${user.profileId}`, readyResponse.data);
+          
+          if (readyResponse.ok) {
+            const assessments = processApiResponseData<Assessment>(readyResponse.data, 'assessments');
+            console.log('✅ Found assessments via ready_for_review status:', assessments.length);
+            return assessments;
+          }
+        } catch (assessmentError) {
+          console.warn('❌ Error fetching assessments with ready_for_review status:', assessmentError);
+        }
+        
+        // Fall back to the legacy API endpoint
+        console.log('🔍 Trying legacy assessments API endpoint...');
+        const legacyResponse = await apiClient.get(`/api/walkers/${user.profileId}/assessments`);
+        logApiResponse('useWalkerPendingAssessments', `/api/walkers/${user.profileId}/assessments`, legacyResponse.data);
+        
+        if (!legacyResponse.ok) {
+          throw new Error(legacyResponse.error || 'Failed to fetch pending assessments');
+        }
+        
+        const assessments = processApiResponseData<Assessment>(legacyResponse.data, 'assessments');
+        console.log('✅ Found assessments via legacy API:', assessments.length);
+        return assessments;
+      } catch (error) {
+        console.error('❌ Error fetching walker pending assessments:', error);
+        // Return empty array instead of throwing to avoid breaking the UI
+        return [];
+      }
     },
     enabled: !!user?.profileId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
 }
 

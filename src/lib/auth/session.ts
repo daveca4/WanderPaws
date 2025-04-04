@@ -14,28 +14,55 @@ export interface Session {
 }
 
 /**
- * Get the current session from storage
+ * Get the user session from memory or localStorage
  */
-export function getSession(): Session | null {
-  if (typeof window === 'undefined') return null;
+export function getSession() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
   
   try {
-    const sessionData = localStorage.getItem(SESSION_STORAGE_KEY);
-    if (!sessionData) return null;
+    // Try getting from localStorage
+    const storedUser = localStorage.getItem('wanderpaws_user');
+    const storedSession = localStorage.getItem('wanderpaws_session');
     
-    const session = JSON.parse(sessionData) as Session;
-    
-    // Check if session has expired
-    if (session.expiresAt && Date.now() > session.expiresAt) {
-      console.log('Session expired, clearing');
-      clearSession();
+    if (!storedUser || !storedSession) {
+      console.warn('Missing user or session in localStorage');
       return null;
     }
     
-    return session;
+    const user = JSON.parse(storedUser);
+    const session = JSON.parse(storedSession);
+    
+    // Add extra debug info
+    console.log('Retrieved session from localStorage', {
+      userId: user.id,
+      role: user.role,
+      isAdmin: user.role === 'admin',
+      sessionData: {
+        hasToken: !!session.token,
+        expires: new Date(session.expires).toISOString(),
+        isExpired: new Date(session.expires) < new Date(),
+      }
+    });
+    
+    // Convert profileId to string if it exists
+    if (user.profileId) {
+      user.profileId = String(user.profileId);
+    }
+    
+    return {
+      userId: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      profileId: user.profileId,
+      token: session.token,
+      refreshToken: session.refreshToken,
+      expires: new Date(session.expires),
+    };
   } catch (error) {
-    console.error('Failed to parse session from storage:', error);
-    clearSession();
+    console.error('Error retrieving session:', error);
     return null;
   }
 }

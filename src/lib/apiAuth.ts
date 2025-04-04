@@ -17,8 +17,52 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AuthVeri
   try {
     const userId = request.headers.get('user-id');
     const userRole = request.headers.get('user-role');
+    const url = request.url;
+    
+    console.log('Admin verification request', { 
+      userId, 
+      userRole, 
+      url, 
+      method: request.method,
+      path: new URL(request.url).pathname
+    });
     
     if (!userId || !userRole) {
+      console.warn('Admin auth failed: Missing user authentication headers', { 
+        userId, 
+        userRole, 
+        url 
+      });
+      
+      // Try getting auth from cookies as fallback
+      const cookies = request.cookies;
+      const authCookie = cookies.get('wanderpaws_auth');
+      
+      if (authCookie) {
+        try {
+          const userData = JSON.parse(authCookie.value);
+          console.log('Found auth cookie during admin verification', { 
+            id: userData.id, 
+            role: userData.role 
+          });
+          
+          if (userData.role === 'admin') {
+            return {
+              authorized: true,
+              userId: userData.id,
+              role: userData.role
+            };
+          } else {
+            console.warn('Auth cookie user is not admin', { 
+              userId: userData.id, 
+              role: userData.role 
+            });
+          }
+        } catch (e) {
+          console.error('Failed to parse auth cookie:', e);
+        }
+      }
+      
       return { 
         authorized: false, 
         error: 'Missing user authentication headers' 
@@ -26,6 +70,12 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AuthVeri
     }
     
     if (userRole !== 'admin') {
+      console.warn('Admin auth failed: User is not an admin', { 
+        userId, 
+        role: userRole, 
+        url 
+      });
+      
       return { 
         authorized: false, 
         userId,
@@ -37,6 +87,12 @@ export async function verifyAdminRequest(request: NextRequest): Promise<AuthVeri
     // If needed, you could verify the admin against the database here
     // const admin = await prisma.user.findUnique({ where: { id: userId } });
     // if (!admin || admin.role !== 'admin') return { authorized: false };
+    
+    console.log('Admin verification successful', { 
+      userId, 
+      role: userRole, 
+      url 
+    });
     
     return { 
       authorized: true,

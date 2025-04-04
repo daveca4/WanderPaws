@@ -3,65 +3,52 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useAuth } from '@/lib/AuthContext';
-import { getDogsByOwnerId } from '@/lib/dbOperations';
+import { useAuth } from '@/lib/auth/AuthContext';
+import { useWalkerDogs } from '@/lib/hooks/useWalkerHooks';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { Dog } from '@/lib/types';
 
 export default function DogsPage() {
-  const [dogs, setDogs] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const { user } = useAuth();
-
+  const [error, setError] = useState<string | null>(null);
+  
+  // Use React Query hook for data fetching
+  const { 
+    data: dogs = [], 
+    isPending: isLoading, 
+    error: fetchError,
+    refetch: refetchDogs
+  } = useWalkerDogs();
+  
+  console.log('WalkerDogsPage - Current user:', user);
+  console.log('WalkerDogsPage - Dogs data:', dogs);
+  
+  // Force refetch when component mounts
   useEffect(() => {
-    const fetchDogs = async () => {
-      try {
-        if (!user) {
-          return;
-        }
-
-        // For walkers, fetch dogs assigned to them
-        if (user.role === 'walker') {
-          console.log('Fetching dogs for walker');
-          
-          // First check if the user object already has walkerId (from current-user API)
-          let walkerId = (user as any).walkerId;
-          
-          // If not, try to get it from the current-user API
-          if (!walkerId) {
-            try {
-              const response = await fetch('/api/auth/current-user');
-              if (response.ok) {
-                const userData = await response.json();
-                console.log('Current user data from API:', userData);
-                walkerId = userData.walkerId;
-              }
-            } catch (error) {
-              console.error('Error fetching current user data:', error);
-            }
-          }
-          
-          if (walkerId) {
-            const response = await fetch(`/api/walkers/${walkerId}/dogs`);
-            if (response.ok) {
-              const data = await response.json();
-              setDogs(data);
-            }
-          }
-        }
-        
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Error fetching dogs:', error);
-        setIsLoading(false);
-      }
-    };
-
-    fetchDogs();
-  }, [user]);
+    if (user && user.profileId) {
+      console.log('WalkerDogsPage - Forcing refetch on mount');
+      refetchDogs();
+    }
+  }, [user, refetchDogs]);
+  
+  // Handle fetch errors
+  useEffect(() => {
+    if (fetchError) {
+      console.error('Error fetching dogs:', fetchError);
+      setError(fetchError instanceof Error ? fetchError.message : 'Failed to load dogs');
+    }
+  }, [fetchError]);
+  
+  // Calculate if we have dogs to display
+  const hasDogs = Array.isArray(dogs) && dogs.length > 0;
+  const dogsArray = Array.isArray(dogs) ? dogs : [];
+  
+  console.log('WalkerDogsPage - Has dogs:', hasDogs, 'Count:', dogsArray.length);
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+        <LoadingSpinner />
       </div>
     );
   }
@@ -70,16 +57,32 @@ export default function DogsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">My Dogs</h1>
+        <button
+          onClick={() => refetchDogs()}
+          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
+        >
+          Refresh
+        </button>
       </div>
       
-      {dogs.length === 0 ? (
+      {error && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4">
+          <div className="flex">
+            <div className="ml-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {!hasDogs ? (
         <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 text-center">
           <p className="text-gray-600">No dogs assigned to you yet.</p>
           <p className="text-gray-500 mt-2">Dogs will appear here after you are assigned to walk them.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {dogs.map((dog: any) => (
+          {dogsArray.map((dog: Dog) => (
             <div key={dog.id} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
               <div className="relative h-48 w-full">
                 {dog.imageUrl ? (

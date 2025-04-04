@@ -1,32 +1,21 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
-import prisma from '@/lib/prisma';
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/db';
+import { getUserFromRequest } from '@/lib/auth/getUserFromRequest';
+import { logger } from '@/lib/utils/logger';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Check authentication and permissions
-    const session = await getServerSession(authOptions);
+    // Verify user is authenticated and is an admin
+    const { userId, role } = await getUserFromRequest(request);
     
-    if (!session || !session.user) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401 }
-      );
+    logger.info('Admin reports request', { userId, role });
+    
+    if (!userId || role !== 'admin') {
+      logger.warn('Unauthorized access attempt to admin reports', { userId, role });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Check if user is admin
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true }
-    });
-    
-    if (!user || user.role !== 'ADMIN') {
-      return new NextResponse(
-        JSON.stringify({ error: 'Forbidden' }),
-        { status: 403 }
-      );
-    }
+    logger.info('Fetching admin reports data');
     
     // Get revenue data (from completed walks)
     const sixMonthsAgo = new Date();
@@ -35,17 +24,13 @@ export async function GET() {
     // Get revenue data by month
     const walks = await prisma.walk.findMany({
       where: {
-        status: 'COMPLETED',
+        status: 'completed',
         startTime: { gte: sixMonthsAgo }
       },
       select: {
         id: true,
         startTime: true,
-        timeSlot: {
-          select: {
-            price: true
-          }
-        }
+        price: true
       }
     });
     
@@ -56,7 +41,7 @@ export async function GET() {
           select: {
             userSubscriptions: {
               where: {
-                status: 'ACTIVE'
+                status: 'active'
               }
             }
           }
@@ -96,7 +81,7 @@ export async function GET() {
       }
       
       walksByMonth[monthName].count += 1;
-      walksByMonth[monthName].amount += walk.timeSlot?.price || 0;
+      walksByMonth[monthName].amount += walk.price || 0;
       walksByMonth[monthName].byDay[dayName] += 1;
       
       // Process for daily distribution
@@ -117,6 +102,8 @@ export async function GET() {
       count: plan._count.userSubscriptions
     }));
     
+    logger.success('Admin reports data fetched');
+    
     return NextResponse.json({
       revenue: revenueData,
       walks: walkData,
@@ -124,9 +111,9 @@ export async function GET() {
     });
     
   } catch (error) {
-    console.error('Error in reports API:', error);
-    return new NextResponse(
-      JSON.stringify({ error: 'Failed to fetch report data' }),
+    logger.error('Error in reports API:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch report data' },
       { status: 500 }
     );
   }
