@@ -1,5 +1,5 @@
-import axios from 'axios';
-import type { AxiosResponse, AxiosError } from 'axios';
+import axios, { AxiosResponse } from 'axios';
+import type { AxiosError } from 'axios';
 import type { Dog, Owner, Walker, Walk, Assessment } from '../types';
 import { getCurrentUser } from '../auth';
 
@@ -13,6 +13,7 @@ const api = axios.create({
 
 // Add request interceptor to include user information in headers
 api.interceptors.request.use((config) => {
+  // Always get a fresh user from localStorage to ensure we have the latest data
   const user = getCurrentUser();
   console.log('API Request - Current User:', user); // Debug output
   console.log('API Request URL:', config.url);
@@ -38,11 +39,25 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Add request/response interceptors for consistent error handling
+// Extend the AxiosResponse type to include 'ok' and 'error' properties
+declare module 'axios' {
+  interface AxiosResponse<T = any> {
+    ok: boolean;
+    error?: string;
+  }
+}
+
+// Add interceptor to transform Axios responses to include 'ok' and 'error' properties
 api.interceptors.response.use(
-  (response: AxiosResponse) => response,
-  (error: AxiosError) => {
-    console.error('API error:', error);
+  (response) => {
+    response.ok = response.status >= 200 && response.status < 300;
+    return response;
+  },
+  (error) => {
+    // Create a response object for errors
+    const response = error.response || {};
+    response.ok = false;
+    response.error = error.message || 'An error occurred';
     return Promise.reject(error);
   }
 );
@@ -92,3 +107,5 @@ export const AssessmentAPI = {
   delete: (id: string) => api.delete(`/data/assessments/${id}`).then((res: AxiosResponse) => res.data),
   getByDogId: (dogId: string) => api.get(`/data/assessments?dogId=${dogId}`).then((res: AxiosResponse) => res.data)
 };
+
+export default api;

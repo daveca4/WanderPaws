@@ -47,6 +47,7 @@ export const queryKeys = {
     all: () => ['dogs'],
     byId: (id: string) => ['dogs', id],
     byWalker: (walkerId: string) => ['dogs', 'walker', walkerId],
+    byOwner: (ownerId: string) => ['dogs', 'owner', ownerId],
     list: (params?: Record<string, any>) => ['dogs', 'list', params],
   },
   
@@ -92,6 +93,7 @@ export const queryKeys = {
   subscriptions: {
     plans: () => ['subscriptions', 'plans'],
     userSubscriptions: () => ['subscriptions', 'user'],
+    user: (userId: string) => ['subscriptions', 'user', userId],
   },
   
   // User-related queries

@@ -2,7 +2,7 @@
 
 import { ReactNode, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { isUrlAccessibleForUser, getRedirectUrlForUnauthorizedAccess } from '@/lib/authUtils';
 
 export function AuthProtection({ children }: { children: ReactNode }) {

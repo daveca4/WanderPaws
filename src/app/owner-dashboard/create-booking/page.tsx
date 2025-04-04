@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format, addDays, isBefore, parseISO, differenceInDays } from 'date-fns';
 import RouteGuard from '@/components/RouteGuard';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { useOwnerDogs, useEnsureOwnerProfile, useOwnerByUserId, useUserSubscriptions } from '@/lib/hooks/useDataHooks';
 import { 
   useDogAvailability, 
@@ -14,7 +14,7 @@ import {
   DateRange
 } from '@/lib/hooks/useBookingHooks';
 import { Dog, Owner } from '@/lib/types';
-import { api } from '@/lib/api/client';
+import apiClient from '@/lib/api/client';
 
 // Define interfaces for our data types
 interface TimeSlot {
@@ -159,9 +159,16 @@ export default function CreateBookingPage() {
     const dogId = event.target.value;
     console.log('CreateBooking - Dog selected:', dogId);
     
+    // Add proper typing for dogs data
+    interface DogsResponse {
+      data?: Dog[];
+    }
+    
     // Add type handling for dogs data
-    const dogsArray = Array.isArray(dogs) ? dogs : dogs?.data || [];
-    const selectedDog = dogsArray.find(dog => dog.id === dogId) || null;
+    const dogsArray = Array.isArray(dogs) 
+      ? dogs 
+      : ((dogs as unknown as DogsResponse)?.data || []);
+    const selectedDog = dogsArray.find((dog: Dog) => dog.id === dogId) || null;
     setSelectedDog(selectedDog);
     setSelectedDate('');
     setTimeSlot('');
@@ -303,10 +310,12 @@ export default function CreateBookingPage() {
 
   // Handle ensuring user has owner profile
   const handleCreateProfile = () => {
-    ensureOwnerProfile({
-      name: user?.name || '',
-      email: user?.email || ''
-    });
+    if (user) {
+      ensureOwnerProfile({
+        name: user.name || '',
+        email: user.email || ''
+      } as any); // Type cast to any to avoid type error
+    }
   };
 
   // Advanced Debugging Panel
@@ -357,15 +366,18 @@ export default function CreateBookingPage() {
         </div>
         
         <div>
-          <h4 className="font-semibold mb-1">Dogs ({Array.isArray(dogs) ? dogs.length : (dogs?.data?.length || 0)})</h4>
+          <h4 className="font-semibold mb-1">Dogs ({Array.isArray(dogs) ? dogs.length : ((dogs as unknown as { data?: Dog[] })?.data?.length || 0)})</h4>
           <pre className="bg-white rounded border p-2 overflow-auto max-h-36">
             {JSON.stringify(
-              (Array.isArray(dogs) ? dogs : dogs?.data || []).map((dog: any) => ({
-                id: dog.id,
-                name: dog.name,
-                ownerId: dog.ownerId
-              }))
-            , null, 2)}
+              (Array.isArray(dogs) 
+                ? dogs 
+                : ((dogs as unknown as { data?: Dog[] })?.data || [])).map((dog: Dog) => ({
+                  id: dog.id,
+                  name: dog.name,
+                  ownerId: dog.ownerId
+                })),
+              null, 2
+            )}
           </pre>
         </div>
         
@@ -450,7 +462,7 @@ export default function CreateBookingPage() {
                     {isCreatingProfile ? 'Creating Profile...' : 'Set Up Profile'}
                   </button>
                 </div>
-              ) : Array.isArray(dogs) ? dogs.length : (dogs?.data?.length || 0) === 0 ? (
+              ) : Array.isArray(dogs) ? dogs.length : ((dogs as unknown as { data?: Dog[] })?.data?.length || 0) === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-gray-600 mb-4">You haven't added any dogs yet.</p>
                   <Link
@@ -473,11 +485,13 @@ export default function CreateBookingPage() {
                     required
                   >
                     <option value="">Select a dog</option>
-                    {(Array.isArray(dogs) ? dogs : dogs?.data || []).map(dog => (
-                      <option key={dog.id} value={dog.id}>
-                        {dog.name}
-                      </option>
-                    ))}
+                    {(Array.isArray(dogs) 
+                      ? dogs 
+                      : ((dogs as unknown as { data?: Dog[] })?.data || [])).map((dog: Dog) => (
+                        <option key={dog.id} value={dog.id}>
+                          {dog.name}
+                        </option>
+                      ))}
                   </select>
                   
                   {walkerName && (

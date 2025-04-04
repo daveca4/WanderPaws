@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { useMessages } from '@/lib/MessageContext';
 import PermissionGate from './PermissionGate';
 import { useState } from 'react';

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, ReactNode, useState, useCallback, useEffect } from 'react';
 import { Dog, Owner, Walker, Walk, Assessment, Message, Conversation, User, UserSubscription, SubscriptionPlan } from './types';
-import { useAuth } from './AuthContext';
+import { useAuth } from './auth/AuthContext';
 import { DogAPI, OwnerAPI, WalkerAPI, WalkAPI, AssessmentAPI } from './api/requests';
 
 // Create a context with initial empty values
@@ -585,9 +585,39 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const createDog = async (data: Omit<Dog, 'id'>): Promise<Dog> => {
     try {
-      const newDog = await DogAPI.create(data);
-      setDogs(prev => [...prev, newDog]);
-      return newDog;
+      // If user is an owner and missing profileId, create dog directly with the specialized API
+      if (user?.role === 'owner' && !user.profileId) {
+        console.log('Creating dog directly with API - will handle owner profile server-side');
+        
+        // Use direct fetch call with exact headers we need
+        const response = await fetch('/api/data/dogs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'user-id': user.id,
+            'user-role': user.role
+          },
+          body: JSON.stringify(data)
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Error creating dog:', errorText);
+          throw new Error(errorText);
+        }
+        
+        const newDog = await response.json();
+        
+        // After successful creation, refresh data to ensure we have latest state
+        refreshData();
+        
+        return newDog;
+      } else {
+        // Normal flow with existing profileId
+        const newDog = await DogAPI.create(data);
+        setDogs(prev => [...prev, newDog]);
+        return newDog;
+      }
     } catch (error) {
       console.error('Error creating dog:', error);
       throw error;

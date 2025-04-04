@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Message, Conversation } from './types';
-import { useAuth } from './AuthContext';
+import { useAuth } from './auth/AuthContext';
 
 // Define the shape of our context
 interface MessageContextType {

@@ -264,15 +264,17 @@ export function getCurrentUser(): User | null {
   
   const userJson = localStorage.getItem(USER_STORAGE_KEY);
   if (!userJson) {
+    console.log('No user found in localStorage');
     return null;
   }
   
   try {
     const user = JSON.parse(userJson);
+    console.log('Retrieved user from localStorage:', user);
     
     // Validate required fields
     if (!user.id || !user.email || !user.role) {
-      console.error('Invalid user object in local storage:', user);
+      console.error('Invalid user object in local storage - missing required fields:', user);
       localStorage.removeItem(USER_STORAGE_KEY);
       return null;
     }
@@ -284,6 +286,12 @@ export function getCurrentUser(): User | null {
       return null;
     }
     
+    // For owners, ensure profileId is present
+    if (user.role === 'owner' && !user.profileId) {
+      console.error('Owner user missing profileId:', user);
+      // Don't remove from storage, but log the issue
+    }
+    
     // Ensure all required fields are present
     const validatedUser: User = {
       id: user.id,
@@ -292,12 +300,12 @@ export function getCurrentUser(): User | null {
       name: user.name || null,
       emailVerified: user.emailVerified || false,
       createdAt: user.createdAt || new Date().toISOString(),
-      updatedAt: user.updatedAt || new Date().toISOString(),
-      lastLogin: user.lastLogin || new Date().toISOString(),
       profileId: user.profileId || null,
       image: user.image || null,
-      passwordHash: user.passwordHash || ''
+      profileImage: user.profileImage || null
     };
+    
+    console.log('Validated user:', validatedUser);
     
     // Update storage with validated user
     localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(validatedUser));

@@ -1,7 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { usePermission } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 interface PermissionGateProps {
   children: ReactNode;
@@ -22,8 +22,9 @@ export default function PermissionGate({
   fallback = null,
 }: PermissionGateProps) {
   // Check if the user has permission to perform this action on this resource
-  const hasPermission = usePermission(action, resource, resourceOwnerId);
+  const { hasPermission } = useAuth();
+  const allowed = hasPermission(action, resource, resourceOwnerId);
 
   // Render children if the user has permission, otherwise render the fallback
-  return <>{hasPermission ? children : fallback}</>;
+  return <>{allowed ? children : fallback}</>;
 } 

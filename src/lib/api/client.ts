@@ -1,166 +1,102 @@
-import { getAuthHeaders } from '../queryClient';
+import axios from 'axios';
+import type { AxiosError, AxiosResponse } from 'axios';
+import { getSession, refreshToken } from '../auth/session';
 
-// API response type for type safety
-type ApiResponse<T> = {
-  data: T;
-  status: number;
-  ok: boolean;
-  error?: string;
-};
-
-// Main API client function
-export async function apiClient<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<ApiResponse<T>> {
-  // Create headers object with auth headers
-  const authHeaders = getAuthHeaders();
-  
-  const headerValues = {
-    'Content-Type': 'application/json',
-    ...authHeaders,
-    ...(options.headers instanceof Headers 
-      ? Object.fromEntries(Array.from(options.headers.entries())) 
-      : options.headers || {})
-  };
-
-  const config: RequestInit = {
-    ...options,
-    headers: headerValues
-  };
-
-  try {
-    // Add cache busting for GET requests
-    const url = options.method === 'GET' 
-      ? `${endpoint}${endpoint.includes('?') ? '&' : '?'}_t=${Date.now()}` 
-      : endpoint;
-    
-    console.log(`API ${options.method || 'GET'} request to ${url}`);
-    const start = performance.now();
-    
-    const response = await fetch(url, config);
-    const end = performance.now();
-    
-    let data;
-    const contentType = response.headers.get('content-type');
-    
-    if (contentType && contentType.includes('application/json')) {
-      data = await response.json();
-    } else {
-      const text = await response.text();
-      try {
-        // Try to parse as JSON anyway, in case Content-Type header is wrong
-        data = JSON.parse(text);
-      } catch {
-        // If it's not JSON, use the text as data
-        data = text;
-      }
-    }
-    
-    console.log(`API response from ${url} in ${Math.round(end - start)}ms:`, 
-      response.status, response.ok ? 'OK' : 'ERROR');
-    
-    if (!response.ok) {
-      console.error('API error:', data);
-    }
-    
-    return {
-      data,
-      status: response.status,
-      ok: response.ok,
-      error: !response.ok ? data?.error || 'An unexpected error occurred' : undefined
-    };
-  } catch (error) {
-    console.error('Network error:', error);
-    return {
-      data: null as unknown as T,
-      status: 0,
-      ok: false,
-      error: error instanceof Error ? error.message : 'Network error'
-    };
+// Extend the AxiosResponse type to include 'ok' and 'error' properties
+declare module 'axios' {
+  interface AxiosResponse<T = any> {
+    ok: boolean;
+    error?: string;
   }
 }
 
-// Convenience methods
-export const api = {
-  get: <T>(endpoint: string, options?: RequestInit) => 
-    apiClient<T>(endpoint, { ...options, method: 'GET' }),
-  
-  post: <T>(endpoint: string, data: any, options?: RequestInit) =>
-    apiClient<T>(endpoint, {
-      ...options,
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-  
-  put: <T>(endpoint: string, data: any, options?: RequestInit) =>
-    apiClient<T>(endpoint, {
-      ...options,
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
-  
-  patch: <T>(endpoint: string, data: any, options?: RequestInit) =>
-    apiClient<T>(endpoint, {
-      ...options,
-      method: 'PATCH',
-      body: JSON.stringify(data),
-    }),
-  
-  delete: <T>(endpoint: string, options?: RequestInit) =>
-    apiClient<T>(endpoint, { ...options, method: 'DELETE' }),
-};
-
-/**
- * API client utilities
- */
-
-// Generic API request function with error handling
-export const apiRequest = async <T>(
-  url: string, 
-  options: RequestInit = {}
-): Promise<T> => {
-  const headers = {
+const apiClient = axios.create({
+  baseURL: '/api',
+  headers: { 
     'Content-Type': 'application/json',
-    ...getAuthHeaders(),
-    ...options.headers
-  };
-
-  const response = await fetch(url, {
-    ...options,
-    headers
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => null);
-    const errorMessage = errorData?.message || `API request failed with status ${response.status}`;
-    throw new Error(errorMessage);
+    'Cache-Control': 'max-age=300' // 5 min cache
   }
+});
 
-  return response.json();
-};
+// Request interceptor to add auth headers
+apiClient.interceptors.request.use(config => {
+  const session = getSession();
+  if (session) {
+    config.headers['user-id'] = session.userId;
+    config.headers['user-role'] = session.role;
+    
+    if (session.profileId) {
+      config.headers['user-profile-id'] = session.profileId;
+    }
+    
+    if (session.token) {
+      config.headers['Authorization'] = `Bearer ${session.token}`;
+    }
+  }
+  
+  // Debug log the request with additional details
+  const requestDetails = {
+    method: config.method?.toUpperCase(),
+    url: config.url,
+    headers: config.headers,
+    data: config.data
+  };
+  
+  console.log('🌐 API Request:', config.method?.toUpperCase(), config.url);
+  console.log('📋 Headers:', JSON.stringify(config.headers, null, 2));
+  
+  if (config.data) {
+    console.log('📦 Request Data:', JSON.stringify(config.data, null, 2));
+  }
+  
+  return config;
+});
 
-// Specialized API request functions
-export const get = <T>(url: string): Promise<T> => {
-  return apiRequest<T>(url);
-};
+// Response interceptor for error handling and token refresh
+apiClient.interceptors.response.use(
+  (response: AxiosResponse) => {
+    // Add ok property to successful responses
+    response.ok = response.status >= 200 && response.status < 300;
+    
+    console.log('✅ API Response:', response.config.method?.toUpperCase(), response.config.url);
+    console.log('📊 Status:', response.status);
+    console.log('📦 Response Data:', JSON.stringify(response.data, null, 2));
+    
+    return response;
+  },
+  async (error: AxiosError) => {
+    const originalRequest = error.config;
+    
+    // Add ok and error properties to error responses
+    if (error.response) {
+      error.response.ok = false;
+      error.response.error = error.message || 'An error occurred';
+      
+      console.log('❌ API Error:', originalRequest?.method?.toUpperCase(), originalRequest?.url);
+      console.log('📊 Status:', error.response.status);
+      console.log('📦 Error Data:', JSON.stringify(error.response.data, null, 2));
+    } else {
+      console.log('❌ Network Error:', error.message);
+    }
+    
+    // Handle 401 Unauthorized errors - try to refresh token if possible
+    if (error.response?.status === 401 && originalRequest && !(originalRequest as any)._isRetry) {
+      try {
+        (originalRequest as any)._isRetry = true;
+        
+        // Attempt to refresh the token
+        const refreshed = await refreshToken();
+        if (refreshed) {
+          // Retry the original request with new token
+          return apiClient(originalRequest);
+        }
+      } catch (refreshError) {
+        console.error('Token refresh failed:', refreshError);
+      }
+    }
+    
+    return Promise.reject(error);
+  }
+);
 
-export const post = <T>(url: string, data: any): Promise<T> => {
-  return apiRequest<T>(url, {
-    method: 'POST',
-    body: JSON.stringify(data)
-  });
-};
-
-export const put = <T>(url: string, data: any): Promise<T> => {
-  return apiRequest<T>(url, {
-    method: 'PUT',
-    body: JSON.stringify(data)
-  });
-};
-
-export const del = <T>(url: string): Promise<T> => {
-  return apiRequest<T>(url, {
-    method: 'DELETE'
-  });
-}; 
+export default apiClient; 

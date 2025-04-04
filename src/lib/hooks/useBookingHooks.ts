@@ -1,8 +1,23 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../AuthContext';
-import { api } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
+import apiClient from '../api/client';
 import { queryKeys } from '../queryClient';
 import { Walk } from '../types';
+
+// Define interfaces for API responses
+interface WalkResponse {
+  id: string;
+  dogId: string;
+  walkerId: string;
+  status: string;
+  startTime: string;
+  endTime: string;
+  notes?: string;
+  feedback?: {
+    rating: number;
+    comment?: string;
+  };
+}
 
 // Interface for availability data
 export interface DayAvailability {
@@ -37,10 +52,10 @@ export function useDogAvailability(dogId: string, date: string) {
     queryFn: async () => {
       if (!dogId || !date) return null;
       
-      const response = await api.get<{
+      const response = await apiClient.get<{
         availability: DayAvailability;
         walkerName?: string;
-      }>(`/api/walks/availability?dogId=${dogId}&date=${date}`);
+      }>(`/walks/availability?dogId=${dogId}&date=${date}`);
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch availability');
@@ -62,10 +77,10 @@ export function useDogAvailabilityRange(dogId: string, range: DateRange) {
     queryFn: async () => {
       if (!dogId || !range.startDate || !range.endDate) return null;
       
-      const response = await api.get<{
+      const response = await apiClient.get<{
         availability: Record<string, DayAvailability>;
         walkerName?: string;
-      }>(`/api/walks/availability/range?dogId=${dogId}&startDate=${range.startDate}&endDate=${range.endDate}`);
+      }>(`/walks/availability/range?dogId=${dogId}&startDate=${range.startDate}&endDate=${range.endDate}`);
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch availability range');
@@ -95,7 +110,7 @@ export function useCreateBooking() {
   
   return useMutation({
     mutationFn: async (bookingData: CreateBookingInput) => {
-      const response = await api.post<Walk>('/api/walks', bookingData);
+      const response = await apiClient.post<Walk>('/walks', bookingData);
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to create booking');
@@ -128,7 +143,7 @@ export function useUpcomingWalks() {
     queryFn: async () => {
       if (!user) return [];
       
-      const response = await api.get<{ walks: Walk[] }>('/api/walks/upcoming');
+      const response = await apiClient.get<{ walks: Walk[] }>('/walks/upcoming');
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch upcoming walks');
@@ -150,12 +165,12 @@ export function useDogWalks(dogId: string, status?: string) {
     queryFn: async () => {
       if (!dogId) return [];
       
-      let url = `/api/dogs/${dogId}/walks`;
+      let url = `/dogs/${dogId}/walks`;
       if (status) {
         url += `?status=${status}`;
       }
       
-      const response = await api.get<Walk[]>(url);
+      const response = await apiClient.get<WalkResponse[]>(url);
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch dog walks');
@@ -177,7 +192,7 @@ export function useCancelWalk() {
   
   return useMutation({
     mutationFn: async ({ walkId, reason }: { walkId: string; reason?: string }) => {
-      const response = await api.patch<Walk>(`/api/walks/${walkId}/cancel`, { reason });
+      const response = await apiClient.patch<Walk>(`/walks/${walkId}/cancel`, { reason });
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to cancel walk');
@@ -234,7 +249,7 @@ export function useRescheduleWalk() {
   
   return useMutation({
     mutationFn: async ({ walkId, newDate, newTimeSlot }: { walkId: string; newDate: string; newTimeSlot: string }) => {
-      const response = await api.patch<Walk>(`/api/walks/${walkId}/reschedule`, {
+      const response = await apiClient.patch<Walk>(`/walks/${walkId}/reschedule`, {
         date: newDate,
         timeSlot: newTimeSlot
       });
@@ -258,5 +273,25 @@ export function useRescheduleWalk() {
         queryClient.invalidateQueries({ queryKey: queryKeys.walks.byWalker(data.walkerId) });
       }
     }
+  });
+}
+
+// Hook for getting walk details
+export function useWalkDetails(walkId: string) {
+  return useQuery({
+    queryKey: queryKeys.walks.byId(walkId),
+    queryFn: async () => {
+      if (!walkId) throw new Error('Walk ID is required');
+      
+      const response = await apiClient.get<Walk>(`/walks/${walkId}`);
+      
+      if (!response.ok) {
+        throw new Error(response.error || 'Failed to fetch walk details');
+      }
+      
+      return response.data;
+    },
+    enabled: !!walkId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 } 

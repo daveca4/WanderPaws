@@ -8,10 +8,15 @@ export async function GET(
 ) {
   try {
     const ownerId = params.id;
-    console.log('Fetching dogs for owner:', ownerId);
+    const userId = request.headers.get('user-id');
+    const userRole = request.headers.get('user-role');
+    const userProfileId = request.headers.get('user-profile-id');
+    
+    console.log('🔍 Fetching dogs for owner:', ownerId);
+    console.log('🔑 Auth context:', { userId, userRole, userProfileId });
     
     if (!ownerId) {
-      console.error('No owner ID provided');
+      console.error('❌ No owner ID provided');
       return NextResponse.json({ error: 'Owner ID is required' }, { status: 400 });
     }
     
@@ -21,8 +26,28 @@ export async function GET(
     });
     
     if (!owner) {
-      console.error('Owner not found:', ownerId);
-      return NextResponse.json({ error: 'Owner not found' }, { status: 404 });
+      console.error('❌ Owner not found:', ownerId);
+      
+      // Try to look up owner by userId if available
+      if (userId) {
+        console.log('🔍 Trying to find owner by userId:', userId);
+        const ownerByUserId = await prisma.owner.findUnique({
+          where: { userId }
+        });
+        
+        if (ownerByUserId) {
+          console.log('✅ Found owner by userId:', ownerByUserId.id);
+          // Redirect to the correct endpoint
+          return NextResponse.redirect(
+            new URL(`/api/data/owners/${ownerByUserId.id}/dogs`, request.url)
+          );
+        }
+      }
+      
+      return NextResponse.json({ 
+        error: 'Owner not found', 
+        context: { ownerId, userId, userRole, userProfileId }
+      }, { status: 404 });
     }
     
     // Find all dogs for this owner
@@ -33,14 +58,20 @@ export async function GET(
       }
     });
     
-    console.log('Found dogs for owner:', dogs.length);
+    console.log('✅ Found dogs for owner:', dogs.length);
     
     // Parse any JSON fields in the data
     const parsedDogs = dogs.map(dog => parseJsonFields(dog));
     
-    return NextResponse.json(parsedDogs);
+    return NextResponse.json({
+      data: parsedDogs,
+      owner: {
+        id: owner.id,
+        name: owner.name
+      }
+    });
   } catch (error) {
-    console.error('Error fetching dogs for owner:', error);
+    console.error('❌ Error fetching dogs for owner:', error);
     return NextResponse.json({ 
       error: 'Failed to fetch dogs',
       details: error instanceof Error ? error.message : 'Unknown error'

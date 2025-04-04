@@ -2,7 +2,7 @@
 
 import { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { AuthProtection } from './AuthProtection';

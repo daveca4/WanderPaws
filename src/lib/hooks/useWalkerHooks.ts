@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../AuthContext';
-import { api } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
+import apiClient from '../api/client';
 import { queryKeys } from '../queryClient';
 import { Walker, Dog, Walk, Assessment } from '../types';
 
@@ -16,7 +16,7 @@ export function useWalkerProfile() {
         return null;
       }
       
-      const response = await api.get<Walker>(`/api/data/walkers/${user.profileId}`);
+      const response = await apiClient.get<Walker>(`/api/data/walkers/${user.profileId}`);
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch walker profile');
       }
@@ -39,7 +39,7 @@ export function useWalkerDogs() {
         return [];
       }
       
-      const response = await api.get<Dog[]>(`/api/walkers/${user.profileId}/dogs`);
+      const response = await apiClient.get<Dog[]>(`/api/walkers/${user.profileId}/dogs`);
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch assigned dogs');
       }
@@ -63,7 +63,7 @@ export function useWalkerUpcomingWalks() {
         return [];
       }
       
-      const response = await api.get<{ walks: Walk[] }>(`/api/walkers/${user.profileId}/walks/upcoming`);
+      const response = await apiClient.get<{ walks: Walk[] }>(`/api/walkers/${user.profileId}/walks/upcoming`);
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch upcoming walks');
       }
@@ -86,7 +86,7 @@ export function useWalkerCompletedWalks() {
         return [];
       }
       
-      const response = await api.get<{ walks: Walk[] }>(`/api/walkers/${user.profileId}/walks/completed`);
+      const response = await apiClient.get<{ walks: Walk[] }>(`/api/walkers/${user.profileId}/walks/completed`);
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch completed walks');
       }
@@ -109,7 +109,7 @@ export function useWalkerPendingAssessments() {
         return [];
       }
       
-      const response = await api.get<Assessment[]>(`/api/walkers/${user.profileId}/assessments/pending`);
+      const response = await apiClient.get<Assessment[]>(`/api/walkers/${user.profileId}/assessments/pending`);
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch pending assessments');
       }
@@ -131,7 +131,7 @@ export function useUpdateWalkerProfile() {
         throw new Error('No walker profile ID available');
       }
       
-      const response = await api.patch<Walker>(`/api/data/walkers/${user.profileId}`, data);
+      const response = await apiClient.patch<Walker>(`/api/data/walkers/${user.profileId}`, data);
       if (!response.ok) {
         throw new Error(response.error || 'Failed to update walker profile');
       }
@@ -150,7 +150,7 @@ export function useUpdateWalkStatus() {
   
   return useMutation({
     mutationFn: async ({ walkId, status, notes }: { walkId: string; status: string; notes?: string }) => {
-      const response = await api.patch<Walk>(`/api/walks/${walkId}/status`, { 
+      const response = await apiClient.patch<Walk>(`/api/walks/${walkId}/status`, { 
         status, 
         notes 
       });
@@ -186,7 +186,7 @@ export function useCompleteWalk() {
   
   return useMutation({
     mutationFn: async ({ walkId, notes }: { walkId: string; notes?: string }) => {
-      const response = await api.patch<Walk>(`/api/walks/${walkId}/complete`, {
+      const response = await apiClient.patch<Walk>(`/api/walks/${walkId}/complete`, {
         notes,
         completedAt: new Date().toISOString()
       });
@@ -270,7 +270,7 @@ export function useSubmitAssessment() {
   
   return useMutation({
     mutationFn: async ({ assessmentId, data }: { assessmentId: string; data: Partial<Assessment> }) => {
-      const response = await api.patch<Assessment>(`/api/assessments/${assessmentId}/submit`, data);
+      const response = await apiClient.patch<Assessment>(`/api/assessments/${assessmentId}/submit`, data);
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to submit assessment');

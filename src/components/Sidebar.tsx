@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import PermissionGate from './PermissionGate';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { useData } from '@/lib/DataContext';
 import { useMessages } from '@/lib/MessageContext';
 import { getPendingHolidayRequestsCount } from '@/lib/holidayRequestService';

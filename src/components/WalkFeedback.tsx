@@ -26,7 +26,7 @@ export function WalkFeedback({ walkId, onSuccess, onCancel }: WalkFeedbackProps)
     }
     
     mutate(
-      { walkId, feedback: { rating, comment } },
+      { walkId, rating, comment },
       {
         onSuccess: () => {
           onSuccess();

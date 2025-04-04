@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { ReactNode, useEffect } from 'react';
 
 interface RouteGuardProps {
@@ -18,28 +18,28 @@ export default function RouteGuard({
   requiredPermission,
   redirectTo = '/login',
 }: RouteGuardProps) {
-  const { user, isLoading, checkPermission } = useAuth();
+  const { user, loading, hasPermission } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
     // Check if the user is authenticated and has the required permission
-    if (!isLoading) {
+    if (!loading) {
       if (!user) {
         // User is not logged in, redirect to login
         router.push(`${redirectTo}?returnUrl=${encodeURIComponent(pathname)}`);
       } else if (
         requiredPermission &&
-        !checkPermission(requiredPermission.action, requiredPermission.resource)
+        !hasPermission(requiredPermission.action, requiredPermission.resource)
       ) {
         // User doesn't have the required permission, redirect to unauthorized page
         router.push('/unauthorized');
       }
     }
-  }, [user, isLoading, requiredPermission, router, redirectTo, pathname, checkPermission]);
+  }, [user, loading, requiredPermission, router, redirectTo, pathname, hasPermission]);
 
   // Show nothing while loading
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
@@ -55,7 +55,7 @@ export default function RouteGuard({
   // If permission is required but not granted, don't render
   if (
     requiredPermission &&
-    !checkPermission(requiredPermission.action, requiredPermission.resource)
+    !hasPermission(requiredPermission.action, requiredPermission.resource)
   ) {
     return null;
   }

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { formatDate, formatTime } from '@/utils/helpers';
 import { Dog, Walker, Walk } from '@/lib/types';
+import { formatDistanceToNow } from 'date-fns';
 
 interface UpcomingWalksProps {
   userDogs?: Dog[];
@@ -130,7 +131,7 @@ export function UpcomingWalks({ userDogs }: UpcomingWalksProps) {
               <div key={walk.id} className="flex items-center border-b border-gray-100 pb-4 last:border-0">
                 <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 relative flex-shrink-0">
                   <Image
-                    src={walk.dog.imageUrl || '/images/default-dog.png'}
+                    src={walk.dog.profileImage || '/images/default-dog.png'}
                     alt={walk.dog.name}
                     width={48}
                     height={48}

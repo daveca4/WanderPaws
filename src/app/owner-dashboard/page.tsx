@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import RouteGuard from '@/components/RouteGuard';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { useOwnerDogs, useOwnerByUserId, useUserSubscriptions } from '@/lib/hooks/useDataHooks';
 import { useUpcomingWalks } from '@/lib/hooks/useBookingHooks';
 import { format } from 'date-fns';
 import { Dog, Owner, UserSubscription, Walk } from '@/lib/types';
-import { api } from '@/lib/api/client';
+import apiClient from '@/lib/api/client';
 
 // Temporary dashboard block components
 const DogCard = ({ dog }: { dog: Dog }) => (

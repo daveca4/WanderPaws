@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Conversation, Message as MessageType, MessageAttachment } from '@/lib/types';
 import { useMessages } from '@/lib/MessageContext';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { format } from 'date-fns';
 import Message from './Message';
 

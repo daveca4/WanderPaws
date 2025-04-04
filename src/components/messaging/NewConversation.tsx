@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMessages } from '@/lib/MessageContext';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { useData } from '@/lib/DataContext';
 import { User } from '@/lib/types';
 import { getWalksByDogId, getWalksByWalkerId } from '@/utils/dataHelpers';
@@ -168,14 +168,14 @@ export default function NewConversation({ onClose }: { onClose: () => void }) {
     setError(null);
 
     try {
-      const conversation = await createConversation(
+      const conversationId = await createConversation(
         selectedUsers,
         isGroup ? groupTitle : undefined
       );
 
-      if (conversation) {
+      if (conversationId) {
         // Redirect to the new conversation
-        router.push(`/messages?conversation=${conversation.id}`);
+        router.push(`/messages?conversation=${conversationId}`);
         onClose();
       } else {
         setError('Failed to create conversation. Please try again.');

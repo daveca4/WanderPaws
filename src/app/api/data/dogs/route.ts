@@ -139,10 +139,11 @@ export async function POST(request: NextRequest) {
   try {
     const userId = request.headers.get('user-id');
     const userRole = request.headers.get('user-role') as Role;
+    const userProfileId = request.headers.get('user-profile-id');
 
     if (!userId || !userRole) {
-      console.error('Missing user headers:', { userId, userRole });
-      return NextResponse.json({ error: 'Unauthorized - Missing user information' }, { status: 401 });
+      console.error('Missing auth headers:', { userId, userRole });
+      return NextResponse.json({ error: 'Unauthorized - Missing authentication information' }, { status: 401 });
     }
 
     // Only owners and admins can create dogs
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
 
     const data = await request.json();
     
-    // Combined validation - more efficient than individual checks
+    // Validate required fields
     const validationErrors = [];
     const requiredFields = ['name', 'breed', 'age', 'size'];
     
@@ -182,32 +183,63 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ errors: validationErrors }, { status: 400 });
     }
 
-    // If user is an owner, use their owner profile
-    // If admin, they must specify an ownerId
+    // Determine owner ID for the dog
     let ownerId = data.ownerId;
 
     if (userRole === 'owner') {
-      const owner = await prisma.owner.findUnique({
-        where: { userId },
-        select: { id: true, address: true }
-      });
+      // Use profile ID if provided in headers, otherwise look it up
+      if (userProfileId) {
+        ownerId = userProfileId;
+        console.log('Using owner profile ID from headers:', ownerId);
+      } else {
+        // Find or create owner profile
+        let owner = await prisma.owner.findUnique({
+          where: { userId },
+          select: { id: true, address: true, name: true, email: true, phone: true }
+        });
 
-      if (!owner) {
-        console.error('Owner profile not found for user:', userId);
-        return NextResponse.json({ error: 'Owner profile not found' }, { status: 404 });
-      }
+        if (!owner) {
+          console.log('Owner profile not found, creating one for user:', userId);
+          
+          // Find the user to get name and email
+          const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { name: true, email: true }
+          });
+          
+          // Create owner profile
+          owner = await prisma.owner.create({
+            data: {
+              userId,
+              name: user?.name || data.ownerName || 'Dog Owner',
+              email: user?.email || data.ownerEmail || '',
+              phone: data.ownerPhone || '',
+              address: data.address || {
+                street: '',
+                city: '',
+                state: '',
+                zip: ''
+              }
+            },
+            select: { id: true, address: true, name: true, email: true, phone: true }
+          });
+          
+          console.log('Created new owner profile:', owner);
+        }
 
-      ownerId = owner.id;
-      
-      // If no address provided, use owner's address
-      if (!data.address) {
-        data.address = owner.address;
+        ownerId = owner.id;
+        
+        // If no address provided, use owner's address
+        if (!data.address) {
+          data.address = owner.address;
+        }
       }
     } else if (!ownerId) {
+      // Admins must specify owner ID
       return NextResponse.json({ error: 'ownerId is required for admin users' }, { status: 400 });
     }
     
-    // Check if owner exists
+    // Verify owner exists
     const ownerExists = await prisma.owner.findUnique({
       where: { id: ownerId },
       select: { id: true, address: true }

@@ -4,9 +4,10 @@ import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import RouteGuard from '@/components/RouteGuard';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { generateId } from '@/utils/helpers';
 import DogImageUploader from '@/components/DogImageUploader';
+import apiClient from '@/lib/api/client';
 
 export default function AddDogPage() {
   const { user } = useAuth();
@@ -89,26 +90,18 @@ export default function AddDogPage() {
     
     try {
       // Call the API to ensure owner profile exists
-      const response = await fetch('/api/data/owners/ensure', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          name: user.name || 'Dog Owner',
-          email: user.email,
-          phone: ''
-        })
+      const response = await apiClient.post('/data/owners/ensure', {
+        userId: user.id,
+        name: user.name || 'Dog Owner',
+        email: user.email,
+        phone: ''
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to ensure owner profile');
+        throw new Error(response.error || 'Failed to ensure owner profile');
       }
       
-      const ownerData = await response.json();
-      return ownerData.id; // Return the owner ID
+      return response.data.id; // Return the owner ID
     } catch (error) {
       console.error('Error ensuring owner profile:', error);
       return null;
@@ -145,22 +138,23 @@ export default function AddDogPage() {
       
       console.log('Submitting new dog:', dogData);
       
-      // Call the API to save the dog
-      const response = await fetch('/api/data/dogs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(dogData)
-      });
+      // Use apiClient instead of raw fetch
+      const response = await apiClient.post('/data/dogs', dogData);
       
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create dog');
+        throw new Error(response.error || 'Failed to create dog');
       }
       
-      const newDog = await response.json();
+      const newDog = response.data;
       console.log('New dog created:', newDog);
+      
+      // Force cache invalidation
+      console.log('Forcing cache invalidation for dogs...');
+      try {
+        await apiClient.get('/data/owners/refresh-cache');
+      } catch (error) {
+        console.warn('Error refreshing cache:', error);
+      }
       
       // Redirect to assessment request page with error handling
       try {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useDog, useUpdateDog, useDeleteDog } from '@/lib/hooks/useDataHooks';
+import { useDogById, useUpdateDog, useDeleteDog } from '@/lib/hooks/useDataHooks';
 import { Dog } from '@/lib/types';
 import { format } from 'date-fns';
 import RouteGuard from '@/components/RouteGuard';
@@ -125,7 +125,7 @@ export default function DogDetailsPage() {
     isPending, 
     error, 
     refetch 
-  } = useDog(dogId);
+  } = useDogById(dogId);
   
   // Cast the dog data to our extended type
   const dog = dogData as ExtendedDog | undefined;

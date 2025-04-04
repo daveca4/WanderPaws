@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import { TabbedDashboard } from '@/components/admin/TabbedDashboard';
 
 export default function AdminDashboard() {

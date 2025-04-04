@@ -1,23 +1,25 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Conversation, User } from '@/lib/types';
+import Image from 'next/image';
+import { useRouter, usePathname } from 'next/navigation';
+import { Conversation, Message, User } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
 import { getUsersByIds } from '@/lib/userService';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import NewConversation from './NewConversation';
 
 interface ConversationListProps {
   conversations: Conversation[];
   currentConversationId?: string;
-  isLoading: boolean;
+  isLoading?: boolean;
 }
 
 export default function ConversationList({
   conversations,
   currentConversationId,
-  isLoading,
+  isLoading = false,
 }: ConversationListProps) {
   const { user } = useAuth();
   const [showNewConversationModal, setShowNewConversationModal] = useState(false);

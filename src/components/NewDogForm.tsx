@@ -2,11 +2,10 @@
 
 import { useState } from 'react';
 import { Owner, Dog } from '@/lib/types';
-import { generateId } from '@/utils/helpers';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import DogImageUploader from './DogImageUploader';
-import { useData } from '@/lib/DataContext';
+import { useCreateDog, useUpdateDog } from '@/lib/hooks/useDogAPI';
 
 interface NewDogFormProps {
   owners: Owner[];
@@ -16,7 +15,10 @@ interface NewDogFormProps {
 
 export default function NewDogForm({ owners, initialData, isEditing = false }: NewDogFormProps) {
   const router = useRouter();
-  const { createDog, updateDog } = useData();
+  
+  // Use our React Query hooks for mutations
+  const createDogMutation = useCreateDog();
+  const updateDogMutation = useUpdateDog();
   
   const [formData, setFormData] = useState<Partial<Dog>>({
     name: initialData?.name || '',
@@ -38,7 +40,6 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
   const [temperamentInput, setTemperamentInput] = useState('');
   const [specialNeedsInput, setSpecialNeedsInput] = useState('');
   
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formErrors, setFormErrors] = useState<{
     [key: string]: string;
   }>({});
@@ -60,14 +61,16 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
     
     // Clear any previous errors
     setFormErrors({});
-    setIsSubmitting(true);
     
     try {
-      // Actually save the data using our API
+      // Save the data using our mutation hooks
       if (isEditing && initialData?.id) {
-        await updateDog(initialData.id, formData);
+        await updateDogMutation.mutateAsync({ 
+          id: initialData.id, 
+          data: formData 
+        });
       } else {
-        await createDog(formData as Omit<Dog, 'id'>);
+        await createDogMutation.mutateAsync(formData as Omit<Dog, 'id'>);
       }
       
       // Navigate back to dogs list
@@ -77,8 +80,6 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
       setFormErrors({
         submit: error instanceof Error ? error.message : 'Failed to save dog'
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
   
@@ -446,12 +447,9 @@ export default function NewDogForm({ owners, initialData, isEditing = false }: N
         </Link>
         <button
           type="submit"
-          disabled={isSubmitting}
-          className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 ${
-            isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
-          }`}
+          className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700`}
         >
-          {isSubmitting ? 'Saving...' : isEditing ? 'Update Dog' : 'Add Dog'}
+          {isEditing ? 'Update Dog' : 'Add Dog'}
         </button>
       </div>
       

@@ -3,7 +3,7 @@
 import React from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { createQueryClient } from './queryClient';
-import { AuthProvider } from './AuthContext';
+import { AuthProvider } from './auth/AuthContext';
 import { DataProvider } from './DataContext';
 import { MessageProvider } from './MessageContext';
 import { LandingLayout } from '@/components/LandingLayout';

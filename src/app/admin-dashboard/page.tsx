@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 import {
   useAdminDashboardStats,
   useAllUsers,
@@ -16,6 +16,24 @@ import {
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { User, Walk, Assessment } from '@/lib/types';
+import RouteGuard from '@/components/RouteGuard';
+import PendingAssessments from '@/components/admin/PendingAssessments';
+
+// Define interface for admin dashboard stats
+interface AdminDashboardStats {
+  totalUsers: number;
+  totalWalks: number;
+  totalDogs: number;
+  pendingAssessments: number;
+  recentSignups: number;
+  activeWalks: number;
+  revenue: {
+    daily: number;
+    weekly: number;
+    monthly: number;
+    total: number;
+  };
+}
 
 interface AdminMetricsCardProps {
   title: string;
@@ -171,218 +189,130 @@ function RecentWalks() {
   );
 }
 
-// Pending Assessments component
-function PendingAssessments() {
-  const { data = [], isPending } = useAdminPendingAssessments();
-  const reviewAssessment = useReviewAssessment();
-  
-  const handleApprove = (assessmentId: string) => {
-    reviewAssessment.mutate({ 
-      assessmentId, 
-      status: 'approved' 
-    });
-  };
-  
-  const handleReject = (assessmentId: string) => {
-    reviewAssessment.mutate({ 
-      assessmentId, 
-      status: 'denied'
-    });
-  };
-  
-  if (isPending) {
-    return <div className="animate-pulse bg-gray-100 h-64 rounded-lg"></div>;
-  }
-  
-  const assessments = Array.isArray(data) ? data : [];
-  
-  if (assessments.length === 0) {
-    return null;
-  }
-  
-  return (
-    <div className="bg-amber-50 rounded-lg border border-amber-200 p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-semibold text-amber-800">
-          <span className="inline-flex items-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Pending Assessments
-          </span>
-        </h2>
-        <span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-amber-100 text-amber-800 text-xs font-medium">
-          {assessments.length}
-        </span>
-      </div>
-      
-      <p className="text-amber-700 mb-4">
-        Walker assessments awaiting your review
-      </p>
-      
-      <div className="space-y-3">
-        {assessments.map((assessment: Assessment) => (
-          <div key={assessment.id} className="bg-white p-4 rounded-lg shadow-sm">
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                <p className="font-medium">{assessment.walker?.name || 'Walker'}</p>
-                <p className="text-sm text-gray-500">Submitted: {format(new Date(assessment.createdAt), 'MMM d, yyyy')}</p>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleApprove(assessment.id)}
-                  disabled={reviewAssessment.isPending}
-                  className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50"
-                >
-                  Approve
-                </button>
-                <button
-                  onClick={() => handleReject(assessment.id)}
-                  disabled={reviewAssessment.isPending}
-                  className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 disabled:opacity-50"
-                >
-                  Reject
-                </button>
-              </div>
-            </div>
-            <div className="text-sm text-gray-700">
-              <p><strong>Dog Types:</strong> {assessment.dogTypes.join(', ')}</p>
-              <p><strong>Experience:</strong> {assessment.experience} years</p>
-              {assessment.notes && <p className="mt-2">{assessment.notes}</p>}
-            </div>
-          </div>
-        ))}
-        
-        {assessments.length > 3 && (
-          <Link 
-            href="/admin-dashboard/assessments"
-            className="block text-center text-sm text-amber-700 hover:text-amber-800 mt-2"
-          >
-            View all {assessments.length} pending assessments
-          </Link>
-        )}
-      </div>
-    </div>
-  );
-}
-
 export default function AdminDashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
   
-  // Use React Query hooks and provide fallback values that match the actual response structure
-  const { 
-    data: stats = { 
-      totalUsers: 0, 
-      totalWalkers: 0, 
-      totalOwners: 0, 
-      totalDogs: 0, 
-      totalWalks: 0, 
-      revenue: {
-        daily: 0,
-        weekly: 0,
-        monthly: 0,
-        total: 0
-      },
-      activeWalks: 0,
-      pendingAssessments: 0,
-      recentSignups: 0
-    }, 
-    isPending: isLoadingStats 
-  } = useAdminDashboardStats();
-
-  // Redirect if not an admin
-  useEffect(() => {
-    if (!loading && user && user.role !== 'admin') {
-      router.push('/unauthorized');
-    }
-  }, [user, loading, router]);
+  const { data: stats = {} as AdminDashboardStats, isPending: statsLoading } = useAdminDashboardStats();
   
-  // Loading state
-  const isPending = loading || isLoadingStats;
-  if (isPending || !user || user.role !== 'admin') {
+  // Initialize state values
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [totalWalks, setTotalWalks] = useState(0);
+  const [revenue, setRevenue] = useState(0);
+  
+  // Process the stats data when it changes
+  useEffect(() => {
+    if (stats) {
+      setTotalUsers((stats as AdminDashboardStats).totalUsers || 0);
+      setTotalWalks((stats as AdminDashboardStats).totalWalks || 0);
+      setRevenue((stats as AdminDashboardStats).revenue?.total || 0);
+    }
+  }, [stats]);
+  
+  // If loading, show loading state
+  if (loading || statsLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
       </div>
     );
   }
-
+  
+  // If user is not admin, redirect
+  if (!user || user.role !== 'admin') {
+    return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold text-red-600">Access Denied</h2>
+        <p className="mt-2 text-gray-600">You don't have permission to access this page.</p>
+        <button
+          onClick={() => router.push('/')}
+          className="mt-4 px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
+        >
+          Go Home
+        </button>
+      </div>
+    );
+  }
+  
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+    <RouteGuard requiredPermission={{ action: 'access', resource: 'admin_dashboard' }}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+          
+          <div className="flex space-x-2">
+            <Link 
+              href="/admin-dashboard/analytics"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              View Analytics
+            </Link>
+            <Link 
+              href="/admin-dashboard/settings"
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Settings
+            </Link>
+          </div>
+        </div>
         
-        <div className="flex space-x-2">
-          <Link 
-            href="/admin-dashboard/analytics"
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            View Analytics
-          </Link>
-          <Link 
-            href="/admin-dashboard/settings"
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-          >
-            Settings
-          </Link>
+        {/* Metrics cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+          <AdminMetricsCard 
+            title="Total Users"
+            value={(stats as AdminDashboardStats).totalUsers || 0}
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            }
+            color="blue"
+          />
+          
+          <AdminMetricsCard 
+            title="Total Walks"
+            value={(stats as AdminDashboardStats).totalWalks || 0}
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+              </svg>
+            }
+            color="green"
+          />
+          
+          <AdminMetricsCard 
+            title="Total Revenue"
+            value={`$${((stats as AdminDashboardStats).revenue?.total || 0).toFixed(2)}`}
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            }
+            color="amber"
+          />
+          
+          <AdminMetricsCard 
+            title="Pending Assessments"
+            value={(stats as AdminDashboardStats).pendingAssessments || 0}
+            icon={
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            }
+            color="purple"
+          />
+        </div>
+        
+        <div className="mt-8">
+          <PendingAssessments />
+        </div>
+        
+        {/* Main content grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+          <RecentUsers />
+          <RecentWalks />
         </div>
       </div>
-      
-      {/* Metrics cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <AdminMetricsCard 
-          title="Total Users"
-          value={stats.totalUsers}
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-            </svg>
-          }
-          color="blue"
-        />
-        
-        <AdminMetricsCard 
-          title="Total Walks"
-          value={stats.totalWalks}
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-            </svg>
-          }
-          color="green"
-        />
-        
-        <AdminMetricsCard 
-          title="Active Walkers"
-          value={stats.activeWalks || 0}
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-            </svg>
-          }
-          color="purple"
-        />
-        
-        <AdminMetricsCard 
-          title="Total Revenue"
-          value={`$${stats.revenue?.total.toFixed(2) || '0.00'}`}
-          icon={
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          }
-          color="amber"
-        />
-      </div>
-      
-      <PendingAssessments />
-      
-      {/* Main content grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentUsers />
-        <RecentWalks />
-      </div>
-    </div>
+    </RouteGuard>
   );
 } 

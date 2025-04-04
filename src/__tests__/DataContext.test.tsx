@@ -2,10 +2,10 @@ import React from 'react';
 import { render, act, waitFor, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { DataProvider, useData } from '@/lib/DataContext';
-import { useAuth } from '@/lib/AuthContext';
+import { useAuth } from '@/lib/auth/AuthContext';
 
 // Mock AuthContext
-jest.mock('@/lib/AuthContext', () => ({
+jest.mock('@/lib/auth/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
 

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '../AuthContext';
-import { api } from '../api/client';
+import { useAuth } from '../auth/AuthContext';
+import apiClient from '../api/client';
 import { queryKeys } from '../queryClient';
 import { User, Walker, Owner, Dog, Walk, Assessment, UserSubscription } from '../types';
 
@@ -16,7 +16,7 @@ export function useAdminDashboardStats() {
         throw new Error('Unauthorized');
       }
       
-      const response = await api.get<{
+      const response = await apiClient.get<{
         totalUsers: number;
         totalWalks: number;
         totalDogs: number;
@@ -29,7 +29,7 @@ export function useAdminDashboardStats() {
           monthly: number;
           total: number;
         }
-      }>('/api/admin/dashboard');
+      }>('/admin/dashboard');
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch admin dashboard data');
@@ -65,12 +65,12 @@ export function useAllUsers(page = 1, limit = 50, filters?: Record<string, any>)
         });
       }
       
-      const response = await api.get<{
+      const response = await apiClient.get<{
         users: User[];
         total: number;
         page: number;
         limit: number;
-      }>(`/api/admin/users?${queryParams.toString()}`);
+      }>(`/admin/users?${queryParams.toString()}`);
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch users');
@@ -94,12 +94,12 @@ export function useAllWalkers(page = 1, limit = 20) {
         throw new Error('Unauthorized');
       }
       
-      const response = await api.get<{
+      const response = await apiClient.get<{
         walkers: Walker[];
         total: number;
         page: number;
         limit: number;
-      }>(`/api/admin/walkers?page=${page}&limit=${limit}`);
+      }>(`/admin/walkers?page=${page}&limit=${limit}`);
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch walkers');
@@ -123,12 +123,12 @@ export function useAllOwners(page = 1, limit = 20) {
         throw new Error('Unauthorized');
       }
       
-      const response = await api.get<{
+      const response = await apiClient.get<{
         owners: Owner[];
         total: number;
         page: number;
         limit: number;
-      }>(`/api/admin/owners?page=${page}&limit=${limit}`);
+      }>(`/admin/owners?page=${page}&limit=${limit}`);
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch owners');
@@ -174,12 +174,12 @@ export function useAdminWalks(
         });
       }
       
-      const response = await api.get<{
+      const response = await apiClient.get<{
         walks: Walk[];
         total: number;
         page: number;
         limit: number;
-      }>(`/api/admin/walks?${queryParams.toString()}`);
+      }>(`/admin/walks?${queryParams.toString()}`);
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch walks');
@@ -203,7 +203,7 @@ export function useAdminPendingAssessments() {
         throw new Error('Unauthorized');
       }
       
-      const response = await api.get<Assessment[]>('/api/admin/assessments/pending');
+      const response = await apiClient.get<Assessment[]>('/admin/assessments/pending');
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch pending assessments');
@@ -227,7 +227,7 @@ export function useUpdateUserRole() {
         throw new Error('Unauthorized');
       }
       
-      const response = await api.patch<User>(`/api/admin/users/${userId}/role`, { role });
+      const response = await apiClient.patch<User>(`/admin/users/${userId}/role`, { role });
       
       if (!response.ok) {
         throw new Error(response.error || `Failed to update user role to ${role}`);
@@ -260,7 +260,7 @@ export function useReviewAssessment() {
         throw new Error('Unauthorized');
       }
       
-      const response = await api.patch<Assessment>(`/api/admin/assessments/${assessmentId}/review`, {
+      const response = await apiClient.patch<Assessment>(`/admin/assessments/${assessmentId}/review`, {
         status,
         feedback
       });
@@ -289,14 +289,14 @@ export function useAdminAnalytics(period: 'day' | 'week' | 'month' | 'year' = 'm
         throw new Error('Unauthorized');
       }
       
-      const response = await api.get<{
+      const response = await apiClient.get<{
         walksByDate: Record<string, number>;
         revenue: Record<string, number>;
         newUsers: Record<string, number>;
         walkerActivity: Record<string, number>;
         dogsByBreed: Record<string, number>;
         walkCompletion: { completed: number; cancelled: number; pending: number };
-      }>(`/api/admin/analytics?period=${period}`);
+      }>(`/admin/analytics?period=${period}`);
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch analytics data');
@@ -320,7 +320,7 @@ export function useSubscriptionAnalytics() {
         throw new Error('Unauthorized');
       }
       
-      const response = await api.get<{
+      const response = await apiClient.get<{
         totalSubscriptions: number;
         activeSubscriptions: number;
         revenue: {
@@ -329,7 +329,7 @@ export function useSubscriptionAnalytics() {
         };
         byPlan: Record<string, number>;
         conversionRate: number;
-      }>('/api/admin/subscriptions/analytics');
+      }>('/admin/subscriptions/analytics');
       
       if (!response.ok) {
         throw new Error(response.error || 'Failed to fetch subscription analytics');
