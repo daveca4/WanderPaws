@@ -288,9 +288,9 @@ export default function CreateBookingPage() {
       }
       
       dates.push({
-        date: dateStr,
-        hasMorning,
-        hasAfternoon,
+          date: dateStr,
+          hasMorning,
+          hasAfternoon,
         formattedDate: format(date, 'EEEE, MMMM d, yyyy')
       });
     }
@@ -322,9 +322,9 @@ export default function CreateBookingPage() {
     setError('');
     
     // Prepare booking data and use React Query mutation
-    const bookingData = {
-      dogId: selectedDog.id,
-      date: selectedDate,
+      const bookingData = {
+        dogId: selectedDog.id,
+        date: selectedDate,
       timeSlot: timeSlot,
       notes: notes,
       isRecurring: isRecurring,
@@ -544,7 +544,7 @@ export default function CreateBookingPage() {
             <p className="text-red-700">{error}</p>
           </div>
         )}
-
+        
         {/* Success message */}
         {successMessage && (
           <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md">
@@ -562,7 +562,7 @@ export default function CreateBookingPage() {
                 <div className="text-center py-4">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
                   <p className="mt-2 text-sm text-gray-500">Loading your dogs...</p>
-                </div>
+              </div>
               ) : !ownerProfile ? (
                 <div className="text-center py-4 bg-yellow-50 border border-yellow-200 rounded-md p-4">
                   <div className="text-yellow-700 mb-2">Your owner profile needs to be set up first</div>
@@ -575,20 +575,20 @@ export default function CreateBookingPage() {
                   >
                     {isCreatingProfile ? 'Creating Profile...' : 'Set Up Profile'}
                   </button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <label htmlFor="dogSelect" className="block text-sm font-medium text-gray-700">
-                    Choose a dog <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    id="dogSelect"
-                    value={selectedDog ? selectedDog.id : ''}
-                    onChange={handleDogChange}
-                    className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    required
-                  >
-                    <option value="">Select a dog</option>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label htmlFor="dogSelect" className="block text-sm font-medium text-gray-700">
+                      Choose a dog <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="dogSelect"
+                      value={selectedDog ? selectedDog.id : ''}
+                      onChange={handleDogChange}
+                      className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    >
+                      <option value="">Select a dog</option>
                     {(() => {
                       // Process dog data from any possible API response format
                       let dogsList: Dog[] = [];
@@ -615,7 +615,7 @@ export default function CreateBookingPage() {
                         </option>
                       ));
                     })()}
-                  </select>
+                    </select>
                   
                   {/* Dog count indicator for debugging */}
                   <div className="text-xs text-gray-500 mt-1">
@@ -677,230 +677,230 @@ export default function CreateBookingPage() {
                       </div>
                     </div>
                   )}
-                  
-                  {walkerName && (
-                    <p className="mt-2 text-sm text-gray-600">
-                      Assigned walker: {walkerName}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
+                    
+                    {walkerName && (
+                      <p className="mt-2 text-sm text-gray-600">
+                        Assigned walker: {walkerName}
+                      </p>
+                )}
+              </div>
+            )}
+          </div>
 
-            {/* Step 2: Select date */}
+          {/* Step 2: Select date */}
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Step 2: Select a Date</h2>
-              
-              {!selectedDog ? (
-                <p className="text-sm text-gray-500">Please select a dog first</p>
+            
+            {!selectedDog ? (
+              <p className="text-sm text-gray-500">Please select a dog first</p>
               ) : isLoadingAvailability ? (
                 <div className="text-center py-4">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto"></div>
                   <p className="mt-2 text-sm text-gray-500">Loading available dates...</p>
-                </div>
-              ) : (
-                <>
-                  {availableDates.length === 0 ? (
+              </div>
+            ) : (
+              <>
+                {availableDates.length === 0 ? (
                     <div className="text-center py-4">
                       <p className="text-gray-600 mb-4">No available dates found for the next 30 days. Your assigned walker may not have availability.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <label htmlFor="dateSelect" className="block text-sm font-medium text-gray-700">
-                        Choose an available date <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="dateSelect"
-                        value={selectedDate}
-                        onChange={handleDateChange}
-                        className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        required
-                      >
-                        <option value="">Select a date</option>
-                        {availableDates.map(({ date, formattedDate }) => (
-                          <option key={date} value={date}>
-                            {formattedDate}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <label htmlFor="dateSelect" className="block text-sm font-medium text-gray-700">
+                      Choose an available date <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="dateSelect"
+                      value={selectedDate}
+                      onChange={handleDateChange}
+                      className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      required
+                    >
+                      <option value="">Select a date</option>
+                      {availableDates.map(({ date, formattedDate }) => (
+                        <option key={date} value={date}>
+                          {formattedDate}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
-            {/* Step 3: Select time slot */}
+          {/* Step 3: Select time slot */}
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">Step 3: Select a Time</h2>
-              
-              {!selectedDate ? (
-                <p className="text-sm text-gray-500">Please select a date first</p>
-              ) : (
-                <div className="grid grid-cols-2 gap-4">
-                  {/* Morning option */}
-                  {availableDates.find(d => d.date === selectedDate)?.hasMorning ? (
-                    <button
-                      type="button"
-                      onClick={() => setTimeSlot('morning')}
-                      className={`
-                        p-4 rounded-lg border text-center transition-all
-                        ${timeSlot === 'morning'
-                          ? 'bg-teal-100 border-teal-500 text-teal-700' 
-                          : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'}
-                      `}
-                    >
-                      <div className="text-2xl font-bold">Morning</div>
-                      <div className="mt-2 text-sm">8:00 AM - 12:00 PM</div>
-                    </button>
-                  ) : (
-                    <div className="p-4 rounded-lg border border-gray-200 bg-gray-100 text-center">
-                      <div className="text-2xl font-bold text-gray-400">Morning</div>
-                      <div className="mt-2 text-sm text-gray-400">Not available</div>
-                    </div>
-                  )}
-                  
-                  {/* Afternoon option */}
-                  {availableDates.find(d => d.date === selectedDate)?.hasAfternoon ? (
-                    <button
-                      type="button"
-                      onClick={() => setTimeSlot('afternoon')}
-                      className={`
-                        p-4 rounded-lg border text-center transition-all
-                        ${timeSlot === 'afternoon'
-                          ? 'bg-teal-100 border-teal-500 text-teal-700' 
-                          : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'}
-                      `}
-                    >
-                      <div className="text-2xl font-bold">Afternoon</div>
-                      <div className="mt-2 text-sm">1:00 PM - 5:00 PM</div>
-                    </button>
-                  ) : (
-                    <div className="p-4 rounded-lg border border-gray-200 bg-gray-100 text-center">
-                      <div className="text-2xl font-bold text-gray-400">Afternoon</div>
-                      <div className="mt-2 text-sm text-gray-400">Not available</div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Step 4: Recurring options */}
-            <div className="mb-8">
-              <div className="flex items-center space-x-2 mb-4">
-                <h3 className="text-lg font-medium">Step 4: Recurring Booking Options</h3>
-                <span className="text-sm text-gray-500">(Optional)</span>
-              </div>
-              
-              <div className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="recurringCheckbox"
-                    checked={isRecurring}
-                    onChange={(e) => setIsRecurring(e.target.checked)}
-                    className="rounded text-primary-600 focus:ring-primary-500 h-4 w-4"
-                  />
-                  <label htmlFor="recurringCheckbox" className="text-sm font-medium text-gray-700">
-                    Make this a recurring booking
-                  </label>
-                </div>
+            
+            {!selectedDate ? (
+              <p className="text-sm text-gray-500">Please select a date first</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {/* Morning option */}
+                {availableDates.find(d => d.date === selectedDate)?.hasMorning ? (
+                  <button
+                    type="button"
+                    onClick={() => setTimeSlot('morning')}
+                    className={`
+                      p-4 rounded-lg border text-center transition-all
+                      ${timeSlot === 'morning'
+                        ? 'bg-teal-100 border-teal-500 text-teal-700' 
+                        : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'}
+                    `}
+                  >
+                    <div className="text-2xl font-bold">Morning</div>
+                    <div className="mt-2 text-sm">8:00 AM - 12:00 PM</div>
+                  </button>
+                ) : (
+                  <div className="p-4 rounded-lg border border-gray-200 bg-gray-100 text-center">
+                    <div className="text-2xl font-bold text-gray-400">Morning</div>
+                    <div className="mt-2 text-sm text-gray-400">Not available</div>
+                  </div>
+                )}
                 
-                {isRecurring && (
-                  <div className="pl-6 space-y-4 mt-2">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label htmlFor="frequencySelect" className="block text-sm font-medium text-gray-700">
-                          How often? <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                          id="frequencySelect"
-                          value={frequency}
-                          onChange={(e) => setFrequency(e.target.value as 'daily' | 'weekly' | 'biweekly' | 'monthly')}
-                          className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                          required={isRecurring}
-                        >
-                          <option value="weekly">Weekly</option>
-                          <option value="biweekly">Every 2 Weeks</option>
-                          <option value="monthly">Monthly</option>
-                        </select>
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <label htmlFor="endDateInput" className="block text-sm font-medium text-gray-700">
-                          Until when? <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="date"
-                          id="endDateInput"
-                          value={endDate}
-                          onChange={(e) => setEndDate(e.target.value)}
-                          min={selectedDate ? format(addDays(new Date(selectedDate), 7), 'yyyy-MM-dd') : ''}
-                          className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                          required={isRecurring}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="p-3 bg-blue-50 rounded-md text-sm">
-                      <p>
-                        This recurring booking will require <strong>{requiredCredits}</strong> walk credits.
-                        You currently have <strong>{remainingCredits}</strong> credits remaining.
-                      </p>
-                      
-                      {requiredCredits > remainingCredits && (
-                        <p className="mt-2 text-red-500">
-                          You don't have enough credits for this recurring booking schedule.
-                        </p>
-                      )}
-                    </div>
+                {/* Afternoon option */}
+                {availableDates.find(d => d.date === selectedDate)?.hasAfternoon ? (
+                  <button
+                    type="button"
+                    onClick={() => setTimeSlot('afternoon')}
+                    className={`
+                      p-4 rounded-lg border text-center transition-all
+                      ${timeSlot === 'afternoon'
+                        ? 'bg-teal-100 border-teal-500 text-teal-700' 
+                        : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'}
+                    `}
+                  >
+                    <div className="text-2xl font-bold">Afternoon</div>
+                    <div className="mt-2 text-sm">1:00 PM - 5:00 PM</div>
+                  </button>
+                ) : (
+                  <div className="p-4 rounded-lg border border-gray-200 bg-gray-100 text-center">
+                    <div className="text-2xl font-bold text-gray-400">Afternoon</div>
+                    <div className="mt-2 text-sm text-gray-400">Not available</div>
                   </div>
                 )}
               </div>
-            </div>
+            )}
+          </div>
 
-            {/* Step 5: Special instructions */}
+          {/* Step 4: Recurring options */}
             <div className="mb-8">
-              <div className="flex items-center space-x-2 mb-4">
-                <h3 className="text-lg font-medium">Step 5: Special Instructions</h3>
-                <span className="text-sm text-gray-500">(Optional)</span>
+            <div className="flex items-center space-x-2 mb-4">
+              <h3 className="text-lg font-medium">Step 4: Recurring Booking Options</h3>
+              <span className="text-sm text-gray-500">(Optional)</span>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="recurringCheckbox"
+                  checked={isRecurring}
+                  onChange={(e) => setIsRecurring(e.target.checked)}
+                  className="rounded text-primary-600 focus:ring-primary-500 h-4 w-4"
+                />
+                <label htmlFor="recurringCheckbox" className="text-sm font-medium text-gray-700">
+                  Make this a recurring booking
+                </label>
               </div>
               
-              <div className="space-y-2">
-                <label htmlFor="notesTextarea" className="block text-sm font-medium text-gray-700">
-                  Notes for your walker
-                </label>
-                <textarea
-                  id="notesTextarea"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                  placeholder="Any special instructions or requests for this walk"
-                />
-              </div>
+              {isRecurring && (
+                <div className="pl-6 space-y-4 mt-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label htmlFor="frequencySelect" className="block text-sm font-medium text-gray-700">
+                        How often? <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        id="frequencySelect"
+                        value={frequency}
+                          onChange={(e) => setFrequency(e.target.value as 'daily' | 'weekly' | 'biweekly' | 'monthly')}
+                        className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        required={isRecurring}
+                      >
+                        <option value="weekly">Weekly</option>
+                        <option value="biweekly">Every 2 Weeks</option>
+                        <option value="monthly">Monthly</option>
+                      </select>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <label htmlFor="endDateInput" className="block text-sm font-medium text-gray-700">
+                        Until when? <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        id="endDateInput"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        min={selectedDate ? format(addDays(new Date(selectedDate), 7), 'yyyy-MM-dd') : ''}
+                        className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        required={isRecurring}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="p-3 bg-blue-50 rounded-md text-sm">
+                    <p>
+                      This recurring booking will require <strong>{requiredCredits}</strong> walk credits.
+                      You currently have <strong>{remainingCredits}</strong> credits remaining.
+                    </p>
+                    
+                    {requiredCredits > remainingCredits && (
+                      <p className="mt-2 text-red-500">
+                        You don't have enough credits for this recurring booking schedule.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
+          </div>
 
-            {/* Submit button */}
-            <button
-              type="submit"
-              disabled={
-                isSubmitting || 
-                !selectedDog || 
-                !selectedDate || 
-                !timeSlot ||
+          {/* Step 5: Special instructions */}
+            <div className="mb-8">
+            <div className="flex items-center space-x-2 mb-4">
+              <h3 className="text-lg font-medium">Step 5: Special Instructions</h3>
+              <span className="text-sm text-gray-500">(Optional)</span>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="notesTextarea" className="block text-sm font-medium text-gray-700">
+                Notes for your walker
+              </label>
+              <textarea
+                id="notesTextarea"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+                className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="Any special instructions or requests for this walk"
+              />
+            </div>
+          </div>
+
+          {/* Submit button */}
+          <button
+            type="submit"
+            disabled={
+              isSubmitting || 
+              !selectedDog || 
+              !selectedDate || 
+              !timeSlot ||
                 (isRecurring && (!endDate || requiredCredits > remainingCredits)) ||
                 selectedDog?.assessmentStatus === 'scheduled' ||
                 selectedDog?.assessmentStatus === 'pending' ||
                 selectedDog?.assessmentStatus === 'in_progress' ||
                 selectedDog?.assessmentStatus === 'pending_review' ||
                 selectedDog?.assessmentStatus !== 'approved'
-              }
-              className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            }
+            className="w-full py-3 px-4 border border-transparent rounded-md shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
               title={selectedDog && selectedDog.assessmentStatus !== 'approved' ? 
                 "This dog requires a completed and approved assessment before booking" : ""}
-            >
-              {isSubmitting ? "Booking..." : "Book Walk"}
-            </button>
+          >
+            {isSubmitting ? "Booking..." : "Book Walk"}
+          </button>
           </div>
         </form>
         

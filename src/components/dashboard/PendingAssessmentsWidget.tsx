@@ -1,13 +1,13 @@
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { formatDate } from '@/utils/helpers';
 import { DashboardWidget } from '../DashboardWidget';
-import { useAdminPendingAssessments } from '@/lib/hooks/useAdminHooks';
+import { useAdminPendingAssessments } from '@/lib/hooks/useStandardizedAdminHooks';
 import { Assessment } from '@/lib/types';
 
 export const PendingAssessmentsWidget = () => {
   const [retryCount, setRetryCount] = useState(0);
-  const { data: pendingAssessments, isLoading, error, refetch } = useAdminPendingAssessments();
+  const { data: pendingAssessments = [], isLoading, error, refetch } = useAdminPendingAssessments();
 
   const handleRetry = () => {
     setRetryCount(prev => prev + 1);
@@ -32,12 +32,14 @@ export const PendingAssessmentsWidget = () => {
           <p className="text-sm text-red-600 mt-1">
             {error instanceof Error ? error.message : 'Database error occurred'}
           </p>
-          <button 
-            onClick={handleRetry}
-            className="mt-3 px-4 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
+          <div className="flex space-x-2 mt-3">
+            <button 
+              onClick={handleRetry}
+              className="px-4 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       </DashboardWidget>
     );
@@ -53,16 +55,26 @@ export const PendingAssessmentsWidget = () => {
       </div>
       
       {!pendingAssessments || pendingAssessments.length === 0 ? (
-        <p className="text-gray-500">No pending assessments</p>
+        <div>
+          <p className="text-gray-500">No pending assessments</p>
+          <button 
+            onClick={handleRetry}
+            className="mt-2 text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+          >
+            Refresh
+          </button>
+        </div>
       ) : (
         <div className="divide-y divide-gray-200">
           {pendingAssessments.slice(0, 5).map((assessment: Assessment) => (
             <div key={assessment.id} className="py-3">
               <div className="flex justify-between">
                 <div>
-                  <p className="font-medium text-gray-900">Assessment ID: {assessment.id.substring(0, 8)}</p>
+                  <p className="font-medium text-gray-900">
+                    {assessment.dog?.name || 'Dog'} Assessment
+                  </p>
                   <p className="text-sm text-gray-500">
-                    Dog ID: {assessment.dogId} • Owner ID: {assessment.ownerId}
+                    Owner: {assessment.owner?.name || 'Unknown'} • ID: {assessment.id.substring(0, 8)}
                   </p>
                 </div>
                 <div className="text-right">
@@ -90,6 +102,14 @@ export const PendingAssessmentsWidget = () => {
               </div>
             </div>
           ))}
+          <div className="py-2 text-right">
+            <button 
+              onClick={handleRetry}
+              className="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
       )}
     </DashboardWidget>

@@ -863,8 +863,19 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 // Hook to use the data context
 export const useData = () => {
   const context = useContext(DataContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useData must be used within a DataProvider');
   }
-  return context;
+  return {
+    ...context,
+    // Remove mock data functionality, always using real database data
+    useMockData: false,
+    setUseMockData: () => {}, // No-op function as we don't support mock data in production
+    migrateToDatabase: async () => ({ success: true }), // No-op function
+    resetDatabase: async () => {
+      console.warn('resetDatabase is disabled in production');
+      return { success: false, error: 'Reset functionality disabled in production' };
+    },
+    dbEmpty: false,
+  };
 }; 

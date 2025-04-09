@@ -7,6 +7,157 @@
 const isProduction = process.env.NODE_ENV === 'production';
 // Can be expanded with actual monitoring services like Sentry
 
+// Add type declarations for window Sentry object
+declare global {
+  interface Window {
+    _SENTRY_INITIALIZED?: boolean;
+    Sentry?: {
+      captureException(error: Error): void;
+    };
+  }
+}
+
+// Simple logger implementation with severity levels
+class Logger {
+  private context: string;
+  private includeTimestamp: boolean;
+
+  constructor(context: string, includeTimestamp = true) {
+    this.context = context;
+    this.includeTimestamp = includeTimestamp;
+  }
+
+  private getTimestamp(): string {
+    if (!this.includeTimestamp) return '';
+    return `[${new Date().toISOString()}] `;
+  }
+
+  info(message: string, data?: any): void {
+    const formattedMessage = data 
+      ? `${this.getTimestamp()}[INFO] [${this.context}] ${message} ${JSON.stringify(data)}`
+      : `${this.getTimestamp()}[INFO] [${this.context}] ${message}`;
+    
+    if (isProduction) {
+      // In production, only log to console if DEBUG is enabled
+      if (process.env.DEBUG === 'true') {
+        console.log(formattedMessage);
+      }
+    } else {
+      console.log(formattedMessage);
+    }
+  }
+
+  warn(message: string, data?: any): void {
+    const formattedMessage = data 
+      ? `${this.getTimestamp()}[WARN] [${this.context}] ${message} ${JSON.stringify(data)}`
+      : `${this.getTimestamp()}[WARN] [${this.context}] ${message}`;
+    
+    console.warn(formattedMessage);
+  }
+
+  error(message: string, error?: any): void {
+    let formattedMessage = `${this.getTimestamp()}[ERROR] [${this.context}] ${message}`;
+    
+    // Include error details if provided
+    if (error) {
+      if (error instanceof Error) {
+        formattedMessage += ` ${error.message}`;
+        
+        if (error.stack) {
+          formattedMessage += `\n${error.stack}`;
+        }
+      } else if (typeof error === 'object') {
+        formattedMessage += ` ${JSON.stringify(error)}`;
+      } else {
+        formattedMessage += ` ${error}`;
+      }
+    }
+    
+    console.error(formattedMessage);
+    
+    if (isProduction) {
+      // Send error to monitoring service in production
+      this.captureException(message, error);
+    }
+  }
+
+  success(message: string, data?: any): void {
+    const formattedMessage = data 
+      ? `${this.getTimestamp()}[SUCCESS] [${this.context}] ${message} ${JSON.stringify(data)}`
+      : `${this.getTimestamp()}[SUCCESS] [${this.context}] ${message}`;
+    
+    if (isProduction) {
+      // In production, only log to console if DEBUG is enabled
+      if (process.env.DEBUG === 'true') {
+        console.log(formattedMessage);
+      }
+    } else {
+      console.log(formattedMessage);
+    }
+  }
+
+  debug(message: string, data?: any): void {
+    // Only log debug messages in development or if DEBUG is explicitly enabled
+    if (!isProduction || process.env.DEBUG === 'true') {
+      const formattedMessage = data 
+        ? `${this.getTimestamp()}[DEBUG] [${this.context}] ${message} ${JSON.stringify(data)}`
+        : `${this.getTimestamp()}[DEBUG] [${this.context}] ${message}`;
+      
+      console.log(formattedMessage);
+    }
+  }
+
+  // Function to track errors in production
+  private captureException(message: string, error?: any): void {
+    // Implementation for error monitoring service (e.g., Sentry)
+    try {
+      if (typeof window !== 'undefined' && window._SENTRY_INITIALIZED) {
+        // Client-side error tracking
+        if (window.Sentry) {
+          window.Sentry.captureException(error || new Error(message));
+        }
+      } else if (typeof process !== 'undefined' && process.env.SENTRY_DSN) {
+        // Server-side error tracking using Sentry SDK
+        // This would require proper Sentry initialization elsewhere in the app
+        // Here we're just assuming it has been set up with process.env.SENTRY_DSN
+        
+        // The actual implementation would depend on your error tracking service
+        // Below is a placeholder for where the implementation would go
+        console.error(`[MONITORING] Error captured: ${message}`);
+      }
+    } catch (e) {
+      // Failsafe to ensure monitoring errors don't crash the app
+      console.error('Error in monitoring system:', e);
+    }
+  }
+
+  // Function to track performance metrics
+  trackPerformance(name: string, durationMs: number, tags?: Record<string, string>): void {
+    // Only track detailed performance in development or if explicitly enabled
+    if (!isProduction || process.env.DEBUG === 'true') {
+      const formattedMessage = tags 
+        ? `${this.getTimestamp()}[PERF] [${this.context}] ${name}: ${durationMs}ms ${JSON.stringify(tags)}`
+        : `${this.getTimestamp()}[PERF] [${this.context}] ${name}: ${durationMs}ms`;
+      
+      console.log(formattedMessage);
+    }
+    
+    if (isProduction && durationMs > 1000) {
+      // Track slow operations in production
+      // Implement your monitoring service integration here
+      console.warn(`[PERF WARNING] [${this.context}] Slow operation: ${name}: ${durationMs}ms`);
+    }
+  }
+}
+
+// Create a single logger instance for the application
+export const logger = new Logger('WanderPaws');
+
+// Export helper function to create context-specific loggers
+export function createLogger(context: string): Logger {
+  return new Logger(context);
+}
+
 export function setupMonitoring() {
   if (typeof window === 'undefined' || !isProduction) return;
 

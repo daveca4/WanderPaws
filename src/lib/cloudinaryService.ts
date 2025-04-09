@@ -5,10 +5,16 @@ if (typeof window === 'undefined') {
   // We're on the server
   try {
     cloudinary = require('cloudinary').v2;
+    
+    // Check for required environment variables
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      console.error('Missing required Cloudinary environment variables');
+    }
+    
     cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'dggxbflnu',
-      api_key: process.env.CLOUDINARY_API_KEY || '399599184441365',
-      api_secret: process.env.CLOUDINARY_API_SECRET || 'HECjkZnvZvMaOgSmESdi-A9ABsQ',
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
       secure: true,
     });
     console.log('Cloudinary configured successfully on server');
@@ -64,6 +70,10 @@ export const uploadMedia = async (
     resource_type?: 'image' | 'video' | 'auto';
   } = {}
 ): Promise<CloudinaryUploadResult> => {
+  if (!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME) {
+    throw new Error('Missing Cloudinary configuration');
+  }
+  
   const { folder = 'wanderpaws', tags = [], resource_type = 'auto' } = options;
   
   // Create a FormData object to send the file

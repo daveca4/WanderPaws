@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth/AuthContext';
-import { useAdminDogs } from '@/lib/hooks/useAdminHooks';
+import { useAdminDogs } from '@/lib/hooks/useStandardizedAdminHooks';
 import RouteGuard from '@/components/RouteGuard';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -18,7 +18,6 @@ export default function AdminDogsPage() {
     sizeFilter: '',
     statusFilter: ''
   });
-  const [showDebug, setShowDebug] = useState(false);
   
   // Use the useAdminDogs hook
   const { 
@@ -79,13 +78,6 @@ export default function AdminDogsPage() {
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Admin Dogs Dashboard</h1>
           <div className="flex space-x-2">
-            <button
-              onClick={() => setShowDebug(!showDebug)}
-              className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200"
-              title="Toggle debug panel"
-            >
-              {showDebug ? 'Hide Debug' : 'Debug'}
-            </button>
             <Link 
               href="/admin-dashboard" 
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
@@ -100,30 +92,6 @@ export default function AdminDogsPage() {
             </button>
           </div>
         </div>
-        
-        {/* Debug Panel */}
-        {showDebug && (
-          <div className="bg-gray-50 border border-gray-200 p-4 rounded-md mb-6">
-            <h3 className="font-medium mb-2">Debug Information</h3>
-            <div className="text-sm text-gray-600 space-y-1">
-              <p>User Role: {user?.role || 'Not logged in'}</p>
-              <p>Total Dogs: {total}</p>
-              <p>Current Page: {page}</p>
-              <p>Results Per Page: {limit}</p>
-              <p>Active Filters: {Object.entries(filters).filter(([, value]) => value).map(([key, value]) => `${key}=${value}`).join(', ') || 'None'}</p>
-              <p>Is Loading: {isPending ? 'true' : 'false'}</p>
-              <p>Has Error: {error ? 'true' : 'false'}</p>
-              {error && <p className="text-red-500">Error: {error instanceof Error ? error.message : 'Unknown error'}</p>}
-            </div>
-            
-            <div className="mt-2">
-              <h4 className="font-medium mb-1">API Response Data:</h4>
-              <pre className="bg-gray-200 p-2 rounded-md overflow-auto text-xs max-h-40">
-                {JSON.stringify(data, null, 2)}
-              </pre>
-            </div>
-          </div>
-        )}
         
         {/* Filters */}
         <div className="bg-white shadow rounded-lg p-4 mb-6">

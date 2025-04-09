@@ -2,20 +2,14 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { formatPrice, getActiveSubscriptionPlans } from '@/lib/subscriptionService'; 
 import { formatDate } from '@/utils/helpers';
-import { UserSubscription, SubscriptionPlan, Owner } from '@/lib/types';
+import { UserSubscription, SubscriptionPlan } from '@/lib/types';
 import { DashboardWidget } from '../DashboardWidget';
 
 export const ActiveSubscriptionsWidget = () => {
   const [subscriptions, setSubscriptions] = useState<UserSubscription[]>([]);
   const [plans, setPlans] = useState<SubscriptionPlan[]>([]);
-  const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Helper function to get owner by ID
-  const getOwnerById = (ownerId: string) => {
-    return owners.find(owner => owner.id === ownerId) || { name: 'Unknown owner' };
-  };
 
   // Helper function to get plan by ID
   const getPlanById = (planId: string) => {
@@ -38,18 +32,9 @@ export const ActiveSubscriptionsWidget = () => {
         // Fetch plans using the subscription service
         const plansData = await getActiveSubscriptionPlans();
         
-        // Fetch owners
-        const ownersResponse = await fetch('/api/owners');
-        if (!ownersResponse.ok) {
-          throw new Error('Failed to fetch owners');
-        }
-        const ownersData = await ownersResponse.json();
-        
         setSubscriptions(subsData.subscriptions.slice(0, 5)); // Only show top 5
         setPlans(plansData);
-        setOwners(ownersData.owners);
       } catch (err) {
-        console.error('Error fetching data:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setLoading(false);
@@ -93,14 +78,15 @@ export const ActiveSubscriptionsWidget = () => {
       ) : (
         <div className="divide-y divide-gray-200">
           {subscriptions.map((subscription) => {
-            const owner = getOwnerById(subscription.ownerId);
+            // Get subscription user name
+            const userName = subscription.user?.name || 'Unknown user';
             const plan = getPlanById(subscription.planId);
             return (
               <div key={subscription.id} className="py-3">
                 <div className="flex justify-between">
                   <div>
-                    <p className="font-medium text-gray-900">{owner.name}</p>
-                    <p className="text-sm text-gray-500">{plan?.name || 'Unknown'} Plan • {subscription.creditsRemaining} credits left</p>
+                    <p className="font-medium text-gray-900">{userName}</p>
+                    <p className="text-sm text-gray-500">{plan?.name || 'Basic Plan'} • {subscription.creditsRemaining} credits left</p>
                   </div>
                   <div className="text-right">
                     <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">

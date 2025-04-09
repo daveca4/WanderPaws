@@ -5,14 +5,10 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/AuthContext';
 import {
   useAdminDashboardStats,
-  useAllUsers,
-  useAllWalkers, 
-  useAllOwners,
+  useAdminUsers,
   useAdminWalks,
   useAdminPendingAssessments,
-  useUpdateUserRole,
-  useReviewAssessment
-} from '@/lib/hooks/useAdminHooks';
+} from '@/lib/hooks/useStandardizedAdminHooks';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { User, Walk, Assessment } from '@/lib/types';
@@ -66,7 +62,7 @@ function AdminMetricsCard({ title, value, icon, color = 'blue' }: AdminMetricsCa
 
 // Recent Users component
 function RecentUsers() {
-  const { data, isPending } = useAllUsers();
+  const { data, isPending } = useAdminUsers();
   
   // Extract users array from response
   const users = Array.isArray(data) ? data : data?.users || [];
@@ -192,26 +188,9 @@ function RecentWalks() {
 export default function AdminDashboard() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  
-  const { data: stats = {} as AdminDashboardStats, isPending: statsLoading, error, refetch } = useAdminDashboardStats();
-  
-  // Add debug logging
-  useEffect(() => {
-    console.log('🔍 Admin dashboard stats data:', stats);
-    
-    if (error) {
-      console.error('❌ Error fetching admin dashboard stats:', error);
-    }
-  }, [stats, error]);
-  
-  // Force refetch when component mounts
-  useEffect(() => {
-    if (user && user.role === 'admin') {
-      console.log('AdminDashboardPage - Forcing refetch on mount');
-      refetch();
-    }
-  }, [user, refetch]);
-  
+
+  const { data: stats = {} as AdminDashboardStats, isPending: statsLoading, error } = useAdminDashboardStats();
+
   // If loading, show loading state
   if (loading || statsLoading) {
     return (
@@ -220,8 +199,8 @@ export default function AdminDashboard() {
       </div>
     );
   }
-  
-  // If user is not admin, redirect
+
+  // If user is not admin, redirect or show access denied
   if (!user || user.role !== 'admin') {
     return (
       <div className="text-center py-12">
@@ -236,111 +215,50 @@ export default function AdminDashboard() {
       </div>
     );
   }
-  
+
+  // Handle error state
+  if (error) {
+     return (
+      <div className="text-center py-12">
+        <h2 className="text-2xl font-bold text-red-600">Error Loading Dashboard</h2>
+        <p className="mt-2 text-gray-600">Could not load dashboard data. Please try again later.</p>
+        <p className="mt-1 text-sm text-red-500">{error.message}</p>
+        <button
+          onClick={() => window.location.reload()} // Simple reload for now
+          className="mt-4 px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
+        >
+          Reload Page
+        </button>
+      </div>
+     )
+  }
+
   return (
     <RouteGuard requiredPermission={{ action: 'access', resource: 'admin_dashboard' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-          
-          <div className="flex space-x-2">
-            <button
-              onClick={() => refetch()}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
-            >
-              Refresh Data
-            </button>
-            <Link 
-              href="/admin-dashboard/analytics"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              View Analytics
-            </Link>
-            <Link 
-              href="/admin-dashboard/dogs"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
-            >
-              Manage Dogs
-            </Link>
+        </div>
+
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+          <AdminMetricsCard title="Total Users" value={stats.totalUsers ?? 0} icon={<span>👥</span>} />
+          <AdminMetricsCard title="Total Walks" value={stats.totalWalks ?? 0} icon={<span>🚶‍♀️</span>} color="green" />
+          <AdminMetricsCard title="Pending Assessments" value={stats.pendingAssessments ?? 0} icon={<span>📝</span>} color="purple" />
+          <AdminMetricsCard title="Monthly Revenue" value={`$${(stats.revenue?.monthly ?? 0).toFixed(2)}`} icon={<span>💰</span>} color="amber" />
+        </div>
+
+        {/* Recent Activity Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+          <div className="lg:col-span-1">
+             <RecentUsers />
           </div>
-        </div>
-        
-        {/* Debug panel for when API returns errors */}
-        {error && (
-          <div className="bg-red-50 border-l-4 border-red-500 p-4 my-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">
-                  Error loading dashboard data. Please try refreshing the page.
-                </p>
-                <p className="text-xs text-red-500 mt-1">
-                  {error instanceof Error ? error.message : 'Unknown error'}
-                </p>
-              </div>
-            </div>
+          <div className="lg:col-span-1">
+             <RecentWalks />
           </div>
-        )}
-        
-        {/* Metrics cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
-          <AdminMetricsCard 
-            title="Total Users"
-            value={stats.totalUsers || 0}
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            }
-            color="blue"
-          />
-          
-          <AdminMetricsCard 
-            title="Total Walks"
-            value={stats.totalWalks || 0}
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
-              </svg>
-            }
-            color="green"
-          />
-          
-          <AdminMetricsCard 
-            title="Total Revenue"
-            value={`$${(stats.revenue?.total || 0).toFixed(2)}`}
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            }
-            color="amber"
-          />
-          
-          <AdminMetricsCard 
-            title="Pending Assessments"
-            value={stats.pendingAssessments || 0}
-            icon={
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-              </svg>
-            }
-            color="purple"
-          />
-        </div>
-        
-        <div className="mt-8">
-          <PendingAssessments />
-        </div>
-        
-        {/* Main content grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
-          <RecentUsers />
-          <RecentWalks />
+           <div className="lg:col-span-1">
+             <PendingAssessments />
+           </div>
         </div>
       </div>
     </RouteGuard>

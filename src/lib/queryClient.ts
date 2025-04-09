@@ -64,6 +64,8 @@ export const queryKeys = {
     byId: (id: string) => ['walkers', 'id', id],
     byUser: (userId: string) => ['walkers', 'user', userId],
     nearby: (lat: number, lng: number) => ['walkers', 'nearby', lat, lng],
+    schedule: (filters?: Record<string, any>) => ['walkers', 'schedule', filters],
+    holidayRequests: (filters?: { walkerId?: string }) => ['walkers', 'holidayRequests', filters],
   },
   
   // Walk-related queries
@@ -112,6 +114,7 @@ export const queryKeys = {
     owners: (filters?: Record<string, any>) => ['admin', 'owners', filters],
     walks: (filters?: Record<string, any>) => ['admin', 'walks', filters],
     dogs: (filters?: Record<string, any>) => ['admin', 'dogs', filters],
+    assessments: (filters?: Record<string, any>) => ['admin', 'assessments', filters],
     pendingAssessments: () => ['admin', 'pendingAssessments'],
     subscriptions: (filters?: Record<string, any>) => ['admin', 'subscriptions', filters],
   },
@@ -136,11 +139,19 @@ export function createQueryClient() {
   });
   
   // Configure specific query options for admin dashboard stats
-  client.setQueryDefaults(['adminDashboardStats'], {
+  client.setQueryDefaults(queryKeys.admin.dashboard(), {
     staleTime: 10 * 1000, // 10 seconds - more frequent refreshes for dashboard
     refetchOnWindowFocus: true, // Refetch when window gets focus
     refetchOnMount: true, // Always refetch on component mount
     retry: 2, // Retry twice on failure
+  });
+  
+  // Set defaults for all admin-related queries
+  client.setQueryDefaults(['admin'], {
+    staleTime: 30 * 1000, // 30 seconds
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
+    retry: 2
   });
   
   return client;

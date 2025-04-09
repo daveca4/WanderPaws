@@ -1,7 +1,9 @@
 import { User, Role } from '../types';
+import { logger } from '../utils/logger';
 
 // Session storage key
 const SESSION_STORAGE_KEY = 'wanderpaws_session';
+const USER_STORAGE_KEY = 'wanderpaws_user';
 
 // Session interface
 export interface Session {
@@ -11,23 +13,66 @@ export interface Session {
   token?: string;
   refreshToken?: string;
   expiresAt?: number;
+  email?: string;
+  name?: string;
+  expires?: Date;
 }
 
 /**
  * Get the user session from memory or localStorage
  */
-export function getSession() {
+export function getSession(): Session | null {
   if (typeof window === 'undefined') {
+    logger.warn('getSession called on server side');
     return null;
   }
   
   try {
     // Try getting from localStorage
-    const storedUser = localStorage.getItem('wanderpaws_user');
-    const storedSession = localStorage.getItem('wanderpaws_session');
+    const storedUser = localStorage.getItem(USER_STORAGE_KEY);
+    const storedSession = localStorage.getItem(SESSION_STORAGE_KEY);
+    
+    // Log all localStorage keys for debugging
+    const allKeys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      allKeys.push(localStorage.key(i));
+    }
+    
+    logger.info('LocalStorage keys', { 
+      allKeys, 
+      hasUser: !!storedUser, 
+      hasSession: !!storedSession 
+    });
     
     if (!storedUser || !storedSession) {
-      console.warn('Missing user or session in localStorage');
+      logger.warn('Missing user or session in localStorage', {
+        hasUser: !!storedUser,
+        hasSession: !!storedSession
+      });
+      
+      // Check if we can recover from wanderpaws_user only
+      if (storedUser && !storedSession) {
+        const user = JSON.parse(storedUser);
+        logger.info('Found user but no session, creating minimal session', {
+          userId: user.id,
+          role: user.role
+        });
+        
+        // Create minimal session
+        const minimalSession: Session = {
+          userId: user.id,
+          role: user.role as Role,
+          profileId: user.profileId,
+          email: user.email,
+          name: user.name
+        };
+        
+        // Save it to localStorage
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(minimalSession));
+        
+        return minimalSession;
+      }
+      
       return null;
     }
     
@@ -35,14 +80,15 @@ export function getSession() {
     const session = JSON.parse(storedSession);
     
     // Add extra debug info
-    console.log('Retrieved session from localStorage', {
+    logger.info('Retrieved session from localStorage', {
       userId: user.id,
       role: user.role,
       isAdmin: user.role === 'admin',
+      profileId: user.profileId,
       sessionData: {
         hasToken: !!session.token,
-        expires: new Date(session.expires).toISOString(),
-        isExpired: new Date(session.expires) < new Date(),
+        expires: session.expires ? new Date(session.expires).toISOString() : 'none',
+        isExpired: session.expires ? new Date(session.expires) < new Date() : false,
       }
     });
     
@@ -51,18 +97,20 @@ export function getSession() {
       user.profileId = String(user.profileId);
     }
     
-    return {
+    const fullSession: Session = {
       userId: user.id,
+      role: user.role as Role,
+      profileId: user.profileId,
       email: user.email,
       name: user.name,
-      role: user.role,
-      profileId: user.profileId,
       token: session.token,
       refreshToken: session.refreshToken,
-      expires: new Date(session.expires),
+      expires: session.expires ? new Date(session.expires) : undefined,
     };
+    
+    return fullSession;
   } catch (error) {
-    console.error('Error retrieving session:', error);
+    logger.error('Error retrieving session:', error);
     return null;
   }
 }
@@ -108,6 +156,8 @@ export function createSession(user: User, token?: string, refreshToken?: string,
     userId: user.id,
     role: user.role,
     profileId: user.profileId,
+    email: user.email,
+    name: user.name,
     token,
     refreshToken
   };
@@ -154,7 +204,7 @@ export async function refreshToken(): Promise<boolean> {
     
     return true;
   } catch (error) {
-    console.error('Failed to refresh token:', error);
+    logger.error('Failed to refresh token:', error);
     // If refresh fails, clear session
     clearSession();
     return false;

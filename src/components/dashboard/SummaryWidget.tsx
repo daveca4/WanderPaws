@@ -1,105 +1,167 @@
 import React, { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import apiClient from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/AuthContext';
+import { useAdminDashboardStats } from '@/lib/hooks/useStandardizedAdminHooks';
+import { logger } from '@/lib/utils/logger';
 
 export function SummaryWidget() {
   const { user } = useAuth();
   const [retryCount, setRetryCount] = useState(0);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
   
   // Debug user auth state
   useEffect(() => {
-    console.log('SummaryWidget - Current User:', {
+    logger.info('SummaryWidget - Current User:', {
       userId: user?.id, 
       role: user?.role,
       profileId: user?.profileId
     });
   }, [user]);
   
-  const { data: stats, isLoading, error, isError, refetch } = useQuery({
-    queryKey: ['adminDashboardStats', retryCount],
-    queryFn: async () => {
-      try {
-        if (!user || user.role !== 'admin') {
-          throw new Error('Only admin users can access dashboard stats');
-        }
-        
-        // Ensure proper headers for admin authentication
-        const headers: Record<string, string> = {};
-        
-        if (user.id) headers['user-id'] = user.id;
-        if (user.role) headers['user-role'] = user.role;
-        if (user.profileId) headers['user-profile-id'] = user.profileId;
-        
-        console.log('SummaryWidget - Sending request with headers:', headers);
-        
-        const response = await apiClient.get('/admin/dashboard', { headers });
-        console.log('SummaryWidget - Dashboard API response:', response);
-        
-        if (response.status === 401) {
-          throw new Error('Unauthorized: Only admins can access dashboard stats');
-        }
-        
-        if (!response.ok) {
-          throw new Error(response.error || 'Failed to fetch dashboard data');
-        }
-        
-        console.log('SummaryWidget - Parsed data:', response.data);
-        return response.data;
-      } catch (err) {
-        console.error('SummaryWidget - Error fetching dashboard stats:', err);
-        throw err;
-      }
-    },
-    enabled: !!user && user.role === 'admin',
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    retry: 2
-  });
+  const { 
+    data: stats, 
+    isLoading, 
+    error, 
+    isError, 
+    refetch,
+    failureCount,
+    isFetching 
+  } = useAdminDashboardStats();
 
   // Debug data state
   useEffect(() => {
-    console.log('SummaryWidget - Stats data updated:', stats);
-  }, [stats]);
+    logger.info('SummaryWidget - Stats data updated:', {
+      hasData: !!stats,
+      failureCount: failureCount,
+      isLoading,
+      isFetching,
+      hasError: !!error
+    });
+    
+    if (stats) {
+      logger.info('SummaryWidget - Stats content:', {
+        totalUsers: stats.totalUsers,
+        pendingAssessments: stats.pendingAssessments,
+        revenue: stats.revenue
+      });
+    }
+  }, [stats, isLoading, isFetching, failureCount, error]);
 
   // Fetch data when user is available
   useEffect(() => {
     if (user && user.role === 'admin') {
-      console.log('SummaryWidget - Triggering refetch with user:', user.id);
+      logger.info('SummaryWidget - Triggering refetch with user:', user.id);
       refetch();
     }
   }, [user, refetch]);
 
   const handleRetry = () => {
-    console.log('SummaryWidget - Manual retry triggered');
+    logger.info('SummaryWidget - Manual retry triggered');
     setRetryCount(prev => prev + 1);
+    refetch();
+  };
+  
+  // Test direct API access
+  const testDirectApi = async () => {
+    try {
+      logger.info('SummaryWidget - Testing direct API call');
+      
+      // Prepare headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (user?.id) headers['user-id'] = user.id;
+      if (user?.role) headers['user-role'] = user.role;
+      if (user?.profileId) headers['user-profile-id'] = user.profileId;
+      
+      logger.info('SummaryWidget - Direct API headers:', headers);
+      
+      const response = await fetch('/api/admin/dashboard', { 
+        method: 'GET',
+        headers
+      });
+      
+      logger.info('SummaryWidget - Direct API status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        logger.info('SummaryWidget - Direct API data:', data);
+        setDebugInfo(data);
+        
+        // Trigger a refetch with the React Query hook
+        refetch();
+      } else {
+        const errorText = await response.text();
+        logger.error('SummaryWidget - Direct API error:', { 
+          status: response.status, 
+          statusText: response.statusText,
+          body: errorText
+        });
+        setDebugInfo({ error: `${response.status}: ${response.statusText}`, body: errorText });
+      }
+    } catch (err) {
+      logger.error('SummaryWidget - Direct API exception:', err);
+      setDebugInfo({ 
+        error: err instanceof Error ? err.message : 'Unknown error',
+        stack: err instanceof Error ? err.stack : undefined
+      });
+    }
   };
 
   if (isLoading) {
-    console.log('SummaryWidget - Loading state');
+    logger.info('SummaryWidget - Rendering loading state');
     return (
-      <div className="h-full w-full p-4 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary-600"></div>
+      <div className="h-full w-full p-4 flex items-center justify-center flex-col">
+        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary-600 mb-3"></div>
+        <p className="text-sm text-gray-500">Loading dashboard data...</p>
       </div>
     );
   }
 
   if (isError || !stats) {
-    console.log('SummaryWidget - Error state:', { error, stats });
+    logger.info('SummaryWidget - Rendering error state:', { error, stats });
     return (
       <div className="h-full w-full p-4">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Dashboard Summary</h2>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Dashboard Summary</h2>
         <div className="bg-red-50 p-4 rounded-lg mb-4">
           <p className="text-red-700">Unable to load dashboard data</p>
           <p className="text-sm text-red-600 mt-1">
             {error instanceof Error ? error.message : 'Database error occurred'}
           </p>
-          <button 
-            onClick={handleRetry}
-            className="mt-3 px-4 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
+          <div className="flex space-x-2 mt-3">
+            <button 
+              onClick={handleRetry}
+              className="px-4 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+            >
+              Retry
+            </button>
+            <button
+              onClick={testDirectApi}
+              className="px-4 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+            >
+              Test API
+            </button>
+          </div>
         </div>
+        
+        {/* Debug info panel */}
+        {debugInfo && (
+          <div className="mt-4 p-3 border border-blue-200 bg-blue-50 rounded text-xs">
+            <div className="flex justify-between items-center">
+              <h3 className="font-semibold">Debug Information</h3>
+              <button
+                onClick={() => setDebugInfo(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            <pre className="mt-2 overflow-auto max-h-40">
+              {JSON.stringify(debugInfo, null, 2)}
+            </pre>
+          </div>
+        )}
+        
         <div className="grid grid-cols-3 gap-4">
           <div className="bg-blue-100 p-4 rounded-lg text-center">
             <p className="text-3xl font-bold text-blue-700">-</p>
@@ -118,7 +180,7 @@ export function SummaryWidget() {
     );
   }
 
-  console.log('SummaryWidget - Rendering with data:', {
+  logger.info('SummaryWidget - Rendering with data:', {
     totalUsers: stats?.totalUsers,
     activeWalks: stats?.activeWalks,
     dailyRevenue: stats?.revenue?.daily
@@ -126,7 +188,42 @@ export function SummaryWidget() {
 
   return (
     <div className="h-full w-full p-4">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Dashboard Summary</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-lg font-semibold text-gray-900">Dashboard Summary</h2>
+        <div className="flex space-x-2">
+          <button 
+            onClick={handleRetry}
+            className="px-3 py-1 bg-gray-100 text-xs rounded hover:bg-gray-200"
+          >
+            Refresh
+          </button>
+          <button
+            onClick={testDirectApi}
+            className="px-3 py-1 bg-blue-100 text-xs rounded hover:bg-blue-200"
+          >
+            Debug
+          </button>
+        </div>
+      </div>
+      
+      {/* Debug info panel */}
+      {debugInfo && (
+        <div className="mb-4 p-3 border border-blue-200 bg-blue-50 rounded text-xs">
+          <div className="flex justify-between items-center">
+            <h3 className="font-semibold">Debug Information</h3>
+            <button
+              onClick={() => setDebugInfo(null)}
+              className="text-gray-500 hover:text-gray-700"
+            >
+              ✕
+            </button>
+          </div>
+          <pre className="mt-2 overflow-auto max-h-40">
+            {JSON.stringify(debugInfo, null, 2)}
+          </pre>
+        </div>
+      )}
+      
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-blue-100 p-4 rounded-lg text-center">
           <p className="text-3xl font-bold text-blue-700">{stats?.totalUsers || 0}</p>

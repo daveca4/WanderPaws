@@ -1,6 +1,6 @@
-# WanderPaws - AI-Powered Dog Walking Management System
+# WanderPaws - Dog Walking Application
 
-WanderPaws is a comprehensive dog walking management system that leverages AI to optimize scheduling, match dogs with compatible walkers, and provide health insights based on walk data.
+WanderPaws is a comprehensive dog walking platform that connects dog owners with professional walkers, provides assessment services, subscription management, and an admin dashboard for business insights.
 
 ## Features
 
@@ -107,5 +107,122 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 ---
 
 WanderPaws - Making dog walking more intelligent, efficient, and insightful.
+
+## Production Deployment Guide
+
+### Prerequisites
+
+- Node.js 18+ and npm
+- PostgreSQL database
+- AWS S3 bucket for media storage
+- Cloudinary account for image/video processing
+- Stripe account for payments
+
+### Environment Setup
+
+1. Clone the repository
+2. Copy `.env.sample` to `.env` and configure all required environment variables:
+
+```bash
+cp .env.sample .env
+```
+
+3. Edit the `.env` file with your production values:
+
+### Required Environment Variables
+
+- **Database**
+  - `DATABASE_URL`: PostgreSQL connection string
+
+- **Cloudinary**
+  - `CLOUDINARY_CLOUD_NAME`: Your Cloudinary cloud name
+  - `CLOUDINARY_API_KEY`: API key for Cloudinary
+  - `CLOUDINARY_API_SECRET`: API secret for Cloudinary
+  - `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME`: Public cloud name for client-side
+
+- **AWS S3**
+  - `AWS_REGION`: Region where your S3 bucket is located
+  - `AWS_ACCESS_KEY_ID`: Access key for AWS
+  - `AWS_SECRET_ACCESS_KEY`: Secret key for AWS
+  - `AWS_S3_BUCKET_NAME`: Name of your S3 bucket
+  - `NEXT_PUBLIC_AWS_S3_BUCKET_NAME`: Public bucket name for client-side
+  - `NEXT_PUBLIC_AWS_REGION`: Public AWS region for client-side
+
+- **Stripe**
+  - `STRIPE_SECRET_KEY`: Your Stripe secret key
+  - `STRIPE_WEBHOOK_SECRET`: Secret for Stripe webhooks
+  - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`: Publishable key for client-side
+  - `NEXT_PUBLIC_BASE_URL`: Your production domain (e.g., https://wanderpaws.com)
+
+### Database Setup
+
+1. Ensure your PostgreSQL database is running and accessible
+2. Run the database migrations:
+
+```bash
+npx prisma migrate deploy
+```
+
+### Building for Production
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Build the application:
+
+```bash
+npm run build
+```
+
+3. Start the production server:
+
+```bash
+npm start
+```
+
+### Deployment Options
+
+#### Vercel (Recommended)
+
+1. Connect your GitHub repository to Vercel
+2. Add all environment variables in the Vercel dashboard
+3. Deploy the application
+
+#### Docker
+
+1. Build the Docker image:
+
+```bash
+docker build -t wanderpaws .
+```
+
+2. Run the container with environment variables:
+
+```bash
+docker run -p 3000:3000 --env-file .env wanderpaws
+```
+
+### Monitoring & Production Considerations
+
+- Configure error tracking by setting up Sentry and setting the `SENTRY_DSN` environment variable
+- Review and adjust rate limiting for API routes
+- Set up database connection pooling for production
+- Configure AWS S3 bucket CORS settings for file uploads
+- Set up Stripe webhooks for payment event handling
+
+### Security Checklist
+
+- Ensure all API keys and secrets are properly secured
+- Set up proper CORS headers
+- Enable HTTPS for all traffic
+- Implement rate limiting for authentication endpoints
+- Review database permissions and ensure least privilege principle
+
+## License
+
+All rights reserved. This code is not open source and should not be redistributed without permission.
 
 ##

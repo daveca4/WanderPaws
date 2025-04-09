@@ -1,25 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
-const cloudinary = require('cloudinary').v2;
+import { v2 as cloudinary } from 'cloudinary';
+import { getUserFromRequest } from '@/lib/auth/getUserFromRequest';
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dggxbflnu',
-  api_key: process.env.CLOUDINARY_API_KEY || '399599184441365',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'HECjkZnvZvMaOgSmESdi-A9ABsQ',
-  secure: true,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate the request - only admin users should access this
+    const { userId, role } = await getUserFromRequest(request);
+    
+    if (!userId || role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    // Check if Cloudinary credentials are configured
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return NextResponse.json({ error: 'Cloudinary not configured properly' }, { status: 500 });
+    }
+    
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const resourceType = searchParams.get('resourceType') || 'image';
-    const tags = searchParams.get('tags') ? searchParams.get('tags')!.split(',') : [];
-    const maxResults = parseInt(searchParams.get('maxResults') || '100', 10);
+    const tagsParam = searchParams.get('tags') || '';
+    const maxResults = parseInt(searchParams.get('maxResults') || '25', 10);
     
-    // Fetch assets from Cloudinary
+    const tags = tagsParam ? tagsParam.split(',') : [];
+    
+    // Call Cloudinary API to get resources
     const result = await cloudinary.api.resources({
       resource_type: resourceType,
       tags: tags.length > 0 ? tags : undefined,
@@ -44,7 +58,7 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(assets);
   } catch (error) {
-    console.error('Error fetching assets from Cloudinary:', error);
-    return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+    console.error('Error fetching Cloudinary assets:', error);
+    return NextResponse.json({ error: 'Failed to fetch assets' }, { status: 500 });
   }
 } 

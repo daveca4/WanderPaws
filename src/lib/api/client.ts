@@ -1,6 +1,7 @@
 import axios from 'axios';
 import type { AxiosError, AxiosResponse } from 'axios';
-import { getSession, refreshToken } from '../auth/session';
+import { getSession, refreshToken, Session } from '../auth/session';
+import { logger } from '../utils/logger';
 
 // Extend the AxiosResponse type to include 'ok' and 'error' properties
 declare module 'axios' {
@@ -21,7 +22,15 @@ const apiClient = axios.create({
 // Request interceptor to add auth headers
 apiClient.interceptors.request.use(config => {
   const session = getSession();
+  
+  logger.info('API Request', { 
+    method: config.method?.toUpperCase(),
+    url: config.url,
+    hasSession: !!session
+  });
+  
   if (session) {
+    // Add all auth headers
     config.headers['user-id'] = session.userId;
     config.headers['user-role'] = session.role;
     
@@ -32,21 +41,33 @@ apiClient.interceptors.request.use(config => {
     if (session.token) {
       config.headers['Authorization'] = `Bearer ${session.token}`;
     }
+    
+    // Log auth details
+    logger.info('Auth headers set', {
+      userId: session.userId,
+      role: session.role,
+      hasProfileId: !!session.profileId,
+      hasToken: !!session.token
+    });
+  } else {
+    logger.warn('No session available for API request', { 
+      url: config.url 
+    });
   }
   
-  // Debug log the request with additional details
-  const requestDetails = {
-    method: config.method?.toUpperCase(),
-    url: config.url,
-    headers: config.headers,
-    data: config.data
-  };
+  // Debug log headers
+  const sanitizedHeaders = { ...config.headers };
+  if (sanitizedHeaders.Authorization) {
+    sanitizedHeaders.Authorization = 'Bearer [REDACTED]';
+  }
   
-  console.log('🌐 API Request:', config.method?.toUpperCase(), config.url);
-  console.log('📋 Headers:', JSON.stringify(config.headers, null, 2));
+  logger.info('Request headers', sanitizedHeaders);
   
   if (config.data) {
-    console.log('📦 Request Data:', JSON.stringify(config.data, null, 2));
+    logger.info('Request payload', {
+      dataSize: JSON.stringify(config.data).length,
+      dataKeys: Object.keys(config.data)
+    });
   }
   
   return config;
@@ -58,25 +79,44 @@ apiClient.interceptors.response.use(
     // Add ok property to successful responses
     response.ok = response.status >= 200 && response.status < 300;
     
-    console.log('✅ API Response:', response.config.method?.toUpperCase(), response.config.url);
-    console.log('📊 Status:', response.status);
-    console.log('📦 Response Data:', JSON.stringify(response.data, null, 2));
+    logger.info('API Response success', {
+      method: response.config.method?.toUpperCase(),
+      url: response.config.url,
+      status: response.status,
+      dataSize: JSON.stringify(response.data).length
+    });
     
     return response;
   },
   async (error: AxiosError) => {
     const originalRequest = error.config;
+    const originalUrl = originalRequest?.url || 'unknown';
     
     // Add ok and error properties to error responses
     if (error.response) {
       error.response.ok = false;
       error.response.error = error.message || 'An error occurred';
       
-      console.log('❌ API Error:', originalRequest?.method?.toUpperCase(), originalRequest?.url);
-      console.log('📊 Status:', error.response.status);
-      console.log('📦 Error Data:', JSON.stringify(error.response.data, null, 2));
+      logger.error('API Response error', {
+        method: originalRequest?.method?.toUpperCase(),
+        url: originalUrl,
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data
+      });
+      
+      // Special handling for 401 Unauthorized
+      if (error.response.status === 401) {
+        logger.warn('Authentication failure', { 
+          url: originalUrl,
+          headers: originalRequest?.headers
+        });
+      }
     } else {
-      console.log('❌ Network Error:', error.message);
+      logger.error('Network Error', { 
+        message: error.message,
+        url: originalUrl
+      });
     }
     
     // Handle 401 Unauthorized errors - try to refresh token if possible
@@ -84,14 +124,36 @@ apiClient.interceptors.response.use(
       try {
         (originalRequest as any)._isRetry = true;
         
+        logger.info('Attempting token refresh after 401', {
+          url: originalUrl
+        });
+        
         // Attempt to refresh the token
         const refreshed = await refreshToken();
         if (refreshed) {
+          logger.success('Token refreshed successfully, retrying request', {
+            url: originalUrl
+          });
+          
+          // Get the fresh session
+          const session = getSession();
+          if (session && session.token) {
+            // Update authorization header with new token
+            originalRequest.headers['Authorization'] = `Bearer ${session.token}`;
+          }
+          
           // Retry the original request with new token
           return apiClient(originalRequest);
+        } else {
+          logger.warn('Token refresh failed', {
+            url: originalUrl
+          });
         }
       } catch (refreshError) {
-        console.error('Token refresh failed:', refreshError);
+        logger.error('Token refresh error', { 
+          error: refreshError,
+          url: originalUrl
+        });
       }
     }
     

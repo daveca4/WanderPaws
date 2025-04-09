@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/lib/AuthContext';
@@ -8,657 +8,533 @@ import RouteGuard from '@/components/RouteGuard';
 import { format } from 'date-fns';
 import UserImageUploader from '@/components/UserImageUploader';
 import apiClient from '@/lib/api/client';
-
-interface UserData {
-  id: string;
-  name: string | null;
-  email: string;
-  role: string;
-  createdAt: string;
-  updatedAt: string;
-  emailVerified: boolean;
-  image: string | null;
-  owner: any | null;
-  walker: any | null;
-}
+import { useAdminUsers, useUpdateUserRole } from '@/lib/hooks/useStandardizedAdminHooks';
+import type { User } from '@/lib/types';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 
 export default function AdminUsersPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const [users, setUsers] = useState<UserData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState('all');
+  const { user: authUser } = useAuth();
+  const [filterRole, setFilterRole] = useState('all');
+  const [filterVerified, setFilterVerified] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  
-  // For modals
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newPassword, setNewPassword] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editFormData, setEditFormData] = useState<{
-    name: string;
-    email: string;
-    emailVerified: boolean;
-    role: string;
-    image: string;
-  }>({
-    name: '',
-    email: '',
-    emailVerified: false,
-    role: 'owner',
-    image: '',
+  const [editFormData, setEditFormData] = useState<Partial<User>>({});
+
+  const {
+    data: usersData,
+    isPending: loading,
+    error,
+    refetch: refetchUsers,
+  } = useAdminUsers(page, limit, {
+    role: filterRole === 'all' ? undefined : filterRole,
+    emailVerified: filterVerified === 'all' ? undefined : filterVerified === 'verified',
+    search: searchTerm || undefined,
   });
-  
-  // Function to fetch users data
-  const fetchUsers = async () => {
-    if (!user || user.role !== 'admin') {
-      console.error('AdminUsers - Not authorized to access users page');
-      setError('Access denied. Only admin users can view this page.');
-      setLoading(false);
-      return;
-    }
 
-    try {
-      console.log('AdminUsers - Fetching users with auth:', {
-        userId: user.id,
-        role: user.role,
-        profileId: user.profileId
-      });
+  const users = usersData?.users || [];
+  const totalUsers = usersData?.total || 0;
+  const totalPages = Math.ceil(totalUsers / limit);
 
-      const headers: Record<string, string> = {};
-      if (user.id) headers['user-id'] = user.id;
-      if (user.role) headers['user-role'] = user.role;
-      if (user.profileId) headers['user-profile-id'] = user.profileId;
-
-      console.log('AdminUsers - Request headers:', headers);
-      
-      const response = await apiClient.get('/admin/users', { headers });
-      console.log('AdminUsers - API response:', response);
-
-      if (!response.ok) {
-        throw new Error(response.error || 'Failed to fetch users');
-      }
-
-      setUsers(response.data || []);
-    } catch (err) {
-      console.error('AdminUsers - Error fetching users:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load users');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
   useEffect(() => {
-    fetchUsers();
-  }, [user]);
-  
-  // Filter users based on selected filter
-  const filteredUsers = users.filter(user => {
-    if (filter === 'all') return true;
-    if (filter === 'owners') return user.role === 'owner';
-    if (filter === 'walkers') return user.role === 'walker';
-    if (filter === 'admins') return user.role === 'admin';
-    if (filter === 'verified') return user.emailVerified;
-    if (filter === 'unverified') return !user.emailVerified;
-    return true;
-  });
-  
-  // Toggle email verification status
-  const toggleVerificationStatus = async (user: UserData) => {
+    if (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to load users');
+      setTimeout(() => setErrorMessage(null), 3000);
+    }
+  }, [error]);
+
+  useEffect(() => {
+    refetchUsers();
+  }, [filterRole, filterVerified, searchTerm, page, limit, refetchUsers]);
+
+  const clearMessages = () => {
+    setSuccessMessage(null);
+    setErrorMessage(null);
+  };
+
+  const toggleVerificationStatus = async (userToUpdate: User) => {
+    clearMessages();
     try {
-      const response = await fetch(`/api/admin/users/${user.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          emailVerified: !user.emailVerified,
-        }),
+      const response = await apiClient.patch(`/admin/users/${userToUpdate.id}/verify`, {
+        emailVerified: !userToUpdate.emailVerified,
       });
-      
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update user');
+        throw new Error(response.error || 'Failed to update verification status');
       }
-      
-      fetchUsers(); // Refresh user list
-      setSuccessMessage(`Email verification status updated for ${user.email}`);
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (error) {
-      console.error('Error updating user:', error);
-      setError(error instanceof Error ? error.message : 'Failed to update user');
-      setTimeout(() => setError(null), 3000);
+
+      refetchUsers();
+      setSuccessMessage(`Email verification updated for ${userToUpdate.email}`);
+      setTimeout(clearMessages, 3000);
+    } catch (err) {
+      console.error('Error updating verification:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Update failed');
+      setTimeout(clearMessages, 3000);
     }
   };
-  
-  // Open reset password modal
-  const openResetPasswordModal = (user: UserData) => {
-    setSelectedUser(user);
+
+  const openResetPasswordModal = (userToReset: User) => {
+    setSelectedUser(userToReset);
     setNewPassword(null);
     setIsResetPasswordModalOpen(true);
+    clearMessages();
   };
-  
-  // Reset user password
+
   const resetPassword = async () => {
     if (!selectedUser) return;
-    
+    clearMessages();
     try {
-      const response = await fetch(`/api/admin/users/${selectedUser.id}/reset-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      
+      const response = await apiClient.post(`/admin/users/${selectedUser.id}/reset-password`, {});
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to reset password');
+        throw new Error(response.error || 'Failed to reset password');
       }
-      
-      const data = await response.json();
+
+      const data = response.data;
       setNewPassword(data.newPassword);
       setSuccessMessage(`Password has been reset for ${selectedUser.email}`);
-    } catch (error) {
-      console.error('Error resetting password:', error);
-      setError(error instanceof Error ? error.message : 'Failed to reset password');
+    } catch (err) {
+      console.error('Error resetting password:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Password reset failed');
     }
   };
-  
-  // Open delete user modal
-  const openDeleteModal = (user: UserData) => {
-    setSelectedUser(user);
+
+  const openDeleteModal = (userToDelete: User) => {
+    setSelectedUser(userToDelete);
     setIsDeleteModalOpen(true);
+    clearMessages();
   };
-  
-  // Delete user
+
   const deleteUser = async () => {
     if (!selectedUser) return;
-    
+    clearMessages();
     try {
-      const response = await fetch(`/api/admin/users/${selectedUser.id}`, {
-        method: 'DELETE',
-      });
-      
+      const response = await apiClient.delete(`/admin/users/${selectedUser.id}`);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete user');
+        throw new Error(response.error || 'Failed to delete user');
       }
-      
-      fetchUsers(); // Refresh user list
-      setIsDeleteModalOpen(false);
-      setSelectedUser(null);
+
+      refetchUsers();
+      closeModals();
       setSuccessMessage(`User ${selectedUser.email} has been deleted`);
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      setError(error instanceof Error ? error.message : 'Failed to delete user');
-      setTimeout(() => setError(null), 3000);
+      setTimeout(clearMessages, 3000);
+    } catch (err) {
+      console.error('Error deleting user:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Delete failed');
+      setTimeout(clearMessages, 3000);
     }
   };
-  
-  // Close modals
+
   const closeModals = () => {
     setIsResetPasswordModalOpen(false);
     setIsDeleteModalOpen(false);
     setIsEditModalOpen(false);
     setSelectedUser(null);
     setNewPassword(null);
+    clearMessages();
   };
-  
-  // Open edit modal with user data
-  const openEditModal = (user: UserData) => {
-    setSelectedUser(user);
+
+  const { mutate: updateUser, isPending: isUpdatingUser } = useUpdateUserRole();
+
+  const openEditModal = (userToEdit: User) => {
+    setSelectedUser(userToEdit);
     setEditFormData({
-      name: user.name || '',
-      email: user.email,
-      emailVerified: user.emailVerified,
-      role: user.role,
-      image: user.image || '',
+      id: userToEdit.id,
+      name: userToEdit.name || '',
+      email: userToEdit.email,
+      emailVerified: userToEdit.emailVerified ?? false,
+      role: userToEdit.role,
+      image: userToEdit.image || '',
     });
     setIsEditModalOpen(true);
+    clearMessages();
   };
-  
-  // Handle input changes in the edit form
+
   const handleEditInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    
-    if (type === 'checkbox') {
-      setEditFormData({
-        ...editFormData,
-        [name]: (e.target as HTMLInputElement).checked,
-      });
-    } else {
-      setEditFormData({
-        ...editFormData,
-        [name]: value,
-      });
-    }
+
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
+    }));
   };
-  
-  // Handle image upload
+
   const handleImageUploaded = (imageUrl: string) => {
-    setEditFormData({
-      ...editFormData,
-      image: imageUrl,
-    });
+    setEditFormData(prev => ({ ...prev, image: imageUrl }));
   };
-  
-  // Submit user edit form
+
   const submitEditForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!selectedUser) return;
-    
+    clearMessages();
+
     try {
-      const response = await fetch(`/api/admin/users/${selectedUser.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editFormData),
-      });
-      
+      const updatePayload = { ...editFormData };
+      delete updatePayload.id;
+
+      const response = await apiClient.patch(`/admin/users/${selectedUser.id}`, updatePayload);
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update user');
+        throw new Error(response.error || 'Failed to update user');
       }
-      
-      fetchUsers(); // Refresh user list
-      setIsEditModalOpen(false);
-      setSelectedUser(null);
-      setSuccessMessage(`User ${editFormData.email} has been updated`);
-      setTimeout(() => setSuccessMessage(null), 3000);
-    } catch (error) {
-      console.error('Error updating user:', error);
-      setError(error instanceof Error ? error.message : 'Failed to update user');
-      setTimeout(() => setError(null), 3000);
+
+      setSuccessMessage(`User ${selectedUser.email} updated successfully.`);
+      refetchUsers();
+      closeModals();
+      setTimeout(clearMessages, 3000);
+    } catch (err) {
+      console.error('Error updating user:', err);
+      setErrorMessage(err instanceof Error ? err.message : 'Update failed');
     }
   };
-  
-  if (loading) {
-    return (
-      <div className="p-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600 mx-auto"></div>
-        <p className="text-center mt-2">Loading users...</p>
-      </div>
-    );
-  }
 
-  if (error) {
-    return (
-      <div className="p-4">
-        <div className="bg-red-50 p-4 rounded-lg">
-          <h2 className="text-red-700 font-semibold">Error</h2>
-          <p>{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="mt-3 px-4 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
+  if (!authUser || authUser.role !== 'admin') {
+    return <div className="p-4 text-red-600">Access Denied. Requires Admin role.</div>;
   }
 
   return (
-    <RouteGuard requiredPermission={{ action: 'access', resource: 'admin-dashboard' }}>
-      <div className="space-y-6">
-        <div className="sm:flex sm:items-center sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-            <p className="mt-1 text-sm text-gray-500">
-              Manage all user accounts in the system
-            </p>
-          </div>
-          <div className="mt-4 sm:mt-0">
-            <Link
-              href="/admin"
-              className="inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 mr-2"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/walkers/add"
-              className="inline-flex items-center rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-primary-700"
-            >
-              Add Walker
-            </Link>
-          </div>
+    <RouteGuard requiredPermission={{ action: 'manage', resource: 'users' }}>
+      <div className="space-y-6 p-4 md:p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h1 className="text-2xl font-bold text-gray-900">Manage Users ({totalUsers})</h1>
+          <Link
+            href="/admin/users/create"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+          >
+            Create New User
+          </Link>
         </div>
-        
-        {/* Success Message */}
-        {successMessage && (
-          <div className="rounded-md bg-green-50 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-green-800">{successMessage}</p>
-              </div>
+
+        {successMessage && <div className="p-3 bg-green-100 text-green-700 rounded-md">{successMessage}</div>}
+        {errorMessage && <div className="p-3 bg-red-100 text-red-700 rounded-md">{errorMessage}</div>}
+
+        <div className="bg-white shadow rounded-lg p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+              <label htmlFor="search" className="block text-sm font-medium text-gray-700">Search</label>
+              <input
+                type="text"
+                id="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Name or Email..."
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+              />
+            </div>
+            <div>
+              <label htmlFor="roleFilter" className="block text-sm font-medium text-gray-700">Role</label>
+              <select
+                id="roleFilter"
+                value={filterRole}
+                onChange={(e) => setFilterRole(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+              >
+                <option value="all">All Roles</option>
+                <option value="owner">Owners</option>
+                <option value="walker">Walkers</option>
+                <option value="admin">Admins</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="verifiedFilter" className="block text-sm font-medium text-gray-700">Email Verified</label>
+              <select
+                id="verifiedFilter"
+                value={filterVerified}
+                onChange={(e) => setFilterVerified(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+              >
+                <option value="all">All Statuses</option>
+                <option value="verified">Verified</option>
+                <option value="unverified">Unverified</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="limit" className="block text-sm font-medium text-gray-700">Users per page</label>
+              <select
+                id="limit"
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm"
+              >
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+              </select>
             </div>
           </div>
-        )}
-        
-        {/* Error Message */}
-        {error && (
-          <div className="rounded-md bg-red-50 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-red-800">{error}</p>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 bg-white p-4 rounded-lg shadow mb-4">
-          <div>
-            <label htmlFor="filter" className="block text-sm font-medium text-gray-700">Filter:</label>
-            <select
-              id="filter"
-              name="filter"
-              className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
-              value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-            >
-              <option value="all">All Users</option>
-              <option value="owners">Owners</option>
-              <option value="walkers">Walkers</option>
-              <option value="admins">Admins</option>
-              <option value="verified">Verified</option>
-              <option value="unverified">Unverified</option>
-            </select>
-          </div>
         </div>
-        
-        {/* User List */}
-        {loading ? (
-          <div className="flex items-center justify-center h-60">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600"></div>
-          </div>
-        ) : (
-          <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-            <table className="min-w-full divide-y divide-gray-200">
+
+        <div className="overflow-hidden bg-white shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+          {loading && page === 1 ? (
+            <div className="flex justify-center items-center h-60"><LoadingSpinner /></div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-300">
               <thead className="bg-gray-50">
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900 sm:pl-6">Name</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Role</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Email Verified</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Created At</th>
+                  <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10">
-                          {user.image ? (
-                            <img className="h-10 w-10 rounded-full" src={user.image} alt="" />
-                          ) : (
-                            <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
-                              <span className="text-lg text-primary-600">
-                                {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
-                              </span>
-                            </div>
-                          )}
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {users.length === 0 && !loading ? (
+                  <tr><td colSpan={5} className="py-4 text-center text-gray-500">No users found.</td></tr>
+                ) : (
+                  users.map((userItem) => (
+                    <tr key={userItem.id} className="hover:bg-gray-50">
+                      <td className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6">
+                        <div className="flex items-center">
+                          <div className="h-10 w-10 flex-shrink-0">
+                            <img
+                              className="h-10 w-10 rounded-full object-cover"
+                              src={userItem.image || '/default-avatar.png'}
+                              alt=""
+                            />
+                          </div>
+                          <div className="ml-4">
+                            <div className="font-medium text-gray-900">{userItem.name || 'N/A'}</div>
+                            <div className="text-gray-500">{userItem.email}</div>
+                          </div>
                         </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">{user.name || 'No Name'}</div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
+                          userItem.role === 'admin' ? 'bg-red-100 text-red-800' :
+                          userItem.role === 'walker' ? 'bg-blue-100 text-blue-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {userItem.role}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        <button
+                          onClick={() => toggleVerificationStatus(userItem)}
+                          className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
+                            userItem.emailVerified ? 'bg-green-100 text-green-800 hover:bg-green-200' : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                          }`}
+                        >
+                          {userItem.emailVerified ? 'Verified' : 'Unverified'}
+                        </button>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        {userItem.createdAt ? format(new Date(userItem.createdAt), 'MMM d, yyyy') : 'N/A'}
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => openEditModal(userItem)}
+                            className="text-indigo-600 hover:text-indigo-900 text-xs p-1 hover:bg-indigo-50 rounded" title="Edit">
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => openResetPasswordModal(userItem)}
+                            className="text-blue-600 hover:text-blue-900 text-xs p-1 hover:bg-blue-50 rounded" title="Reset Password">
+                            Reset PW
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(userItem)}
+                            className="text-red-600 hover:text-red-900 text-xs p-1 hover:bg-red-50 rounded" title="Delete">
+                            Delete
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                        ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 
-                          user.role === 'walker' ? 'bg-green-100 text-green-800' : 
-                            'bg-blue-100 text-blue-800'}`}>
-                        {user.role}
-                      </span>
-                      {user.role === 'walker' && user.walker && (
-                        <span className="ml-2 text-xs text-gray-500">
-                          {user.walker.dogs ? `${user.walker.dogs.length} dogs` : ''}
-                        </span>
-                      )}
-                      {user.role === 'owner' && user.owner && (
-                        <span className="ml-2 text-xs text-gray-500">
-                          {user.owner.dogs ? `${user.owner.dogs.length} dogs` : ''}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <button 
-                        onClick={() => toggleVerificationStatus(user)}
-                        className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          user.emailVerified
-                            ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                            : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                        }`}
-                      >
-                        {user.emailVerified ? 'Verified' : 'Unverified'}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {format(new Date(user.createdAt), 'MMM dd, yyyy')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => openResetPasswordModal(user)}
-                          className="text-primary-600 hover:text-primary-900 text-xs"
-                        >
-                          Reset Password
-                        </button>
-                        <button
-                          onClick={() => openDeleteModal(user)}
-                          className="text-red-600 hover:text-red-900 text-xs"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => openEditModal(user)}
-                          className="text-primary-600 hover:text-primary-900 text-xs"
-                        >
-                          Edit
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  ))
+                )}
+                {loading && page > 1 && (
+                  <tr><td colSpan={5} className="py-4 text-center"><LoadingSpinner /></td></tr>
+                )}
               </tbody>
             </table>
-          </div>
-        )}
-        
-        {/* Reset Password Modal */}
-        {isResetPasswordModalOpen && selectedUser && (
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Reset Password</h3>
-              
-              <p className="text-sm text-gray-500 mb-4">
-                Are you sure you want to reset the password for <span className="font-semibold">{selectedUser.email}</span>?
+          )}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center bg-white px-4 py-3 border-t border-gray-200 sm:px-6 rounded-b-lg shadow">
+            <div>
+              <p className="text-sm text-gray-700">
+                Showing <span className="font-medium">{(page - 1) * limit + 1}</span> to <span className="font-medium">{Math.min(page * limit, totalUsers)}</span> of{' '}
+                <span className="font-medium">{totalUsers}</span> results
               </p>
-              
-              {newPassword ? (
-                <div className="mb-4 p-3 bg-green-50 rounded-md border border-green-200">
-                  <p className="text-sm text-gray-700 mb-1">New password:</p>
-                  <p className="text-base font-mono font-bold">{newPassword}</p>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Make sure to copy this password and provide it to the user. For security reasons, it will not be shown again.
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-700 mb-4">
-                  This will generate a new random password. The new password will be displayed only once.
-                </p>
-              )}
-              
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  type="button"
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  onClick={closeModals}
-                >
-                  {newPassword ? 'Close' : 'Cancel'}
-                </button>
-                {!newPassword && (
-                  <button
-                    type="button"
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
-                    onClick={resetPassword}
-                  >
-                    Reset Password
-                  </button>
-                )}
-              </div>
+            </div>
+            <div className="flex space-x-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+                className="relative inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || loading}
+                className="relative inline-flex items-center px-3 py-1 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
             </div>
           </div>
         )}
-        
-        {/* Delete User Modal */}
-        {isDeleteModalOpen && selectedUser && (
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Delete User</h3>
-              
-              <p className="text-sm text-gray-500 mb-4">
-                Are you sure you want to delete <span className="font-semibold">{selectedUser.email}</span>? This action cannot be undone.
-              </p>
-              
-              <div className="p-3 bg-red-50 rounded-md border border-red-200 mb-4">
-                <p className="text-sm text-red-700">
-                  Warning: This will permanently delete the user account and all associated data. If this user has any active subscriptions or walks, they will also be affected.
-                </p>
-              </div>
-              
-              <div className="flex justify-end space-x-3">
+
+        {/* Reset Password Modal */}
+        {isResetPasswordModalOpen && selectedUser && (
+          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full space-y-4">
+               <h3 className="text-lg font-medium text-gray-900">Reset User Password</h3>
+              <p>Are you sure you want to reset the password for <strong>{selectedUser.email}</strong>?</p>
+              {newPassword ? (
+                <div>
+                  <p className="text-green-600 font-semibold">Password reset successfully!</p>
+                  <p>New temporary password:</p>
+                  <pre className="bg-gray-100 p-2 rounded mt-1 font-mono text-sm">{newPassword}</pre>
+                  <p className="text-xs text-gray-500 mt-1">Please provide this to the user. They should change it upon next login.</p>
+                </div>
+              ) : (
                 <button
-                  type="button"
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  onClick={resetPassword}
+                  className="w-full inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                  disabled={!!errorMessage}
+                >
+                  Reset Password
+                </button>
+              )}
+               {errorMessage && <p className="text-sm text-red-600 mt-2">{errorMessage}</p>}
+              <button
+                onClick={closeModals}
+                className="mt-2 w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                Close
+              </button>
+            </div>
+           </div>
+          )}
+
+        {/* Delete User Modal */}
+         {isDeleteModalOpen && selectedUser && (
+           <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4">
+             <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full space-y-4">
+               <h3 className="text-lg font-medium text-gray-900">Delete User</h3>
+              <p>Are you sure you want to permanently delete the user <strong>{selectedUser.email}</strong>?</p>
+              <p className="text-sm text-red-600">This action cannot be undone.</p>
+              <div className="flex justify-end space-x-2">
+                <button
                   onClick={closeModals}
+                  type="button"
+                  className="inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
-                  type="button"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
                   onClick={deleteUser}
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-        
-        {/* Edit User Modal */}
-        {isEditModalOpen && selectedUser && (
-          <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Edit User</h3>
-                <button
                   type="button"
-                  onClick={closeModals}
-                  className="text-gray-400 hover:text-gray-500"
+                  className="inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
                 >
-                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  Delete User
                 </button>
               </div>
-              
-              <form onSubmit={submitEditForm}>
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name:</label>
-                    <input
-                      id="name"
-                      name="name"
-                      type="text"
-                      value={editFormData.name}
-                      onChange={handleEditInputChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email:</label>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={editFormData.email}
-                      onChange={handleEditInputChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="emailVerified" className="flex items-center">
-                      <input
-                        id="emailVerified"
-                        name="emailVerified"
-                        type="checkbox"
-                        checked={editFormData.emailVerified}
-                        onChange={handleEditInputChange}
-                        className="h-4 w-4 border-gray-300 rounded text-primary-600 focus:ring-primary-500"
-                      />
-                      <span className="ml-2 text-sm text-gray-700">Verified</span>
-                    </label>
-                  </div>
-                  <div>
-                    <label htmlFor="role" className="block text-sm font-medium text-gray-700">Role:</label>
-                    <select
-                      id="role"
-                      name="role"
-                      value={editFormData.role}
-                      onChange={handleEditInputChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 py-2 pl-3 pr-10 text-base focus:border-primary-500 focus:outline-none focus:ring-primary-500 sm:text-sm"
-                    >
-                      <option value="owner">Owner</option>
-                      <option value="walker">Walker</option>
-                      <option value="admin">Admin</option>
-                    </select>
-                  </div>
-                  <div>
-                    <UserImageUploader 
-                      initialImageUrl={editFormData.image} 
-                      onImageUploaded={handleImageUploaded}
-                    />
-                  </div>
-                </div>
-                <div className="mt-6 flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={closeModals}
-                    className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-                  >
-                    Update User
-                  </button>
-                </div>
-              </form>
+               {errorMessage && <p className="text-sm text-red-600 mt-2">{errorMessage}</p>}
             </div>
-          </div>
-        )}
+           </div>
+          )}
+
+        {/* Edit User Modal */}
+         {isEditModalOpen && selectedUser && (
+           <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4 overflow-y-auto">
+             <div className="bg-white p-6 rounded-lg shadow-xl max-w-md w-full my-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">{`Edit User: ${selectedUser?.email || ''}`}</h3>
+             <form onSubmit={submitEditForm} className="space-y-4">
+               <div>
+                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">Name</label>
+                 <input
+                   type="text"
+                   name="name"
+                   id="name"
+                   value={editFormData.name || ''}
+                   onChange={handleEditInputChange}
+                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                 />
+               </div>
+               <div>
+                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+                 <input
+                   type="email"
+                   name="email"
+                   id="email"
+                   value={editFormData.email || ''}
+                   onChange={handleEditInputChange}
+                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                   required
+                 />
+               </div>
+               <div>
+                 <label htmlFor="role" className="block text-sm font-medium text-gray-700">Role</label>
+                 <select
+                   name="role"
+                   id="role"
+                   value={editFormData.role || 'owner'}
+                   onChange={handleEditInputChange}
+                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm sm:text-sm"
+                 >
+                   <option value="owner">Owner</option>
+                   <option value="walker">Walker</option>
+                   <option value="admin">Admin</option>
+                 </select>
+               </div>
+                <div className="flex items-center">
+                   <input
+                     id="emailVerified"
+                     name="emailVerified"
+                     type="checkbox"
+                     checked={editFormData.emailVerified || false}
+                     onChange={handleEditInputChange}
+                     className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                   />
+                   <label htmlFor="emailVerified" className="ml-2 block text-sm text-gray-900">Email Verified</label>
+                 </div>
+               <div>
+                 <label className="block text-sm font-medium text-gray-700">Profile Image</label>
+                 <UserImageUploader
+                    initialImageUrl={editFormData.image || undefined}
+                    onImageUploaded={handleImageUploaded}
+                 />
+                 {editFormData.image && (
+                   <img src={editFormData.image} alt="Current" className="mt-2 h-20 w-20 rounded-full object-cover" />
+                 )}
+               </div>
+
+               {errorMessage && <p className="text-sm text-red-600 mt-2">{errorMessage}</p>}
+
+               <div className="flex justify-end space-x-2 pt-4">
+                 <button
+                   type="button"
+                   onClick={closeModals}
+                   className="inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                 >
+                   Cancel
+                 </button>
+                 <button
+                   type="submit"
+                   className="inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+                   disabled={isUpdatingUser}
+                 >
+                   {isUpdatingUser ? 'Saving...' : 'Save Changes'}
+                 </button>
+               </div>
+             </form>
+            </div>
+           </div>
+          )}
       </div>
     </RouteGuard>
   );

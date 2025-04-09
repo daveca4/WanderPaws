@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSignedViewUrl } from '@/lib/s3Service';
 import axios from 'axios';
-const cloudinary = require('cloudinary').v2;
+import { v2 as cloudinary } from 'cloudinary';
+import { getUserFromRequest } from '@/lib/auth/getUserFromRequest';
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || 'dggxbflnu',
-  api_key: process.env.CLOUDINARY_API_KEY || '399599184441365',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'HECjkZnvZvMaOgSmESdi-A9ABsQ',
-  secure: true,
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || '',
+  api_key: process.env.CLOUDINARY_API_KEY || '',
+  api_secret: process.env.CLOUDINARY_API_SECRET || '',
 });
 
 // When handling S3 assets, use axios with timeout and retries
@@ -311,6 +311,18 @@ export async function POST(request: NextRequest) {
   console.log('🔍 [CREATE REEL] Request received');
   
   try {
+    // Authenticate the request - only admin users should access this
+    const { userId, role } = await getUserFromRequest(request);
+    
+    if (!userId || role !== 'admin') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    
+    // Check if Cloudinary credentials are configured
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return NextResponse.json({ error: 'Cloudinary not configured properly' }, { status: 500 });
+    }
+    
     const startTime = Date.now();
     const body = await request.json();
     const { mediaItems, title, transitions, outputFormat, aspectRatio, tags, advancedOptions } = body;

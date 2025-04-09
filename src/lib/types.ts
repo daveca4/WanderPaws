@@ -249,6 +249,20 @@ export interface UserSubscription {
   purchaseDate: string;   // ISO date string
   createdAt: string;      // ISO date string
   updatedAt: string;      // ISO date string
+  
+  // Included relationships
+  user?: {
+    id: string;
+    name: string;
+    email?: string;
+    role?: string;
+  };
+  owner?: {
+    id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+  };
 }
 
 export interface SubscriptionTransaction {
@@ -308,6 +322,17 @@ export interface Assessment {
     id: string;
     name: string;
     profileImage?: string;
+  };
+  // Added relationships from API includes
+  dog?: {
+    id: string;
+    name: string;
+    breed?: string;
+  };
+  owner?: {
+    id: string;
+    name: string;
+    email?: string;
   };
 }
 
